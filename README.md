@@ -8,7 +8,7 @@ Coming up
 
 ## License
 
-Beckhoff-ads-client is licensed under [MIT License](http://www.opensource.org/licenses/MIT).
+Licensed under [MIT License](http://www.opensource.org/licenses/MIT).
 
 ---
 
