@@ -20,6 +20,14 @@
   ],
   "author": "Jussi Isotalo <j.isotalo91@gmail.com> (https://github.com/jisotalo)",
   "license": "MIT",
+  "homepage": "https://jisotalo.github.io/ads-client/",
+  "bugs": {
+    "url": "https://github.com/jisotalo/ads-client/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/jisotalo/ads-client.git"
+  },
   "dependencies": {
     "debug": "^4.1.1",
     "iconv-lite": "^0.5.1",
