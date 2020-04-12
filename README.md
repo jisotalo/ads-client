@@ -1,14 +1,32 @@
-# beckhoff-ads-client
+# ads-client
 
 A node.js ADS library for connecting to Beckhoff TwinCAT automation systems using ADS protocol.
 
+Coded from scratch using [TwinCAT ADS specification](https://infosys.beckhoff.com/content/1033/tc3_ads_intro/116157835.html?id=124964102706356243) and [Beckhoff.TwinCAT.Ads nuget package](https://www.nuget.org/packages/Beckhoff.TwinCAT.Ads/5.0.0-preview6). Inspiration from similar projects like [node-ads](https://www.npmjs.com/package/node-ads), [beckhoff-js](https://www.npmjs.com/package/beckhoff-js) and [iecstruct](https://www.npmjs.com/package/iecstruct).
+
+
 ## Readme under construction!
 
-Coming up
+**Coming up in the following days!**
+
+## Documentation
+
+The readme will containg *getting started* and other guides in the future.
+
+You can find the full html documentation from project [Github home page](https://jisotalo.github.io/ads-client/) as well as from `docs/` folder in the repository.
+
+## Installation
+
+Install [the npm package](https://www.npmjs.com/package/ads-client) using npm command:
+```bash
+npm i ads-client
+```
+
+
 
 ## License
 
-Licensed under [MIT License](http://www.opensource.org/licenses/MIT).
+Licensed under [MIT License](http://www.opensource.org/licenses/MIT). 
 
 ---
 
