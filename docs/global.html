@@ -1,0 +1,1799 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    
+    <meta charset="utf-8">
+    <title>Global - Documentation</title>
+    
+    
+    <script src="scripts/prettify/prettify.js"></script>
+    <script src="scripts/prettify/lang-css.js"></script>
+    <!--[if lt IE 9]>
+      <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]-->
+    <link type="text/css" rel="stylesheet" href="styles/prettify.css">
+    <link type="text/css" rel="stylesheet" href="styles/jsdoc.css">
+    <script src="scripts/nav.js" defer></script>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body>
+
+<input type="checkbox" id="nav-trigger" class="nav-trigger" />
+<label for="nav-trigger" class="navicon-button x">
+  <div class="navicon"></div>
+</label>
+
+<label for="nav-trigger" class="overlay"></label>
+
+<nav >
+    
+    <h2><a href="index.html">Home</a></h2><h3>Classes</h3><ul><li><a href="Client.html">Client</a><ul class='methods'><li data-type='method'><a href="Client.html#.defaultSettings">defaultSettings</a></li><li data-type='method'><a href="Client.html#connect">connect</a></li><li data-type='method'><a href="Client.html#createVariableHandle">createVariableHandle</a></li><li data-type='method'><a href="Client.html#deleteVariableHandle">deleteVariableHandle</a></li><li data-type='method'><a href="Client.html#disconnect">disconnect</a></li><li data-type='method'><a href="Client.html#getDataType">getDataType</a></li><li data-type='method'><a href="Client.html#getSymbolInfo">getSymbolInfo</a></li><li data-type='method'><a href="Client.html#readAndCacheDataTypes">readAndCacheDataTypes</a></li><li data-type='method'><a href="Client.html#readAndCacheSymbols">readAndCacheSymbols</a></li><li data-type='method'><a href="Client.html#readDeviceInfo">readDeviceInfo</a></li><li data-type='method'><a href="Client.html#readPlcRuntimeState">readPlcRuntimeState</a></li><li data-type='method'><a href="Client.html#readRaw">readRaw</a></li><li data-type='method'><a href="Client.html#readRawByHandle">readRawByHandle</a></li><li data-type='method'><a href="Client.html#readRawByName">readRawByName</a></li><li data-type='method'><a href="Client.html#readRawBySymbol">readRawBySymbol</a></li><li data-type='method'><a href="Client.html#readSymbol">readSymbol</a></li><li data-type='method'><a href="Client.html#readSymbolVersion">readSymbolVersion</a></li><li data-type='method'><a href="Client.html#readSystemManagerState">readSystemManagerState</a></li><li data-type='method'><a href="Client.html#readUploadInfo">readUploadInfo</a></li><li data-type='method'><a href="Client.html#subscribe">subscribe</a></li><li data-type='method'><a href="Client.html#subscribeRaw">subscribeRaw</a></li><li data-type='method'><a href="Client.html#unsubscribe">unsubscribe</a></li><li data-type='method'><a href="Client.html#unsubscribeAll">unsubscribeAll</a></li><li data-type='method'><a href="Client.html#writeRaw">writeRaw</a></li><li data-type='method'><a href="Client.html#writeRawByHandle">writeRawByHandle</a></li><li data-type='method'><a href="Client.html#writeRawBySymbol">writeRawBySymbol</a></li><li data-type='method'><a href="Client.html#writeSymbol">writeSymbol</a></li></ul></li><li><a href="ClientException.html">ClientException</a></li></ul><h3>Namespaces</h3><ul><li><a href="-_LibraryInternals.html">_LibraryInternals</a><ul class='methods'><li data-type='method'><a href="-_LibraryInternals.html#._amsNedIdStrToByteArray">_amsNedIdStrToByteArray</a></li><li data-type='method'><a href="-_LibraryInternals.html#._byteArrayToAmsNedIdStr">_byteArrayToAmsNedIdStr</a></li><li data-type='method'><a href="-_LibraryInternals.html#._checkReceivedData">_checkReceivedData</a></li><li data-type='method'><a href="-_LibraryInternals.html#._console">_console</a></li><li data-type='method'><a href="-_LibraryInternals.html#._createAmsHeader">_createAmsHeader</a></li><li data-type='method'><a href="-_LibraryInternals.html#._createAmsTcpHeader">_createAmsTcpHeader</a></li><li data-type='method'><a href="-_LibraryInternals.html#._createAmsTcpRequest">_createAmsTcpRequest</a></li><li data-type='method'><a href="-_LibraryInternals.html#._deepMergeObjects">_deepMergeObjects</a></li><li data-type='method'><a href="-_LibraryInternals.html#._getDataTypeInfo">_getDataTypeInfo</a></li><li data-type='method'><a href="-_LibraryInternals.html#._getDataTypeRecursive">_getDataTypeRecursive</a></li><li data-type='method'><a href="-_LibraryInternals.html#._onAdsCommandReceived">_onAdsCommandReceived</a></li><li data-type='method'><a href="-_LibraryInternals.html#._onAmsTcpPacketReceived">_onAmsTcpPacketReceived</a></li><li data-type='method'><a href="-_LibraryInternals.html#._onPlcRuntimeStateChanged">_onPlcRuntimeStateChanged</a></li><li data-type='method'><a href="-_LibraryInternals.html#._onRouterStateChanged">_onRouterStateChanged</a></li><li data-type='method'><a href="-_LibraryInternals.html#._onSymbolVersionChanged">_onSymbolVersionChanged</a></li><li data-type='method'><a href="-_LibraryInternals.html#._parseAdsData">_parseAdsData</a></li><li data-type='method'><a href="-_LibraryInternals.html#._parseAdsNotification">_parseAdsNotification</a></li><li data-type='method'><a href="-_LibraryInternals.html#._parseAmsHeader">_parseAmsHeader</a></li><li data-type='method'><a href="-_LibraryInternals.html#._parseAmsTcpHeader">_parseAmsTcpHeader</a></li><li data-type='method'><a href="-_LibraryInternals.html#._parseAmsTcpPacket">_parseAmsTcpPacket</a></li><li data-type='method'><a href="-_LibraryInternals.html#._parseDataType">_parseDataType</a></li><li data-type='method'><a href="-_LibraryInternals.html#._parseJsObjectToBuffer">_parseJsObjectToBuffer</a></li><li data-type='method'><a href="-_LibraryInternals.html#._parseJsVariableToPlc">_parseJsVariableToPlc</a></li><li data-type='method'><a href="-_LibraryInternals.html#._parsePlcDataToObject">_parsePlcDataToObject</a></li><li data-type='method'><a href="-_LibraryInternals.html#._parsePlcVariableToJs">_parsePlcVariableToJs</a></li><li data-type='method'><a href="-_LibraryInternals.html#._parseSymbolInfo">_parseSymbolInfo</a></li><li data-type='method'><a href="-_LibraryInternals.html#._readDataTypeInfo">_readDataTypeInfo</a></li><li data-type='method'><a href="-_LibraryInternals.html#._readSymbolInfo">_readSymbolInfo</a></li><li data-type='method'><a href="-_LibraryInternals.html#._registerAdsPort">_registerAdsPort</a></li><li data-type='method'><a href="-_LibraryInternals.html#._reInitializeInternals">_reInitializeInternals</a></li><li data-type='method'><a href="-_LibraryInternals.html#._sendAdsCommand">_sendAdsCommand</a></li><li data-type='method'><a href="-_LibraryInternals.html#._socketReceive">_socketReceive</a></li><li data-type='method'><a href="-_LibraryInternals.html#._socketWrite">_socketWrite</a></li><li data-type='method'><a href="-_LibraryInternals.html#._startSystemManagerStatePoller">_startSystemManagerStatePoller</a></li><li data-type='method'><a href="-_LibraryInternals.html#._subcribeToPlcRuntimeStateChanges">_subcribeToPlcRuntimeStateChanges</a></li><li data-type='method'><a href="-_LibraryInternals.html#._subscribe">_subscribe</a></li><li data-type='method'><a href="-_LibraryInternals.html#._subscribeToSymbolVersionChanges">_subscribeToSymbolVersionChanges</a></li><li data-type='method'><a href="-_LibraryInternals.html#._trimPlcString">_trimPlcString</a></li><li data-type='method'><a href="-_LibraryInternals.html#._unregisterAdsPort">_unregisterAdsPort</a></li><li data-type='method'><a href="-_LibraryInternals.html#._unsubscribeAllInternals">_unsubscribeAllInternals</a></li></ul></li></ul><h3><a href="global.html">Global</a></h3>
+</nav>
+
+<div id="main">
+    
+    <h1 class="page-title">Global</h1>
+    
+
+    
+
+
+
+
+<section>
+
+<header>
+    
+        <h2>
+        
+        </h2>
+        
+    
+</header>
+
+<article>
+    
+        <div class="container-overview">
+        
+            
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+            
+
+            
+        
+        </div>
+    
+
+    
+
+    
+
+    
+    
+    
+
+     
+
+    
+
+    
+
+    
+
+    
+        <h3 class="subsection-title">Type Definitions</h3>
+
+        
+                
+<h4 class="name" id="AdsErrorInfo">AdsErrorInfo</h4>
+
+
+
+
+
+<dl class="details">
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="ads-client.js.html">ads-client.js</a>, <a href="ads-client.js.html#line1708">line 1708</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+    <h5 class="subsection-title">Properties:</h5>
+
+    
+
+<table class="props">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>adsErrorType</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">string</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last"><p>Type of the error (AMS error, ADS error)</p>
+<ul>
+<li>AMS error: Something went wrong with the routing, the command was unknown etc.</li>
+<li>ADS error: The command failed</li>
+</ul></td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>adsErrorCode</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">number</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last"><p>ADS error code</p></td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>adsErrorStr</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">string</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last"><p>The description/message of ADS error code <a href="https://infosys.beckhoff.com/english.php?content=../content/1033/tf6610_tc3_s5s7communication/36028797393240971.html&amp;id=">https://infosys.beckhoff.com/english.php?content=../content/1033/tf6610_tc3_s5s7communication/36028797393240971.html&amp;id=</a></p></td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+
+
+
+
+
+
+
+
+
+            
+                
+<h4 class="name" id="Connection">Connection</h4>
+
+
+
+
+
+<dl class="details">
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="ads-client.js.html">ads-client.js</a>, <a href="ads-client.js.html#line178">line 178</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+    <h5 class="subsection-title">Properties:</h5>
+
+    
+
+<table class="props">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>connected</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">boolean</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last"><p>True if target is connected</p></td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>localAmsNetId</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">string</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last"><p>Local system AmsNetId</p></td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>localAdsPort</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">number</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last"><p>Local system ADS port</p></td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>targetAmsNetId</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">string</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last"><p>Target system AmsNetId</p></td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>targetAdsPort</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">number</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last"><p>Target system ADS port</p></td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+
+
+
+
+
+
+
+
+
+            
+                
+<h4 class="name" id="Metadata">Metadata</h4>
+
+
+
+
+
+<dl class="details">
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="ads-client.js.html">ads-client.js</a>, <a href="ads-client.js.html#line145">line 145</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+    <h5 class="subsection-title">Properties:</h5>
+
+    
+
+<table class="props">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>deviceInfo</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">object</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last"><p>Target device info (read after connecting)</p></td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>systemManagerState</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">object</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last"><p>Target device system manager state (run, config, etc.)</p></td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>plcRuntimeState</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">object</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last"><p>Target PLC runtime state (run, stop, etc.) (if target port is 851 -&gt; this is TwinCAT 3 runtime 1 status and so on)</p></td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>uploadInfo</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">object</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last"><p>Contains information of target data types, symbols and so on</p></td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>symbolVersion</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">number</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last"><p>Active symbol version at target system. Changes when PLC software is updated</p></td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>allSymbolsCached</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">boolean</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last"><p>True if all symbols are cached (so we know to re-cache all during symbol version change)</p></td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>symbols</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">object</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last"><p>Object containing all so far cached symbols</p></td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>allDataTypesCached</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">boolean</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last"><p>True if all data types are cached (so we know to re-cache all during symbol version change)</p></td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>dataTypes</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">object</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last"><p>Object containing all so far cached data types</p></td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+
+
+
+
+
+
+
+
+
+            
+                
+<h4 class="name" id="Settings">Settings</h4>
+
+
+
+
+
+<dl class="details">
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="ads-client.js.html">ads-client.js</a>, <a href="ads-client.js.html#line49">line 49</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+    <h5 class="subsection-title">Properties:</h5>
+
+    
+
+<table class="props">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+        <th>Attributes</th>
+        
+
+        
+        <th>Default</th>
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>targetAmsNetId</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">string</span>
+
+
+            
+            </td>
+
+            
+                <td class="attributes">
+                
+
+                
+                </td>
+            
+
+            
+                <td class="default">
+                
+                </td>
+            
+
+            <td class="description last"><p>Target system AmsNetId, use '127.0.0.1.1.1' if connecting to a local system</p></td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>targetAdsPort</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">number</span>
+
+
+            
+            </td>
+
+            
+                <td class="attributes">
+                
+
+                
+                </td>
+            
+
+            
+                <td class="default">
+                
+                </td>
+            
+
+            <td class="description last"><p>Target system ADS port, TwinCAT 3: 851 (1st runtime), 852 (2nd runtime) and so on</p></td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>objectifyEnumerations</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">boolean</span>
+
+
+            
+            </td>
+
+            
+                <td class="attributes">
+                
+                    &lt;optional><br>
+                
+
+                
+                </td>
+            
+
+            
+                <td class="default">
+                
+                    <code>true</code>
+                
+                </td>
+            
+
+            <td class="description last"><p>If true, read ENUM data types are converted to objects instead of numbers, e.g. {name: 'enumValue', value: 5} instead of 5 - (<strong>default</strong>: true)</p></td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>convertDatesToJavascript</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">boolean</span>
+
+
+            
+            </td>
+
+            
+                <td class="attributes">
+                
+                    &lt;optional><br>
+                
+
+                
+                </td>
+            
+
+            
+                <td class="default">
+                
+                    <code>true</code>
+                
+                </td>
+            
+
+            <td class="description last"><p>If true, PLC DT (DATE_AND_TIME) and DATE types are converted to Javascript dates - Optional (<strong>default</strong>: true)</p></td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>readAndCacheSymbols</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">boolean</span>
+
+
+            
+            </td>
+
+            
+                <td class="attributes">
+                
+                    &lt;optional><br>
+                
+
+                
+                </td>
+            
+
+            
+                <td class="default">
+                
+                    <code>false</code>
+                
+                </td>
+            
+
+            <td class="description last"><p>If true, all PLC symbols are cached during connecting. Otherwise they are read and cached only when needed - Optional (<strong>default</strong>: false)</p></td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>readAndCacheDataTypes</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">boolean</span>
+
+
+            
+            </td>
+
+            
+                <td class="attributes">
+                
+                    &lt;optional><br>
+                
+
+                
+                </td>
+            
+
+            
+                <td class="default">
+                
+                    <code>false</code>
+                
+                </td>
+            
+
+            <td class="description last"><p>If true, all PLC data types are cached during connecting. Otherwise they are read and cached only when needed - Optional (<strong>default</strong>: false)</p></td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>disableSymbolVersionMonitoring</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">boolean</span>
+
+
+            
+            </td>
+
+            
+                <td class="attributes">
+                
+                    &lt;optional><br>
+                
+
+                
+                </td>
+            
+
+            
+                <td class="default">
+                
+                    <code>false</code>
+                
+                </td>
+            
+
+            <td class="description last"><p>If true, PLC symbol version changes aren't monitored and cached symbols and datatypes won't be updated after PLC program download - Optional - Optional (<strong>default</strong>: false)</p></td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>disableStructPackModeWarning</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">boolean</span>
+
+
+            
+            </td>
+
+            
+                <td class="attributes">
+                
+                    &lt;optional><br>
+                
+
+                
+                </td>
+            
+
+            
+                <td class="default">
+                
+                    <code>false</code>
+                
+                </td>
+            
+
+            <td class="description last"><p>If true, no warnings are shown even if STRUCTs without pack-mode 1 are read/written - Optional (<strong>default</strong>: false)</p></td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>routerTcpPort</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">number</span>
+
+
+            
+            </td>
+
+            
+                <td class="attributes">
+                
+                    &lt;optional><br>
+                
+
+                
+                </td>
+            
+
+            
+                <td class="default">
+                
+                    <code>48898</code>
+                
+                </td>
+            
+
+            <td class="description last"><p>Target ADS router TCP port - Optional (<strong>default</strong>: 48898)</p></td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>routerAddress</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">string</span>
+
+
+            
+            </td>
+
+            
+                <td class="attributes">
+                
+                    &lt;optional><br>
+                
+
+                
+                </td>
+            
+
+            
+                <td class="default">
+                
+                    <code>localhost</code>
+                
+                </td>
+            
+
+            <td class="description last"><p>Target ADS router IP address/hostname - Optional (<strong>default</strong>: localhost)</p></td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>localAddress</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">string</span>
+
+
+            
+            </td>
+
+            
+                <td class="attributes">
+                
+                    &lt;optional><br>
+                
+
+                
+                </td>
+            
+
+            
+                <td class="default">
+                
+                    <code>'(system default)'</code>
+                
+                </td>
+            
+
+            <td class="description last"><p>Local IP address to use, use this to change used network interface if required - Optional (<strong>default</strong>: System default)</p></td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>localTcpPort</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">number</span>
+
+
+            
+            </td>
+
+            
+                <td class="attributes">
+                
+                    &lt;optional><br>
+                
+
+                
+                </td>
+            
+
+            
+                <td class="default">
+                
+                    <code>'(system default)'</code>
+                
+                </td>
+            
+
+            <td class="description last"><p>Local TCP port to use for outgoing connections - Optional (<strong>default</strong>: System default)</p></td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>localAmsNetId</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">string</span>
+
+
+            
+            </td>
+
+            
+                <td class="attributes">
+                
+                    &lt;optional><br>
+                
+
+                
+                </td>
+            
+
+            
+                <td class="default">
+                
+                    <code>'(from AMS router)'</code>
+                
+                </td>
+            
+
+            <td class="description last"><p>Local AmsNetId to use - Optional (<strong>default</strong>: From AMS router)</p></td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>localAdsPort</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">number</span>
+
+
+            
+            </td>
+
+            
+                <td class="attributes">
+                
+                    &lt;optional><br>
+                
+
+                
+                </td>
+            
+
+            
+                <td class="default">
+                
+                    <code>'(from AMS router)'</code>
+                
+                </td>
+            
+
+            <td class="description last"><p>Local ADS port to use - Optional (<strong>default</strong>: From AMS router)</p></td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>timeoutDelay</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">number</span>
+
+
+            
+            </td>
+
+            
+                <td class="attributes">
+                
+                    &lt;optional><br>
+                
+
+                
+                </td>
+            
+
+            
+                <td class="default">
+                
+                    <code>2000</code>
+                
+                </td>
+            
+
+            <td class="description last"><p>Time (milliseconds) after connecting to the router or waiting for command response is canceled to timeout - Optional (<strong>default</strong>: 2000 ms)</p></td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>hideConsoleWarnings</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">boolean</span>
+
+
+            
+            </td>
+
+            
+                <td class="attributes">
+                
+                    &lt;optional><br>
+                
+
+                
+                </td>
+            
+
+            
+                <td class="default">
+                
+                    <code>false</code>
+                
+                </td>
+            
+
+            <td class="description last"><p>If true, no warnings are written to console (=nothing is ever written to console) - Optional (<strong>default</strong>: false)</p></td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+
+
+
+
+
+
+
+
+
+            
+                
+
+    
+
+    <h4 class="name" id="subscriptionCallback"><span class="type-signature"></span>subscriptionCallback<span class="signature">(data, sub)</span><span class="type-signature"></span></h4>
+
+    
+
+
+
+
+<dl class="details">
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="ads-client.js.html">ads-client.js</a>, <a href="ads-client.js.html#line1082">line 1082</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    <h5>Parameters:</h5>
+    
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>data</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type"><a href="global.html#subscriptionCallbackData">subscriptionCallbackData</a></span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last"><p>Object containing {value, timeStamp, type] where value is the latest data from PLC</p></td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>sub</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">object</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last"><p>Subscription object - Information about subscription and for example, unsubscribe() method</p></td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+            
+                
+<h4 class="name" id="subscriptionCallbackData">subscriptionCallbackData</h4>
+
+
+
+
+
+<dl class="details">
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="ads-client.js.html">ads-client.js</a>, <a href="ads-client.js.html#line1075">line 1075</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+    <h5 class="subsection-title">Properties:</h5>
+
+    
+
+<table class="props">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>value</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">object</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last"><p>Parsed data (if available) or Buffer</p></td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>timeStamp</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">Date</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last"><p>Date object that contains the PLC timestamp of the data</p></td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>type</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">object</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last"><p>Data type object (if available)</p></td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+
+
+
+
+
+
+
+
+
+            
+    
+
+    
+</article>
+
+</section>
+
+
+
+
+    
+    
+</div>
+
+<br class="clear">
+
+<footer>
+    Documentation generated by <a href="https://github.com/jsdoc3/jsdoc">JSDoc 3.6.4</a> on Sun Apr 12 2020 12:24:18 GMT+0300 (GMT+03:00) using the <a href="https://github.com/clenemt/docdash">docdash</a> theme.
+</footer>
+
+<script>prettyPrint();</script>
+<script src="scripts/polyfill.js"></script>
+<script src="scripts/linenumber.js"></script>
+
+
+
+</body>
+</html>
