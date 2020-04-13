@@ -26,6 +26,9 @@ There is still some work to do for "production ready" version. See this [Github 
     - [Reading a base type PLC variable (INT)](#reading-a-base-type-plc-variable-int)
     - [Reading a STRUCT type PLC variable](#reading-a-struct-type-plc-variable)
   - [Writing any PLC variable](#Writing-any-PLC-variable)
+    - [Writing a base type PLC variable (INT)](#writing-a-base-type-plc-variable-int)
+    - [Writing a STRUCT type PLC variable](#writing-a-struct-type-plc-variable)
+    - [Writing a STRUCT type PLC variable (just some members of the struct)](#writing-a-struct-type-plc-variable-just-some-members-of-the-struct)
 - [Documentation](#documentation)
 - [License](#license)
 
@@ -233,6 +236,40 @@ Value read: 1234
 Disconnected
 ````
 
+### Reading a base type PLC variable (STRING)
+
+First, we need to have a GVL_Test at the PLC with the following:
+````
+VAR_GLOBAL
+	TestSTRING 		: STRING := 'Hello this is a test string';
+END_VAR
+````
+
+```javascript
+//...the previous lines are hidden
+
+
+client.connect()
+  .then(res => {   
+    console.log(`Connected to the ${res.targetAmsNetId}`)
+
+    return client.readSymbol('GVL_Test.TestSTRING')
+  })
+  .then(res => {
+    console.log(`Value read: ${res.value}`)
+
+    return client.disconnect()
+  })
+
+//...the next lines are hidden
+```
+Example console output
+````
+Connected to the 127.0.0.1.1.1
+Value read: Hello this is a test string
+Disconnected
+````
+
 ### Reading a STRUCT type PLC variable
 
 **IMPORTANT NOTE:** See chapter [IMPORTANT: Note about STRUCT variables](#IMPORTANT-Note-about-STRUCT-variables)
@@ -244,6 +281,7 @@ TYPE ST_Example :
 STRUCT
 	SomeText : STRING(50) := 'Hello ads-client';
 	SomeReal : REAL := 3.14159265359;
+	SomeDate : DT := DT#2020-4-13-12:25:33;
 END_STRUCT
 END_TYPE
 ````
@@ -262,7 +300,7 @@ Then reading is simple.
 const ads = require('ads-client')
 
 const client = new ads.Client({
-  targetAmsNetId: '127.0.0.1.1.1', //Loopback AmsNetId, you could use local AmsNetId too if you know it
+  targetAmsNetId: '127.0.0.1.1.1',
   targetAdsPort: 851
 }); //Note required ; because of (async()...
 
@@ -295,19 +333,21 @@ const client = new ads.Client({
     return
   }
 })()
-
 ```
+
 Example console output
 ````
 Connected to the 127.0.0.1.1.1
-Value read: { SomeText: 'Hello ads-client', SomeReal: 3.1415927410125732 }
+Value read: { SomeText: 'Hello ads-client',
+  SomeReal: 3.1415927410125732,
+  SomeDate: 2020-04-13T12:25:33.000Z }     
 Disconneted
 ````
 
 
 ## Writing any PLC variable
 
-### Writing a base type PLC variable
+### Writing a base type PLC variable (INT)
 
 First, we need to have a GVL_Test at the PLC with the following:
 ````
@@ -364,7 +404,6 @@ const client = new ads.Client({
     return
   }
 })()
-
 ```
 Example console output
 ````
@@ -374,9 +413,59 @@ Value written: 5
 Value read: 5
 ````
 
+
+
+### Writing a base type PLC variable (STRING)
+
+First, we need to have a GVL_Test at the PLC with the following:
+````
+VAR_GLOBAL
+	TestSTRING : STRING := 'Hello this is a test string';
+END_VAR
+````
+
+Let's read the value, change it and read again:
+```javascript
+//...the previous lines are hidden
+    try {
+      
+      //Reading the value
+      let res = await client.readSymbol('GVL_Test.TestSTRING')
+      console.log('Value read:', res.value)
+
+      //Writing the value
+      res = await client.writeSymbol('GVL_Test.TestSTRING', 'Changing the string value to this')
+      console.log('Value written:', res.value)
+
+      //Reading the value again to be sure
+      res = await client.readSymbol('GVL_Test.TestSTRING')
+      console.log('Value read:', res.value)
+
+    } catch (err) {
+      console.log('Something failed:', err)
+      return
+    }
+
+//...the next lines are hidden
+```
+Example console output
+````
+Connected to the 127.0.0.1.1.1
+Value read: Hello this is a test string
+Value written: Changing the string value to this
+Value read: Changing the string value to this   
+Disconneted
+````
+
 ### Writing a STRUCT type PLC variable
 
+---
+
 **IMPORTANT NOTE:** See chapter [IMPORTANT: Note about STRUCT variables](#IMPORTANT-Note-about-STRUCT-variables)
+
+**NOTE** At the moment the given object keys are case-sensitive, so writing to `someTEXT` instead of `SomeText` won't work. This will be fixed soon, see [issue #5](https://github.com/jisotalo/ads-client/issues/5).
+
+---
 
 First, we need to have a ST_Example like the following:
 ````
@@ -385,6 +474,7 @@ TYPE ST_Example :
 STRUCT
 	SomeText : STRING(50) := 'Hello ads-client';
 	SomeReal : REAL := 3.14159265359;
+	SomeDate : DT := DT#2020-4-13-12:25:33;
 END_STRUCT
 END_TYPE
 ````
@@ -396,8 +486,6 @@ VAR_GLOBAL
 END_VAR
 ````
 
-
-**NOTE** At the moment the given object keys are case-sensitive, so writing to `someTEXT` instead of `SomeText` won't work. This will be fixed soon, see [issue #5](https://github.com/jisotalo/ads-client/issues/5).
 ```javascript
 const ads = require('ads-client')
 
@@ -420,7 +508,8 @@ const client = new ads.Client({
       //Writing the value
       res = await client.writeSymbol('GVL_Test.ExampleSTRUCT', {
         SomeText: 'Hello to you too, Mr. PLC!',
-        SomeReal: 5456.06854
+        SomeReal: 5456.06854,
+        SomeDate: new Date()
       })
       console.log('Value written:', res.value)
 
@@ -452,19 +541,28 @@ const client = new ads.Client({
 Example console output
 ````
 Connected to the 127.0.0.1.1.1
-Value read: { SomeText: 'Hello ads-client', SomeReal: 3.1415927410125732 }
-Value written: { SomeText: 'Hello to you too, Mr. PLC!', SomeReal: 5456.06854 }
-Value read: { SomeText: 'Hello to you too, Mr. PLC!',
-  SomeReal: 5456.068359375 }
+Value read: { SomeText: 'Hello ads-client',
+  SomeReal: 3.1415927410125732,
+  SomeDate: 2020-04-13T12:25:33.000Z }     
+Value written: { SomeText: 'Hello to you too, Mr. PLC!',
+  SomeReal: 5456.06854,
+  SomeDate: 2020-04-13T09:32:24.933Z }
+Value read: { SomeText: 'Hello to you too, Mr. PLC!',   
+  SomeReal: 5456.068359375,
+  SomeDate: 2020-04-13T09:32:24.000Z }
 Disconneted
 ````
 
 ### Writing a STRUCT type PLC variable (just some members of the struct)
 
+---
+
 **IMPORTANT NOTE:** See chapter [IMPORTANT: Note about STRUCT variables](#IMPORTANT-Note-about-STRUCT-variables)
 
 
 **NOTE** At the moment the given object keys are case-sensitive, so writing to `someTEXT` instead of `SomeText` won't work. This will be fixed soon, see [issue #5](https://github.com/jisotalo/ads-client/issues/5).
+
+---
 
 We can also write just some members of the struct if we like.
 
@@ -476,6 +574,7 @@ The following will throw an error:
 
 //Writing the value
 res = await client.writeSymbol('GVL_Test.ExampleSTRUCT', {
+  SomeReal: 123.45,
   SomeText: 'This will not work...'
 })
 
@@ -484,22 +583,20 @@ res = await client.writeSymbol('GVL_Test.ExampleSTRUCT', {
 Example console output
 ````
 Connected to the 127.0.0.1.1.1
-Value read: { SomeText: 'Hello to you too, Mr. PLC!',
-  SomeReal: 5456.068359375 }
-Something failed: { ClientException: Writing symbol GVL_Test.ExampleSTRUCT failed: Given Javascript object is missing key/value for at least ".SomeReal" (REAL) - Set 
-writeSymbol() 3rd parameter (autoFill) to true to allow uncomplete objects
+Value read: { SomeText: 'Hello ads-client',
+  SomeReal: 3.1415927410125732,
+  SomeDate: 2020-04-13T12:25:33.000Z }     
+Something failed: { ClientException: Writing symbol GVL_Test.ExampleSTRUCT failed: Given Javascript object is missing key/value for at least ".SomeDate" (DATE_AND_TIME) - Set writeSymbol() 3rd parameter (autoFill) to true to allow uncomplete objects
     at Promise ...
-Disconneted
 ````
-
-We need to tell the `WriteSymbol` that we indeed want to write just some members and the rest will stay the same. This happens by providing the 3rd parameter `autoFill`, which causes the method first read the newest value and then overwrite only the given members.
-
+We need to tell the `WriteSymbol` that we *indeed* want to write just some members and the rest will stay the same. This happens by providing the 3rd parameter `autoFill`, which causes the method first read the newest value and then overwrite only the given members.
 
 ```javascript
 //...the previous lines are hidden
 
 //Writing the value
 res = await client.writeSymbol('GVL_Test.ExampleSTRUCT', {
+  SomeReal: 123.45,
   SomeText: 'But this works!'
 }, true)
 
@@ -508,12 +605,29 @@ res = await client.writeSymbol('GVL_Test.ExampleSTRUCT', {
 Example console output
 ````
 Connected to the 127.0.0.1.1.1
-Value read: { SomeText: 'Hello to you too, Mr. PLC!',
-  SomeReal: 5456.068359375 }
-Value written: { SomeText: 'But this works!', SomeReal: 5456.068359375 }
-Value read: { SomeText: 'But this works!', SomeReal: 5456.068359375 }
+Value read: { SomeText: 'Hello ads-client',
+  SomeReal: 3.1415927410125732,
+  SomeDate: 2020-04-13T12:25:33.000Z }     
+Value written: { SomeText: 'But this works!',
+  SomeReal: 123.45,
+  SomeDate: 2020-04-13T12:25:33.000Z }       
+Value read: { SomeText: 'But this works!',
+  SomeReal: 123.44999694824219,
+  SomeDate: 2020-04-13T12:25:33.000Z }    
 Disconneted
 ````
+
+Of course, it would be possible to do with two separate commands:
+```javascript
+//...the previous lines are hidden
+
+//Writing the value
+res = await client.writeSymbol('GVL_Test.ExampleSTRUCT.SomeReal', 123.45)
+res = await client.writeSymbol('GVL_Test.ExampleSTRUCT.SomeText', 'This is also possible')
+
+//...the next lines are hidden
+```
+
 # Documentation
 
 You can find the full html documentation from the project [GitHub home page](https://jisotalo.github.io/ads-client/) as well as from `./docs/` folder in the repository.
