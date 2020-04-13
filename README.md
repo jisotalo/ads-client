@@ -4,25 +4,48 @@ A node.js ADS library for connecting to Beckhoff TwinCAT automation systems usin
 
 Coded from scratch using [TwinCAT ADS specification](https://infosys.beckhoff.com/content/1033/tc3_ads_intro/116157835.html?id=124964102706356243) and [Beckhoff.TwinCAT.Ads nuget package](https://www.nuget.org/packages/Beckhoff.TwinCAT.Ads/5.0.0-preview6). Inspiration from similar projects like [node-ads](https://www.npmjs.com/package/node-ads), [beckhoff-js](https://www.npmjs.com/package/beckhoff-js) and [iecstruct](https://www.npmjs.com/package/iecstruct).
 
+---
+## *Readme is still under construction!*
+---
+## Table of contents
 
-## Readme under construction!
+- [Features](#installation)
+- [Installation](#installation)
+- [Documentation](#documentation)
+- [License](#license)
 
-**Coming up in the following days!**
+---
 
-## Documentation
 
-The readme will containg *getting started* and other guides in the future.
+## Features
 
-You can find the full html documentation from project [Github home page](https://jisotalo.github.io/ads-client/) as well as from `docs/` folder in the repository.
+- Promises and async/await
+- Supports connecting to the local TwinCAT runtime (see [enabling localhost support](#localhost-support))
+- Supports multiple connections from the same host
+- Reading and writing all kinds of variables by PLC variable name
+- Subscribing to variable changes by PLC variable name (ADS notifications)
+- Automatic conversion from PLC variables to Javascript objects and vice-versa
+- Reading symbol and data type information
+- Reading PLC runtime and system manager states
+- Caching symbol and data type information (only read at first time when needed)
+- Automatic updating of symbols, data types and sunbscriptions when PLC program changes or system starts (*NOTE: Not 100 % ready yet, see milestone [Ready for production](https://github.com/jisotalo/ads-client/milestone/1) )
+
+---
 
 ## Installation
 
-Install [the npm package](https://www.npmjs.com/package/ads-client) using npm command:
+Install the [npm package](https://www.npmjs.com/package/ads-client) using npm command:
 ```bash
 npm i ads-client
 ```
 
+## Enabling localhost support
 
+If you want to 
+
+## Documentation
+
+You can find the full html documentation from the project [GitHub home page](https://jisotalo.github.io/ads-client/) as well as from `./docs/` folder in the repository.
 
 ## License
 
