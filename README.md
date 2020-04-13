@@ -18,6 +18,7 @@ There is still some work to do for "production ready" version. See this [Github 
 - [Features](#installation)
 - [Installation](#installation)
 - [Enabling localhost support](#enabling-localhost-support)
+- [Examples](#examples)
 - [Documentation](#documentation)
 - [License](#license)
 
@@ -44,7 +45,7 @@ npm i ads-client
 ```
 
 ## Enabling localhost support 
-*NOTE: Only required for TwinCAT versions older than 4024.5*
+*NOTE: Only required for TwinCAT versions older than 4024.5. Newer versions have this already enabled.*
 
 If you want to connect to the local TwinCAT runtime (Node.js and the TwinCAT on the same computer), the ADS router TCP loopback feature has to be enabled. Tested with TwinCAT 4022.27 and 4024.4.
 
@@ -69,6 +70,31 @@ HKEY_LOCAL_MACHINE\SOFTWARE\WOW6432Node\Beckhoff\TwinCAT3\System\EnableAmsTcpLoo
 
 Now the connection to localhost using AMS address 127.0.0.1.1.1 should work.
 
+## Examples ##
+
+This chapter includes some examples for using the library. See the [documentation](#documentation) for detailed description.
+
+### Connecting to the PLC
+
+Connecting to the local TwinCAT 3 runtime 1 (port is 851) using local ADS router (= you have TwinCAT ADS router installed).
+
+```javascript
+const ads = require('ads-client')
+
+const client = new ads.Client({
+  targetAmsNetId: '127.0.0.1.1.1', //Local system, you could use local AmsNetId too
+  targetAdsPort: 851
+})
+
+client.connect()
+  .then(res => {
+    console.log(`Connected to the ${res.targetAmsNetId}`)
+    console.log(`Router assigned us AmsNetId ${res.localAmsNetId} and port ${res.localAdsPort}`)
+  })
+  .catch(err => {
+    console.log('Connection failed:', err)
+  })
+```
 
 ## Documentation
 
