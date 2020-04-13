@@ -5,7 +5,7 @@ A node.js ADS library for connecting to Beckhoff TwinCAT automation systems usin
 Coded from scratch using [TwinCAT ADS specification](https://infosys.beckhoff.com/content/1033/tc3_ads_intro/116157835.html?id=124964102706356243) and [Beckhoff.TwinCAT.Ads nuget package](https://www.nuget.org/packages/Beckhoff.TwinCAT.Ads/5.0.0-preview6). Inspiration from similar projects like [node-ads](https://www.npmjs.com/package/node-ads), [beckhoff-js](https://www.npmjs.com/package/beckhoff-js) and [iecstruct](https://www.npmjs.com/package/iecstruct).
 
 ---
-## *Readme is still under construction!*
+## ***NOTE:** Readme is still under construction!*
 
 
 **Important note**:
@@ -29,6 +29,7 @@ There is still some work to do for "production ready" version. See this [Github 
     - [Writing a base type PLC variable (INT)](#writing-a-base-type-plc-variable-int)
     - [Writing a STRUCT type PLC variable](#writing-a-struct-type-plc-variable)
     - [Writing a STRUCT type PLC variable (just some members of the struct)](#writing-a-struct-type-plc-variable-just-some-members-of-the-struct)
+  - [Subscribing to PLC variable changes](#subscribing-to-plc-variable-changes)
 - [Documentation](#documentation)
 - [License](#license)
 
@@ -671,7 +672,7 @@ IF tonTimer.Q THEN
 END_IF
 ````
 
-Now we can subscribe to the `Increment` variable. Let's ask the PLC to monitor it for us every 1000 ms. We also want to unsubscribe after 10 seconds for testing purposes using `setTimeout`.
+Now we can subscribe to the `Increment` variable. Let's ask the PLC to monitor it for us every 1000 ms using `subscribe()`. We also want to `unsubscribe()` after 10 seconds for testing purposes using `setTimeout`.
 
 ```javascript
 const ads = require('ads-client')
