@@ -6,15 +6,20 @@ Coded from scratch using [TwinCAT ADS specification](https://infosys.beckhoff.co
 
 ---
 ## *Readme is still under construction!*
+
+
+**Important note**:
+
+There is still some work to do for "production ready" version. See this [Github milestone for details](https://github.com/jisotalo/ads-client/milestone/1)
+
 ---
 ## Table of contents
 
 - [Features](#installation)
 - [Installation](#installation)
+- [Enabling localhost support](#enabling-localhost-support)
 - [Documentation](#documentation)
 - [License](#license)
-
----
 
 
 ## Features
@@ -28,9 +33,8 @@ Coded from scratch using [TwinCAT ADS specification](https://infosys.beckhoff.co
 - Reading symbol and data type information
 - Reading PLC runtime and system manager states
 - Caching symbol and data type information (only read at first time when needed)
-- Automatic updating of symbols, data types and sunbscriptions when PLC program changes or system starts (*NOTE: Not 100 % ready yet, see milestone [Ready for production](https://github.com/jisotalo/ads-client/milestone/1) )
+- Automatic updating of symbols, data types and sunbscriptions when PLC program changes or system starts (*NOTE: Not 100 % ready yet*)
 
----
 
 ## Installation
 
@@ -39,9 +43,32 @@ Install the [npm package](https://www.npmjs.com/package/ads-client) using npm co
 npm i ads-client
 ```
 
-## Enabling localhost support
+## Enabling localhost support 
+*NOTE: Only required for TwinCAT versions older than 4024.5*
 
-If you want to 
+If you want to connect to the local TwinCAT runtime (Node.js and the TwinCAT on the same computer), the ADS router TCP loopback feature has to be enabled. Tested with TwinCAT 4022.27 and 4024.4.
+
+The following method is from [Beckhoff.TwinCAT.Ads nuget package](https://www.nuget.org/packages/Beckhoff.TwinCAT.Ads/5.0.0-preview6) installation guide.
+
+1. Stop TwinCAT System Service
+
+1. Enable TCP Loopback for TwinCAT via registery:
+
+32-Bit Windows Operating System:
+
+```
+Create following DWORD and set value to 1:
+HKEY_LOCAL_MACHINE\SOFTWARE\Beckhoff\TwinCAT3\System\EnableAmsTcpLoopback
+ ```
+64-Bit Windows Operating System:
+```
+Create following DWORD and set value to 1:
+HKEY_LOCAL_MACHINE\SOFTWARE\WOW6432Node\Beckhoff\TwinCAT3\System\EnableAmsTcpLoopback
+ ```
+3. Restart TwinCAT System Service 
+
+Now the connection to localhost using AMS address 127.0.0.1.1.1 should work.
+
 
 ## Documentation
 
@@ -51,7 +78,6 @@ You can find the full html documentation from the project [GitHub home page](htt
 
 Licensed under [MIT License](http://www.opensource.org/licenses/MIT). 
 
----
 
 Copyright (c) 2020 Jussi Isotalo <<j.isotalo91@gmail.com>>
 
