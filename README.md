@@ -20,6 +20,9 @@ There is still some work to do for "production ready" version. See this [Github 
 - [Enabling localhost support](#enabling-localhost-support)
 - [IMPORTANT: Note about STRUCT variables](#IMPORTANT-Note-about-STRUCT-variables)
 - [Examples](#examples)
+  - [Creating a new Client instance](#Creating-a-new-Client-instance)
+  - [Connecting and disconnecting](#Connecting-and-disconnecting)
+  - [Reading any PLC variable](#Reading-any-PLC-variable)
 - [Documentation](#documentation)
 - [License](#license)
 
@@ -245,38 +248,52 @@ END_TYPE
 Second, we need to have a GVL_Test at the PLC with the following:
 ````
 VAR_GLOBAL
-	TestINT 		: INT := 1234;
-	ExampleSTRUCT 	: ST_Example;
+	TestINT         : INT := 1234;
+	ExampleSTRUCT   : ST_Example;
 END_VAR
 ````
 
-Then reading is simple. Note: Using async/await just for example purposes
+Then reading is simple.
+
+*Note: Using async/await just for example purposes*
 ```javascript
 const ads = require('ads-client')
 
 const client = new ads.Client({
   targetAmsNetId: '127.0.0.1.1.1', //Loopback AmsNetId, you could use local AmsNetId too if you know it
   targetAdsPort: 851
-})
+}); //Note required ; because of (async()...
 
-client.connect()
-  .then(res => {   
+(async () => {
+  try {
+    //Connecting
+    const res = await client.connect()
     console.log(`Connected to the ${res.targetAmsNetId}`)
-    console.log(`Router assigned us AmsNetId ${res.localAmsNetId} and port ${res.localAdsPort}`)
 
-    return client.readSymbol('GVL_Test.ExampleSTRUCT')
-  })
-  .then(res => {
-    console.log('Value read:', res.value)
+    //Reading
+    try {
+      const res = await client.readSymbol('GVL_Test.ExampleSTRUCT')
+      console.log('Value read:', res.value)
+    } catch (err) {
+      console.log('Reading failed:', err)
+      return
+    }
 
-    return client.disconnect()
-  })
-  .then(() => {
-    console.log('Disconnected')
-  })
-  .catch(err => {
-    console.log('Something failed:', err)
-  })
+    //Disconnecting
+    try {
+      const res = await client.disconnect()
+      console.log('Disconneted')
+    } catch (err) {
+      console.log('Disconnecting failed:', err)
+      return
+    }
+
+  } catch (err) {
+    console.log('Connecting failed:', err)
+    return
+  }
+})()
+
 ```
 Example console output
 ````
@@ -285,6 +302,79 @@ Value read: { SomeText: 'Hello ads-client', SomeReal: 3.1415927410125732 }
 Disconneted
 ````
 
+
+
+### Reading a STRUCT type PLC variable using symbols
+
+**IMPORTANT NOTE:** See chapter [IMPORTANT: Note about STRUCT variables](#IMPORTANT-Note-about-STRUCT-variables)
+
+First, we need to have a ST_Example like the following:
+````
+{attribute 'pack_mode' := '1'}
+TYPE ST_Example :
+STRUCT
+	SomeText : STRING(50) := 'Hello ads-client';
+	SomeReal : REAL := 3.14159265359;
+END_STRUCT
+END_TYPE
+````
+
+Second, we need to have a GVL_Test at the PLC with the following:
+````
+VAR_GLOBAL
+	TestINT         : INT := 1234;
+	ExampleSTRUCT   : ST_Example;
+END_VAR
+````
+
+Then reading is simple.
+
+*Note: Using async/await just for example purposes*
+```javascript
+const ads = require('ads-client')
+
+const client = new ads.Client({
+  targetAmsNetId: '127.0.0.1.1.1', //Loopback AmsNetId, you could use local AmsNetId too if you know it
+  targetAdsPort: 851
+}); //Note required ; because of (async()...
+
+(async () => {
+  try {
+    //Connecting
+    const res = await client.connect()
+    console.log(`Connected to the ${res.targetAmsNetId}`)
+
+    //Reading
+    try {
+      const res = await client.readSymbol('GVL_Test.ExampleSTRUCT')
+      console.log('Value read:', res.value)
+    } catch (err) {
+      console.log('Reading failed:', err)
+      return
+    }
+
+    //Disconnecting
+    try {
+      const res = await client.disconnect()
+      console.log('Disconneted')
+    } catch (err) {
+      console.log('Disconnecting failed:', err)
+      return
+    }
+
+  } catch (err) {
+    console.log('Connecting failed:', err)
+    return
+  }
+})()
+
+```
+Example console output
+````
+Connected to the 127.0.0.1.1.1
+Value read: { SomeText: 'Hello ads-client', SomeReal: 3.1415927410125732 }
+Disconneted
+````
 # Documentation
 
 You can find the full html documentation from the project [GitHub home page](https://jisotalo.github.io/ads-client/) as well as from `./docs/` folder in the repository.
