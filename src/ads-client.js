@@ -2979,7 +2979,7 @@ function _parseJsVariableToPlc(value, dataType, dataBuffer) {
   
     //All others ads data types:
     default:       
-      ADS.BASE_DATA_TYPES.toBuffer(this.settings, dataType.type, value)
+      ADS.BASE_DATA_TYPES.toBuffer(this.settings, dataType.type, value, dataBuffer)
   }
 }
 
