@@ -456,7 +456,7 @@ class Client {
     return new Promise(async (resolve, reject) => {
       debug(`readDeviceInfo(): Reading device info`)
     
-      _sendAdsCommand.call(this, ADS.ADS_COMMAND.ReadDeviceInfo, Buffer.alloc(0), 10000)
+      _sendAdsCommand.call(this, ADS.ADS_COMMAND.ReadDeviceInfo, Buffer.alloc(0), ADS.ADS_RESERVED_PORTS.SystemService)
         .then((res) => {
           debug(`readDeviceInfo(): Device info read successfully`)
           this.metaData.deviceInfo = res.ads.data
@@ -485,7 +485,7 @@ class Client {
     return new Promise(async (resolve, reject) => {
       debug(`readSystemManagerState(): Reading device system manager state`)
 
-      _sendAdsCommand.call(this, ADS.ADS_COMMAND.ReadState, Buffer.alloc(0), 10000)
+      _sendAdsCommand.call(this, ADS.ADS_COMMAND.ReadState, Buffer.alloc(0), ADS.ADS_RESERVED_PORTS.SystemService)
         .then((res) => {
           debug(`readSystemManagerState(): Device system state read successfully`)
           this.metaData.systemManagerState = res.ads.data
@@ -1029,7 +1029,9 @@ class Client {
             let activeValue = await this.readSymbol(variableName)
 
             //Deep merge objects - Object.assign() won't work for objects that contain objects
-            value = _deepMergeObjects(activeValue.value, value)
+            value = _deepMergeObjects(false, activeValue.value, value)
+
+            console.log(value)
 
             debugD(`writeSymbol(): Parsing data buffer from Javascript object (after autoFill)`)
             dataBuffer = _parseJsObjectToBuffer.call(this, value, dataType)
@@ -2881,16 +2883,24 @@ function _parseJsObjectToBuffer(value, dataType, objectPathStr = '', isArraySubI
     }
       
     for (const subItem of dataType.subItems) {
+      //Try the find the subitem from javascript object (case-INsensitive)
+      let key = null
+      try {
+        key = Object.keys(value).find(objKey => objKey.toLowerCase() === subItem.name.toLowerCase())
+      } catch (err) {
+        //value is null or not object or something else
+      }
+
       //If the subitem isn't found from given object, throw error
-      if (value[subItem.name] == null) {
+      if (!key) {
         const err = new TypeError(`Given Javascript object is missing key/value for at least "${objectPathStr}.${subItem.name}" (${subItem.type})`)
         err.isNotCompleteObject = true
 
         throw err
       }
-        
+
       //Recursively parse subitem(s)
-      const bufferedData = _parseJsObjectToBuffer.call(this, value[subItem.name], subItem, `${objectPathStr}.${subItem.name}`)
+      const bufferedData = _parseJsObjectToBuffer.call(this, value[key], subItem, `${objectPathStr}.${subItem.name}`)
 
       //Add the subitem data to the buffer
       buffer = Buffer.concat([buffer, bufferedData]) //TODO: optimize, concat is not a good way
@@ -2899,8 +2909,10 @@ function _parseJsObjectToBuffer(value, dataType, objectPathStr = '', isArraySubI
   //Array - Go through each array subitem
   } else if (dataType.arrayData.length > 0 && !isArraySubItem) {
     for (let i = 0; i < dataType.arrayData[0].length; i++) {
+      console.log(dataType.arrayData[0].length, value[i])
+      
       //Recursively parse array subitems
-      const bufferedData = _parseJsObjectToBuffer.call(this, value[i], dataType, `${objectPathStr}.${dataType.name}[${i}]`, true)
+      const bufferedData = _parseJsObjectToBuffer.call(this, value[i], dataType, `${objectPathStr}.${dataType.name}[${dataType.arrayData[0].startIndex + i}]`, true)
 
       buffer = Buffer.concat([buffer, bufferedData]) //TODO: optimize, concat is not a good way
       }
@@ -4252,6 +4264,10 @@ function _console(str) {
  * 
  * Based on https://stackoverflow.com/a/34749873/8140625 by Salakar and https://stackoverflow.com/a/49727784/8140625
  * 
+ * Later modified to work with in both case-sensitive and case-insensitive ways (as the PLC is case-insensitive too). 
+ * Also fixed isObjectOrArray to return true only when input is object literal {} or array (https://stackoverflow.com/a/16608074/8140625)
+ * 
+ * @param {boolean} isCaseSensitive True = Object keys are merged case-sensitively --> target['key'] !== target['KEY'], false = case-insensitively
  * @param {object} target Target object to copy data to
  * @param {...object} sources Source objects to copy data from
  * 
@@ -4259,30 +4275,78 @@ function _console(str) {
  * 
  * @memberof _LibraryInternals
  */
-function _deepMergeObjects(target, ...sources) {
+
+function _deepMergeObjects(isCaseSensitive, target, ...sources) {
   if (!sources.length) return target
   
-  const isObject = (item) => {
-    return (item && typeof item === 'object' && !Array.isArray(item))
+  const isObjectOrArray = (item) => {
+    return (!!item) && ((item.constructor === Object) || Array.isArray(item))
+  }
+  
+  //Checks if object key exists
+  const keyExists = (obj, key, isCaseSensitive) => {
+    if (isCaseSensitive === false) {
+      return !!Object.keys(obj).find(objKey => objKey.toLowerCase() === key.toLowerCase())
+    } else {
+      return (obj[key] != null)
+    }
+  }
+
+  //Returns object value by key
+  const getValue = (obj, key, isCaseSensitive) => {
+    if (isCaseSensitive === false) {
+      return obj[Object.keys(obj).find(objKey => objKey.toLowerCase() === key.toLowerCase())]
+    } else {
+      return obj[key]
+    }
+  }
+
+  //Sets object value obj[key] to value - If isCaseSensitive == false, obj[KeY] == obj[key]
+  const setValue = (obj, key, value, isCaseSensitive) => {
+    if (isCaseSensitive === false) {
+      Object.keys(obj).forEach(objKey => {
+        if (objKey.toLowerCase() === key.toLowerCase()) {
+          obj[objKey] = value
+        }
+      });
+    } else {
+      //Case-sensitive is easy
+      obj[key] = value
+    }
   }
 
   const source = sources.shift()
 
-  if (isObject(target) && isObject(source)) {    
+  if (isObjectOrArray(target) && isObjectOrArray(source)) {    
     for (const key in source) {
-      if (isObject(source[key])) {
-        if (!target[key]) { 
+
+      if (isObjectOrArray(source[key])) {
+        //If source is object
+        if (keyExists(target, key, isCaseSensitive)) { 
+          //Target has this key, copy value
+          setValue(target, key, Object.assign({}, target[key]), isCaseSensitive)
+        } else {       
+          //Target doesn't have this key, add it)
           Object.assign(target, { [key]: {} })
-        }else{          
-          target[key] = Object.assign({}, target[key])
         }
-        _deepMergeObjects(target[key], source[key])
+        //As this is an object, go through it recursively
+        _deepMergeObjects(isCaseSensitive, getValue(target, key, false), source[key])
+
       } else {
-        Object.assign(target, { [key]: source[key] })
+        //Source is not object
+
+        if (keyExists(target, key, isCaseSensitive)) {
+          //Target has this key, copy value
+          setValue(target, key, source[key], isCaseSensitive)
+        } else {
+          //Target doesn't have this key, add it
+          Object.assign(target, { [key]: source[key] })
+        }
       }
     }
   }
-  return _deepMergeObjects(target, ...sources)
+  
+  return _deepMergeObjects(isCaseSensitive, target, ...sources)
 }
 
 

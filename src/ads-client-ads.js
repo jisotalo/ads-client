@@ -77,6 +77,158 @@ const AMS_HEADER_FLAG = {
 exports.AMS_HEADER_FLAG = AMS_HEADER_FLAG
 
 /**
+ * Reserved/known ADS ports
+ * 
+ * Source: TwinCAT.Ads.dll By Beckhoff
+ */
+const ADS_RESERVED_PORTS = {
+  None: 0,
+  //AMS Router (Port 1)
+  Router: 1,
+  //AMS Debugger (Port 2)
+  Debugger: 2,
+  //The TCom Server. Dpc or passive level.
+  R0_TComServer: 10, // 0x0000000A
+  //TCom Server Task. RT context.
+  R0_TComServerTask: 11, // 0x0000000B
+  //TCom Serve Task. Passive level.
+  R0_TComServer_PL: 12, // 0x0000000C
+  //TwinCAT Debugger
+  R0_TcDebugger: 20, // 0x00000014
+  //TwinCAT Debugger Task
+  R0_TcDebuggerTask: 21, // 0x00000015
+  //The License Server (Port 30)
+  R0_LicenseServer: 30, // 0x0000001E
+  //Logger (Port 100)
+  Logger: 100, // 0x00000064
+  //Event Logger (Port 110)
+  EventLog: 110, // 0x0000006E
+  //application for coupler (EK), gateway (EL), etc.
+  DeviceApplication: 120, // 0x00000078
+  //Event Logger UM
+  EventLog_UM: 130, // 0x00000082
+  //Event Logger RT
+  EventLog_RT: 131, // 0x00000083
+  //Event Logger Publisher
+  EventLogPublisher: 132, // 0x00000084
+  //R0 Realtime (Port 200)
+  R0_Realtime: 200, // 0x000000C8
+  //R0 Trace (Port 290)
+  R0_Trace: 290, // 0x00000122
+  //R0 IO (Port 300)
+  R0_IO: 300, // 0x0000012C
+  //NC (R0) (Port 500)
+  R0_NC: 500, // 0x000001F4
+  //R0 Satzausführung (Port 501)
+  R0_NCSAF: 501, // 0x000001F5
+  //R0 Satzvorbereitung (Port 511)
+  R0_NCSVB: 511, // 0x000001FF
+  //Preconfigured Nc2-Nc3-Instance
+  R0_NCINSTANCE: 520, // 0x00000208
+  //R0 ISG (Port 550)
+  R0_ISG: 550, // 0x00000226
+  //R0 CNC (Port 600)
+  R0_CNC: 600, // 0x00000258
+  //R0 Line (Port 700)
+  R0_LINE: 700, // 0x000002BC
+  //R0 PLC (Port 800)
+  R0_PLC: 800, // 0x00000320
+  //Tc2 PLC RuntimeSystem 1 (Port 801)
+  Tc2_Plc1: 801, // 0x00000321
+  //Tc2 PLC RuntimeSystem 2 (Port 811)
+  Tc2_Plc2: 811, // 0x0000032B
+  //Tc2 PLC RuntimeSystem 3 (Port 821)
+  Tc2_Plc3: 821, // 0x00000335
+  //Tc2 PLC RuntimeSystem 4 (Port 831)
+  Tc2_Plc4: 831, // 0x0000033F
+  //R0 RTS (Port 850)
+  R0_RTS: 850, // 0x00000352
+  //Tc3 PLC RuntimeSystem 1 (Port 851)
+  Tc3_Plc1: 851,
+  //Tc3 PLC RuntimeSystem 2 (Port 852)
+  Tc3_Plc2: 852,
+  //Tc3 PLC RuntimeSystem 3 (Port 853)
+  Tc3_Plc3: 853,
+  //Tc3 PLC RuntimeSystem 4 (Port 854)
+  Tc3_Plc4: 854,
+  //Tc3 PLC RuntimeSystem 5 (Port 855)
+  Tc3_Plc4: 855,
+  //Camshaft Controller (R0) (Port 900)
+  CamshaftController: 900, // 0x00000384
+  //R0 CAM Tool (Port 950)
+  R0_CAMTOOL: 950, // 0x000003B6
+  //R0 User (Port 2000)
+  R0_USER: 2000, // 0x000007D0
+  //(Port 10000)
+  R3_CTRLPROG: 10000, // 0x00002710
+  //System Service (AMSPORT_R3_SYSSERV, 10000)
+  SystemService: 10000, // 0x00002710
+  //(Port 10001)
+  R3_SYSCTRL: 10001, // 0x00002711
+  //Port 10100
+  R3_SYSSAMPLER: 10100, // 0x00002774
+  //Port 10200
+  R3_TCPRAWCONN: 10200, // 0x000027D8
+  //Port 10201
+  R3_TCPIPSERVER: 10201, // 0x000027D9
+  //Port 10300
+  R3_SYSMANAGER: 10300, // 0x0000283C
+  //Port 10400
+  R3_SMSSERVER: 10400, // 0x000028A0
+  //Port 10500
+  R3_MODBUSSERVER: 10500, // 0x00002904
+  //Port 10502
+  R3_AMSLOGGER: 10502, // 0x00002906
+  //Port 10600
+  R3_XMLDATASERVER: 10600, // 0x00002968
+  //Port 10700
+  R3_AUTOCONFIG: 10700, // 0x000029CC
+  //Port 10800
+  R3_PLCCONTROL: 10800, // 0x00002A30
+  //Port 10900
+  R3_FTPCLIENT: 10900, // 0x00002A94
+  //Port 11000
+  R3_NCCTRL: 11000, // 0x00002AF8
+  //Port 11500
+  R3_NCINTERPRETER: 11500, // 0x00002CEC
+  //Port 11600
+  R3_GSTINTERPRETER: 11600, // 0x00002D50
+  //Port 12000
+  R3_STRECKECTRL: 12000, // 0x00002EE0
+  //Port 13000
+  R3_CAMCTRL: 13000, // 0x000032C8
+  //Port 14000
+  R3_SCOPE: 14000, // 0x000036B0
+  //Port 14100
+  R3_CONDITIONMON: 14100, // 0x00003714
+  //Port 15000
+  R3_SINECH1: 15000, // 0x00003A98
+  //Port 16000
+  R3_CONTROLNET: 16000, // 0x00003E80
+  //Port 17000
+  R3_OPCSERVER: 17000, // 0x00004268
+  //Port 17500
+  R3_OPCCLIENT: 17500, // 0x0000445C
+  //Port 18000
+  R3_MAILSERVER: 18000, // 0x00004650
+  //Port 19000
+  R3_EL60XX: 19000, // 0x00004A38
+  //Port 19100
+  R3_MANAGEMENT: 19100, // 0x00004A9C
+  //Port 19200
+  R3_MIELEHOME: 19200, // 0x00004B00
+  //Port 19300
+  R3_CPLINK3: 19300, // 0x00004B64
+  //Port 19500
+  R3_VNSERVICE: 19500, // 0x00004C2C
+  //Multiuser (Port 19600)
+  R3_MULTIUSER: 19600, // 0x00004C90
+  //Default (AMS router assigns)
+  USEDEFAULT: 65535, // 0x0000FFFF
+}
+exports.ADS_RESERVED_PORTS = ADS_RESERVED_PORTS
+
+/**
  * ADS command
  * 
  * Source: TwinCAT.Ads.dll By Beckhoff
