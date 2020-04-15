@@ -1031,8 +1031,6 @@ class Client {
             //Deep merge objects - Object.assign() won't work for objects that contain objects
             value = _deepMergeObjects(false, activeValue.value, value)
 
-            console.log(value)
-
             debugD(`writeSymbol(): Parsing data buffer from Javascript object (after autoFill)`)
             dataBuffer = _parseJsObjectToBuffer.call(this, value, dataType)
 
@@ -2883,16 +2881,24 @@ function _parseJsObjectToBuffer(value, dataType, objectPathStr = '', isArraySubI
     }
       
     for (const subItem of dataType.subItems) {
-      //Try the find the subitem from javascript object (case-INsensitive)
+      //Try the find the subitem from javascript object
       let key = null
-      try {
-        key = Object.keys(value).find(objKey => objKey.toLowerCase() === subItem.name.toLowerCase())
-      } catch (err) {
-        //value is null or not object or something else
+            
+      //First, try the easy way (5-20x times faster)
+      if (value[subItem.name] !== undefined) {
+        key = subItem.name
+      } else {
+        //Not found, try case-insensitive way
+        try {
+          key = Object.keys(value).find(objKey => objKey.toLowerCase() === subItem.name.toLowerCase())
+        } catch (err) {
+          //value is null or not object or something else
+          key = null
+        }
       }
 
       //If the subitem isn't found from given object, throw error
-      if (!key) {
+      if (key == null) {
         const err = new TypeError(`Given Javascript object is missing key/value for at least "${objectPathStr}.${subItem.name}" (${subItem.type})`)
         err.isNotCompleteObject = true
 
@@ -2908,9 +2914,7 @@ function _parseJsObjectToBuffer(value, dataType, objectPathStr = '', isArraySubI
 
   //Array - Go through each array subitem
   } else if (dataType.arrayData.length > 0 && !isArraySubItem) {
-    for (let i = 0; i < dataType.arrayData[0].length; i++) {
-      console.log(dataType.arrayData[0].length, value[i])
-      
+    for (let i = 0; i < dataType.arrayData[0].length; i++) {      
       //Recursively parse array subitems
       const bufferedData = _parseJsObjectToBuffer.call(this, value[i], dataType, `${objectPathStr}.${dataType.name}[${dataType.arrayData[0].startIndex + i}]`, true)
 
@@ -3199,7 +3203,7 @@ function _readDataTypeInfo(dataTypeName) {
         return reject(new ClientException('_getDataTypeRecursive()', err))
       }
 
-      //Select default values
+      //Select default values. Edit this to add more to the end-user data type object
       let parsedDataType = {
         name: dataType.name,
         type: dataType.type,
@@ -3207,10 +3211,11 @@ function _readDataTypeInfo(dataTypeName) {
         offset: dataType.offset,
         adsDataType: dataType.dataType,
         adsDataTypeStr: dataType.dataTypeStr,
+        comment: dataType.comment,
+        attributes: (dataType.attributes ? dataType.attributes : []),
         arrayData: [],
         subItems: []
       }
-
 
       //If data type has subItems, loop them through
       if (dataType.subItemCount > 0) {
@@ -3237,17 +3242,11 @@ function _readDataTypeInfo(dataTypeName) {
         //TODO: Get rid of this
 
 
-      //Data type is pointer or reference. We should not go deeper as we would get info of the pointer target -> size would be wrong
-      } else if ((dataType.name.toLowerCase().includes('pointer to') || dataType.name.toLowerCase().includes('reference to')) && dataType.flagsStr.includes('DataType') && !dataType.flagsStr.includes('EnumInfos') && dataType.arrayDimension === 0) {
+      //Data type is a pseudo data type (pointer, reference, PVOID, UXINT etc..).
+      } else if (ADS.BASE_DATA_TYPES.isPseudoType(dataType.name) && dataType.arrayDimension === 0) {
         
-        if (dataType.size === 8) {
-          //64 bit system
-          parsedDataType.name = 'ULINT'
-        } else {
-          //32 bit system
-          parsedDataType.name = 'UDINT'
-        }
-
+        //TODO: If this somehow fails (dataType.size is unknown) - what to do?
+        parsedDataType.name = ADS.BASE_DATA_TYPES.getTypeByPseudoType(dataType.name, dataType.size)
 
       //If the data type is array
       } else if (dataType.arrayDimension > 0) {

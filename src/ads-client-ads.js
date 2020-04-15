@@ -838,7 +838,7 @@ const BASE_DATA_TYPES = {
    * 
    * @param {string} name Data type name
    */
-  find: function(name) {
+  find: function (name) {
     return this.types.find(type => type.name.includes(name.trim().toUpperCase()))
   },
 
@@ -996,6 +996,74 @@ const BASE_DATA_TYPES = {
           return buffer.readBigInt64LE(0)
         else
           return buffer
+      }
+    },
+  ],
+
+
+
+
+  /**
+   * Returns true if given data type is found and known
+   * 
+   * @param {string} name Data type name
+   */
+  isPseudoType: function (name) {
+    return (this.findPseudoType(name) !== undefined)
+  },
+
+
+
+  /**
+   * Finds the given pseudo data type from array using regular expressions
+   * 
+   * @param {string} name Pseudo data type name
+   */
+  findPseudoType: function (name) {
+    
+    return this.pseudoTypes.find(type => {
+      const regexName = type.name.map(t => `^${t}`)
+      
+      const re = new RegExp(regexName.join('|'), 'i')
+        
+      return re.test(name.trim())
+    })
+  },
+
+
+  /**
+   * Finds the given pseudo data type from array using regular expressions
+   * 
+   * @param {string} name Pseudo data type name
+   */
+  getTypeByPseudoType: function (name, byteSize) {
+    return this.findPseudoType(name).actualTypesBySize[byteSize]
+  },
+
+  /**
+   * All pseudo data types and their actual types depending on size
+   * Example: XINT is 4 bytes @ 32 bit platform -> DINT
+   */
+  pseudoTypes: [
+    {
+      name: ['XINT', '__XINT'],
+      actualTypesBySize: {
+        4: 'DINT',
+        8: 'LINT'
+      }
+    },
+    {
+      name: ['UXINT', '__UXINT', 'POINTER TO', 'REFERENCE TO', 'PVOID'],
+      actualTypesBySize: {
+        4: 'UDINT',
+        8: 'ULINT'
+      }
+    },
+    {
+      name: ['XWORD', '__XWORD'],
+      actualTypesBySize: {
+        4: 'DWORD',
+        8: 'LWORD'
       }
     },
   ]
