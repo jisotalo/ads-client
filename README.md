@@ -1,6 +1,10 @@
 # ads-client
 
-A node.js ADS library for connecting to Beckhoff TwinCAT automation systems using ADS protocol.
+![npm](https://img.shields.io/badge/View%20on-GitHub!-brightgreen)
+![npm](https://img.shields.io/npm/v/ads-client)
+![GitHub](https://img.shields.io/github/license/jisotalo/ads-client)
+
+Unofficial node.js ADS library for connecting to Beckhoff TwinCAT automation systems using ADS protocol.
 
 Coded from scratch using [TwinCAT ADS specification](https://infosys.beckhoff.com/content/1033/tc3_ads_intro/116157835.html?id=124964102706356243) and [Beckhoff.TwinCAT.Ads nuget package](https://www.nuget.org/packages/Beckhoff.TwinCAT.Ads/5.0.0-preview6). Inspiration from similar projects like [node-ads](https://www.npmjs.com/package/node-ads), [beckhoff-js](https://www.npmjs.com/package/beckhoff-js) and [iecstruct](https://www.npmjs.com/package/iecstruct).
 
@@ -10,7 +14,30 @@ Coded from scratch using [TwinCAT ADS specification](https://infosys.beckhoff.co
 
 **Important note**:
 
+![GitHub milestone](https://img.shields.io/github/milestones/progress-percent/jisotalo/ads-client/1)
+
 There is still some work to do for "production ready" version. See this [Github milestone for details](https://github.com/jisotalo/ads-client/milestone/1)
+
+
+---
+
+
+---
+# Latest update
+
+## [1.1.0] - 16.04.2020
+### Added
+- Support for pseudo data types (like PVOID, XINT, UXINT etc.)
+- Reserved ADS ports to ads-client-ads.js
+
+### Changed
+- writeSymbol is now case-insensitive (as the PLC system is)
+- Fixed bug: Changed iconv-encode unicode to ucs2 at WSTRING
+- Fixed bug: Better suppor for arrays when using `autoFill = true` parameter
+- Updated README.md
+  - array examples
+  - `writeSymbol` and case-insensitive information
+
 
 ---
 # Table of contents
@@ -19,16 +46,21 @@ There is still some work to do for "production ready" version. See this [Github 
 - [Installation](#installation)
 - [Enabling localhost support](#enabling-localhost-support)
 - [IMPORTANT: Note about STRUCT variables](#IMPORTANT-Note-about-STRUCT-variables)
+  - [NOTE: Writing STURCT variables](#NOTE-Writing-STURCT-variables)
 - [Examples](#examples)
   - [Creating a new Client instance](#Creating-a-new-Client-instance)
   - [Connecting and disconnecting](#Connecting-and-disconnecting)
   - [Reading any PLC variable](#Reading-any-PLC-variable)
     - [Reading a base type PLC variable (INT)](#reading-a-base-type-plc-variable-int)
     - [Reading a STRUCT type PLC variable](#reading-a-struct-type-plc-variable)
+    - [Reading an ARRAY of base type PLC variable](#Reading-an-ARRAY-of-base-type-PLC-variable)
+    - [Reading an ARRAY of STRUCT type PLC variable](#Reading-an-ARRAY-of-STRUCT-type-PLC-variable)
   - [Writing any PLC variable](#Writing-any-PLC-variable)
     - [Writing a base type PLC variable (INT)](#writing-a-base-type-plc-variable-int)
     - [Writing a STRUCT type PLC variable](#writing-a-struct-type-plc-variable)
     - [Writing a STRUCT type PLC variable (just some members of the struct)](#writing-a-struct-type-plc-variable-just-some-members-of-the-struct)
+    - [Writing an ARRAY of base type PLC variable](#Writing-an-ARRAY-of-base-type-PLC-variable)
+    - [Writing an ARRAY of STRUCT type PLC variable](#Writing-an-ARRAY-of-STRUCT-type-PLC-variable)
   - [Subscribing to PLC variable changes](#subscribing-to-plc-variable-changes)
 - [Documentation](#documentation)
 - [License](#license)
@@ -45,6 +77,7 @@ There is still some work to do for "production ready" version. See this [Github 
 - Reading symbol and data type information
 - Reading PLC runtime and system manager states
 - Caching symbol and data type information (only read at first time when needed)
+- Automatic pointer/reference support for 32bit and 64bit systems
 - Automatic updating of symbols, data types and sunbscriptions when PLC program changes or system starts (*NOTE: Not 100 % ready yet*)
 - Tested to work successfully
   - Node.js v10.16.3 and newer
@@ -89,7 +122,7 @@ HKEY_LOCAL_MACHINE\SOFTWARE\WOW6432Node\Beckhoff\TwinCAT3\System\EnableAmsTcpLoo
  ```
 3. Restart TwinCAT System Service 
 
-Now the connection to localhost using AMS address 127.0.0.1.1.1 should work.
+Now the connection to the localhost using `localAmsNetId` address `127.0.0.1.1.1` or `localhost` should work.
 
 # IMPORTANT: Note about STRUCT variables
 
@@ -109,8 +142,39 @@ If the attribute is not found, the library will print a warning to the console:
 ````
 ads-client: WARNING: PLC data type ST_Example is a STRUCT and has no attribute {attribute 'pack_mode' := '1'} above it's definition -> Read data may be corrupted depending on the struct layout. Disable this warning with setting 'disableStructPackModeWarning: true'
 ````
-The warning can be hidden using setting `'disableStructPackModeWarning: true'`
+The warning can be hidden using setting `'disableStructPackModeWarning: true'`. If the pack-mode is not defined, reading or writing data will cause corrupted data and problems depending on the struct layout.
 
+See [this GitHub issue](https://github.com/jisotalo/ads-client/issues/13) for developing support for TwinCAT 3 default byte alignment.
+
+---
+## NOTE: Writing STURCT variables
+When writing a struct using `writeSymbol`, the given Javascript object keys are handled as case-insensitive. The TwinCAT 3 system is case-insensitive, so variables like `TestINT` and `testint` are the same.
+
+Basically this means that the following Javascript objects work the same way when using `writeSymbol`:
+
+```javascript
+{
+  sometext: 'hello',
+  somereal: 3.14
+}
+````
+
+```javascript
+{
+  SOmeTEXT: 'hello',
+  SOMEreal: 3.14
+}
+````
+
+**NOTE** If the object has two keys with same name but different case, it depends on the Javascript engine which one is found first using .find() method.
+
+```javascript
+//You can't be sure which one is selected, when writing PLC variable SomeText!
+{
+  sometext: 'hello',
+  SOMEtext: 'good day'
+}
+````
 
 # Examples
 
@@ -127,7 +191,7 @@ The constructor takes settings as its parameter. See all settings from the [Sett
 const ads = require('ads-client')
 
 const client = new ads.Client({
-  targetAmsNetId: '127.0.0.1.1.1',
+  targetAmsNetId: '127.0.0.1.1.1', //could be also 'localhost'
   targetAdsPort: 851,
 })
 ````
@@ -139,7 +203,7 @@ const client = new ads.Client({
 const ads = require('ads-client')
 
 const client = new ads.Client({
-  targetAmsNetId: '127.0.0.1.1.1',
+  targetAmsNetId: '127.0.0.1.1.1', 
   targetAdsPort: 851,
   objectifyEnumerations: false,
   convertDatesToJavascript: false
@@ -200,6 +264,7 @@ Disconnected
 
 First, we need to have a GVL_Test at the PLC with the following:
 ````
+//GVL_Test
 VAR_GLOBAL
 	TestINT : INT := 1234;
 END_VAR
@@ -242,6 +307,7 @@ Disconnected
 
 First, we need to have a GVL_Test at the PLC with the following:
 ````
+//GVL_Test
 VAR_GLOBAL
 	TestSTRING 		: STRING := 'Hello this is a test string';
 END_VAR
@@ -249,7 +315,6 @@ END_VAR
 
 ```javascript
 //...the previous lines are hidden
-
 
 client.connect()
   .then(res => {   
@@ -274,7 +339,10 @@ Disconnected
 
 ### Reading a STRUCT type PLC variable
 
+---
 **IMPORTANT NOTE:** See chapter [IMPORTANT: Note about STRUCT variables](#IMPORTANT-Note-about-STRUCT-variables)
+
+---
 
 First, we need to have a ST_Example like the following:
 ````
@@ -290,6 +358,7 @@ END_TYPE
 
 Second, we need to have a GVL_Test at the PLC with the following:
 ````
+//GVL_Test
 VAR_GLOBAL
 	ExampleSTRUCT   : ST_Example;
 END_VAR
@@ -347,12 +416,114 @@ Disconneted
 ````
 
 
+
+### Reading an ARRAY of base type PLC variable
+
+---
+**NOTE:** Handling multi-dimensional arrays is not supported at the moment. See [this GitHub issue](https://github.com/jisotalo/ads-client/issues/10) for the development of the multi-dimensional array support.
+
+---
+First, we need to have a GVL_Test at the PLC with the following:
+````
+//GVL_Test
+VAR_GLOBAL
+	TestARRAY 		: ARRAY[0..4] OF INT := [0, 10, 200, 3000, 4000];
+END_VAR
+````
+Then we can read the whole array at once:
+```javascript
+//...the previous lines are hidden
+
+    try {
+      const res = await client.readSymbol('GVL_Test.TestARRAY')
+      console.log('Value read:', res.value)
+    } catch (err) {
+      console.log('Reading failed:', err)
+      return
+    }
+    
+//...the next lines are hidden
+```
+
+Example console output
+````
+Connected to the 127.0.0.1.1.1
+Value read: [ 0, 10, 200, 3000, 4000 ]
+Disconneted
+````
+
+
+### Reading an ARRAY of STRUCT type PLC variable
+
+---
+**NOTE:** Handling multi-dimensional arrays is not supported at the moment. See [this GitHub issue](https://github.com/jisotalo/ads-client/issues/10) for the development of the multi-dimensional array support.
+
+---
+
+First, we need to have a ST_Example like the following:
+````
+{attribute 'pack_mode' := '1'}
+TYPE ST_Example :
+STRUCT
+	SomeText : STRING(50) := 'Hello ads-client';
+	SomeReal : REAL := 3.14159265359;
+	SomeDate : DT := DT#2020-4-13-12:25:33;
+END_STRUCT
+END_TYPE
+````
+
+Second, we need to have a GVL_Test at the PLC with the following:
+````
+//GVL_Test
+VAR_GLOBAL
+	TestARRAY		: ARRAY[0..4] OF ST_Example := [(SomeText := 'Just for demo purposes')];
+END_VAR
+````
+Then we can read the whole array at once:
+```javascript
+//...the previous lines are hidden
+
+try {
+  const res = await client.readSymbol('GVL_Test.TestARRAY')
+  console.log('Value read:', res.value)
+} catch (err) {
+  console.log('Reading failed:', err)
+  return
+}
+    
+//...the next lines are hidden
+```
+
+Example console output
+````
+Connected to the 127.0.0.1.1.1
+Value read: [ { SomeText: 'Just for demo purposes',
+    SomeReal: 3.1415927410125732,
+    SomeDate: 2020-04-13T12:25:33.000Z },
+  { SomeText: 'Hello ads-client',
+    SomeReal: 3.1415927410125732,
+    SomeDate: 2020-04-13T12:25:33.000Z },
+  { SomeText: 'Hello ads-client',
+    SomeReal: 3.1415927410125732,
+    SomeDate: 2020-04-13T12:25:33.000Z },
+  { SomeText: 'Hello ads-client',
+    SomeReal: 3.1415927410125732,
+    SomeDate: 2020-04-13T12:25:33.000Z },
+  { SomeText: 'Hello ads-client',
+    SomeReal: 3.1415927410125732,
+    SomeDate: 2020-04-13T12:25:33.000Z } ]
+Disconneted
+````
+
+
+
 ## Writing any PLC variable
 
 ### Writing a base type PLC variable (INT)
 
 First, we need to have a GVL_Test at the PLC with the following:
 ````
+//GVL_Test
 VAR_GLOBAL
 	TestINT : INT := 1234;
 END_VAR
@@ -360,52 +531,28 @@ END_VAR
 
 Let's read the value, change it and read again:
 ```javascript
-const ads = require('ads-client')
 
-const client = new ads.Client({
-  targetAmsNetId: '127.0.0.1.1.1',
-  targetAdsPort: 851
-}); //Note required ; because of (async()...
+//...the previous lines are hidden
+try {
+  
+  //Reading the value
+  let res = await client.readSymbol('GVL_Test.TestINT')
+  console.log('Value read:', res.value)
 
-(async () => {
-  try {
-    //Connecting
-    const res = await client.connect()
-    console.log(`Connected to the ${res.targetAmsNetId}`)
+  //Writing the value
+  res = await client.writeSymbol('GVL_Test.TestINT', 5)
+  console.log('Value written:', res.value)
 
-    try {
-      
-      //Reading the value
-      let res = await client.readSymbol('GVL_Test.TestINT')
-      console.log('Value read:', res.value)
+  //Reading the value again to be sure
+  res = await client.readSymbol('GVL_Test.TestINT')
+  console.log('Value read:', res.value)
 
-      //Writing the value
-      res = await client.writeSymbol('GVL_Test.TestINT', 5)
-      console.log('Value written:', res.value)
+} catch (err) {
+  console.log('Something failed:', err)
+  return
+}
 
-      //Reading the value again to be sure
-      res = await client.readSymbol('GVL_Test.TestINT')
-      console.log('Value read:', res.value)
-
-    } catch (err) {
-      console.log('Something failed:', err)
-      return
-    }
-
-    //Disconnecting
-    try {
-      const res = await client.disconnect()
-      console.log('Disconneted')
-    } catch (err) {
-      console.log('Disconnecting failed:', err)
-      return
-    }
-
-  } catch (err) {
-    console.log('Connecting failed:', err)
-    return
-  }
-})()
+//...the next lines are hidden
 ```
 Example console output
 ````
@@ -421,6 +568,7 @@ Value read: 5
 
 First, we need to have a GVL_Test at the PLC with the following:
 ````
+//GVL_Test
 VAR_GLOBAL
 	TestSTRING : STRING := 'Hello this is a test string';
 END_VAR
@@ -429,24 +577,25 @@ END_VAR
 Let's read the value, change it and read again:
 ```javascript
 //...the previous lines are hidden
-    try {
-      
-      //Reading the value
-      let res = await client.readSymbol('GVL_Test.TestSTRING')
-      console.log('Value read:', res.value)
 
-      //Writing the value
-      res = await client.writeSymbol('GVL_Test.TestSTRING', 'Changing the string value to this')
-      console.log('Value written:', res.value)
+try {
+  
+  //Reading the value
+  let res = await client.readSymbol('GVL_Test.TestSTRING')
+  console.log('Value read:', res.value)
 
-      //Reading the value again to be sure
-      res = await client.readSymbol('GVL_Test.TestSTRING')
-      console.log('Value read:', res.value)
+  //Writing the value
+  res = await client.writeSymbol('GVL_Test.TestSTRING', 'Changing the string value to this')
+  console.log('Value written:', res.value)
 
-    } catch (err) {
-      console.log('Something failed:', err)
-      return
-    }
+  //Reading the value again to be sure
+  res = await client.readSymbol('GVL_Test.TestSTRING')
+  console.log('Value read:', res.value)
+
+} catch (err) {
+  console.log('Something failed:', err)
+  return
+}
 
 //...the next lines are hidden
 ```
@@ -465,8 +614,6 @@ Disconneted
 
 **IMPORTANT NOTE:** See chapter [IMPORTANT: Note about STRUCT variables](#IMPORTANT-Note-about-STRUCT-variables)
 
-**NOTE** At the moment the given object keys are case-sensitive, so writing to `someTEXT` instead of `SomeText` won't work. This will be fixed soon, see [issue #5](https://github.com/jisotalo/ads-client/issues/5).
-
 ---
 
 First, we need to have a ST_Example like the following:
@@ -483,62 +630,38 @@ END_TYPE
 
 Second, we need to have a GVL_Test at the PLC with the following:
 ````
+//GVL_Test
 VAR_GLOBAL
 	ExampleSTRUCT   : ST_Example;
 END_VAR
 ````
 
 ```javascript
-const ads = require('ads-client')
+//...the previous lines are hidden
 
-const client = new ads.Client({
-  targetAmsNetId: '127.0.0.1.1.1',
-  targetAdsPort: 851
-}); //Note required ; because of (async()...
+try {
+  //Reading the value
+  let res = await client.readSymbol('GVL_Test.ExampleSTRUCT')
+  console.log('Value read:', res.value)
 
-(async () => {
-  try {
-    //Connecting
-    const res = await client.connect()
-    console.log(`Connected to the ${res.targetAmsNetId}`)
+  //Writing the value
+  res = await client.writeSymbol('GVL_Test.ExampleSTRUCT', {
+    SomeText: 'Hello to you too, Mr. PLC!',
+    SomeReal: 5456.06854,
+    SomeDate: new Date()
+  })
+  console.log('Value written:', res.value)
 
-    try {
-      //Reading the value
-      let res = await client.readSymbol('GVL_Test.ExampleSTRUCT')
-      console.log('Value read:', res.value)
+  //Reading the value to be sure
+  res = await client.readSymbol('GVL_Test.ExampleSTRUCT')
+  console.log('Value read:', res.value)
 
-      //Writing the value
-      res = await client.writeSymbol('GVL_Test.ExampleSTRUCT', {
-        SomeText: 'Hello to you too, Mr. PLC!',
-        SomeReal: 5456.06854,
-        SomeDate: new Date()
-      })
-      console.log('Value written:', res.value)
+} catch (err) {
+  console.log('Something failed:', err)
+  return
+}
 
-      //Reading the value to be sure
-      res = await client.readSymbol('GVL_Test.ExampleSTRUCT')
-      console.log('Value read:', res.value)
-
-    } catch (err) {
-      console.log('Something failed:', err)
-      return
-    }
-
-    //Disconnecting
-    try {
-      const res = await client.disconnect()
-      console.log('Disconneted')
-    } catch (err) {
-      console.log('Disconnecting failed:', err)
-      return
-    }
-
-  } catch (err) {
-    console.log('Connecting failed:', err)
-    return
-  }
-})()
-
+//...the next lines are hidden
 ```
 Example console output
 ````
@@ -555,14 +678,11 @@ Value read: { SomeText: 'Hello to you too, Mr. PLC!',
 Disconneted
 ````
 
-### Writing a STRUCT type PLC variable (just some members of the struct)
+### Writing a STRUCT type PLC variable (some members of the struct)
 
 ---
 
 **IMPORTANT NOTE:** See chapter [IMPORTANT: Note about STRUCT variables](#IMPORTANT-Note-about-STRUCT-variables)
-
-
-**NOTE** At the moment the given object keys are case-sensitive, so writing to `someTEXT` instead of `SomeText` won't work. This will be fixed soon, see [issue #5](https://github.com/jisotalo/ads-client/issues/5).
 
 ---
 
@@ -580,6 +700,7 @@ END_TYPE
 
 Second, we need to have a GVL_Test at the PLC with the following:
 ````
+//GVL_Test
 VAR_GLOBAL
 	ExampleSTRUCT   : ST_Example;
 END_VAR
@@ -648,6 +769,169 @@ res = await client.writeSymbol('GVL_Test.ExampleSTRUCT.SomeText', 'This is also 
 
 //...the next lines are hidden
 ```
+
+
+
+### Writing an ARRAY of base type PLC variable
+
+First, we need to have a GVL_Test at the PLC with the following:
+````
+//GVL_Test
+VAR_GLOBAL
+	TestARRAY 		: ARRAY[0..4] OF INT := [0, 10, 200, 3000, 4000];
+END_VAR
+````
+
+Let's read the value, change it and read again:
+```javascript
+//...the previous lines are hidden
+
+try {
+  
+  //Reading the value
+  let res = await client.readSymbol('GVL_Test.TestArray')
+  console.log('Value read:', res.value)
+
+  //Writing the value
+  res = await client.writeSymbol('GVL_Test.TestArray', [9999, 8888, 6666, 5555, 4444])
+  console.log('Value written:', res.value)
+
+  //Reading the value again to be sure
+  res = await client.readSymbol('GVL_Test.TestArray')
+  console.log('Value read:', res.value)
+
+} catch (err) {
+  console.log('Something failed:', err)
+  return
+}
+
+//...the next lines are hidden
+```
+Example console output
+````
+Connected to the 127.0.0.1.1.1
+Value read: [ 0, 10, 200, 3000, 4000 ]
+Value written: [ 9999, 8888, 6666, 5555, 4444 ]
+Value read: [ 9999, 8888, 6666, 5555, 4444 ]   
+Disconneted
+````
+
+
+### Writing an ARRAY of STRUCT type PLC variable
+
+
+First, we need to have a ST_Example like the following:
+````
+{attribute 'pack_mode' := '1'}
+TYPE ST_Example :
+STRUCT
+	SomeText : STRING(50) := 'Hello ads-client';
+	SomeReal : REAL := 3.14159265359;
+	SomeDate : DT := DT#2020-4-13-12:25:33;
+END_STRUCT
+END_TYPE
+````
+
+Second, we need to have a GVL_Test at the PLC with the following:
+````
+//GVL_Test
+VAR_GLOBAL
+	TestARRAY		: ARRAY[0..4] OF ST_Example := [(SomeText := 'Just for demo purposes')];
+END_VAR
+````
+
+Let's read the value, change it and read again:
+```javascript
+//...the previous lines are hidden
+
+try {
+  
+  //Reading the value
+  let res = await client.readSymbol('GVL_Test.TestArray')
+  console.log('Value read:', res.value)
+
+  //Writing the value
+  res = await client.writeSymbol('GVL_Test.TestArray', 
+    [ { SomeText: 'First value',
+        SomeReal: 1.0,
+        SomeDate: new Date()},
+      { SomeText: 'Second',
+        SomeReal: 10.10,
+        SomeDate: new Date()},
+      { SomeText: 'Third',
+        SomeReal: 20.20,
+        SomeDate: new Date()},
+      { SomeText: 'Fourth',
+        SomeReal: 30.30,
+        SomeDate: new Date()},
+      { SomeText: 'Fifth',
+        SomeReal: 40.40,
+        SomeDate: new Date()}]
+  )
+  console.log('Value written:', res.value)
+
+  //Reading the value again to be sure
+  res = await client.readSymbol('GVL_Test.TestArray')
+  console.log('Value read:', res.value)
+
+} catch (err) {
+  console.log('Something failed:', err)
+  return
+}
+
+//...the next lines are hidden
+```
+Example console output
+````
+Connected to the 127.0.0.1.1.1
+Value read: [ { SomeText: 'Just for demo purposes',
+    SomeReal: 3.1415927410125732,
+    SomeDate: 2020-04-13T12:25:33.000Z },
+  { SomeText: 'Hello ads-client',
+    SomeReal: 3.1415927410125732,
+    SomeDate: 2020-04-13T12:25:33.000Z },
+  { SomeText: 'Hello ads-client',
+    SomeReal: 3.1415927410125732,
+    SomeDate: 2020-04-13T12:25:33.000Z },
+  { SomeText: 'Hello ads-client',
+    SomeReal: 3.1415927410125732,
+    SomeDate: 2020-04-13T12:25:33.000Z },
+  { SomeText: 'Hello ads-client',
+    SomeReal: 3.1415927410125732,
+    SomeDate: 2020-04-13T12:25:33.000Z } ]
+Value written: [ { SomeText: 'First value',
+    SomeReal: 1,
+    SomeDate: 2020-04-16T19:02:38.836Z },  
+  { SomeText: 'Second',
+    SomeReal: 10.1,
+    SomeDate: 2020-04-16T19:02:38.836Z },  
+  { SomeText: 'Third',
+    SomeReal: 20.2,
+    SomeDate: 2020-04-16T19:02:38.836Z },
+  { SomeText: 'Fourth',
+    SomeReal: 30.3,
+    SomeDate: 2020-04-16T19:02:38.836Z },
+  { SomeText: 'Fifth',
+    SomeReal: 40.4,
+    SomeDate: 2020-04-16T19:02:38.836Z } ]
+Value read: [ { SomeText: 'First value',
+    SomeReal: 1,
+    SomeDate: 2020-04-16T19:02:38.000Z },
+  { SomeText: 'Second',
+    SomeReal: 10.100000381469727,
+    SomeDate: 2020-04-16T19:02:38.000Z },
+  { SomeText: 'Third',
+    SomeReal: 20.200000762939453,
+    SomeDate: 2020-04-16T19:02:38.000Z },
+  { SomeText: 'Fourth',
+    SomeReal: 30.299999237060547,
+    SomeDate: 2020-04-16T19:02:38.000Z },
+  { SomeText: 'Fifth',
+    SomeReal: 40.400001525878906,
+    SomeDate: 2020-04-16T19:02:38.000Z } ]
+Disconneted
+````
+
 
 ## Subscribing to PLC variable changes
 

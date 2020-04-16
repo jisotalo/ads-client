@@ -121,6 +121,11 @@ class Client {
       ...settings
     }
 
+    //Loopback address
+    if (this.settings.localAmsNetId === 'localhost') {
+      this.settings.localAmsNetId = '127.0.0.1.1.1'
+    }
+
     /**
      * Internal variables - Not intended for external use
      * 
