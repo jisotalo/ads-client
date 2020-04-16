@@ -2990,7 +2990,7 @@ function _parseJsVariableToPlc(value, dataType, dataBuffer) {
       break
     
     case ADS.ADS_DATA_TYPES['ADST_WSTRING']:
-      iconv.encode(value, 'unicode').copy(dataBuffer)
+      iconv.encode(value, 'ucs2').copy(dataBuffer)
       break
   
     //All others ads data types:
@@ -3106,7 +3106,7 @@ function _parsePlcVariableToJs(dataBuffer, dataType) {
       return _trimPlcString(iconv.decode(dataBuffer, 'cp1252'))
     
     case ADS.ADS_DATA_TYPES['ADST_WSTRING']:
-      return _trimPlcString(iconv.decode(dataBuffer, 'unicode'))
+      return _trimPlcString(iconv.decode(dataBuffer, 'ucs2'))
     
     //All others ads data types:
     default:
@@ -3240,7 +3240,6 @@ function _readDataTypeInfo(dataTypeName) {
       } else if ((dataType.type === '' || ADS.BASE_DATA_TYPES.isKnownType(dataType.name)) && dataType.flagsStr.includes('DataType') && !dataType.flagsStr.includes('EnumInfos') && dataType.arrayDimension === 0) {
         //Do nothing - this is the final form
         //TODO: Get rid of this
-
 
       //Data type is a pseudo data type (pointer, reference, PVOID, UXINT etc..).
       } else if (ADS.BASE_DATA_TYPES.isPseudoType(dataType.name) && dataType.arrayDimension === 0) {

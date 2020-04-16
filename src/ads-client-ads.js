@@ -828,7 +828,21 @@ const BASE_DATA_TYPES = {
    * @param {string} name Data type name
    */
   isKnownType: function (name) {
-    return this.find(name) !== undefined || name.toUpperCase().includes('STRING(')
+    name = name.trim()
+
+    let found = this.find(name) !== undefined
+
+    //We have special cases: STRING and WSTRING (they are detected @ parsing fom ADS types)
+    //But we still use isKnownType to detect them (This should be refractored later...)
+    if (!found) {
+      const regexName = ['^STRING$', '^STRING\\(', '^STRING\\[', '^WSTRING$', '^WSTRING\\(', '^WSTRING\\[']
+      
+      const re = new RegExp(regexName.join('|'), 'i')
+        
+      found = re.test(name)
+    }
+
+    return found
   },
 
 
@@ -886,7 +900,6 @@ const BASE_DATA_TYPES = {
     }
     return type.fromBuffer(buffer, settings)
   },
-
 
 
 
