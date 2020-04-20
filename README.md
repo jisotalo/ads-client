@@ -1,7 +1,7 @@
 # ads-client
 
 
-[![npm version](https://img.shields.io/npm/v/ads-client)](https://www.npmjs.org/package/ads-cllient)
+[![npm version](https://img.shields.io/npm/v/ads-client)](https://www.npmjs.org/package/ads-client)
 [![GitHub](https://img.shields.io/badge/View%20on-GitHub!-brightgreen)](https://img.shields.io/github/license/jisotalo/ads-client)
 [![License](https://img.shields.io/github/license/jisotalo/ads-client)](https://choosealicense.com/licenses/mit/)
 
