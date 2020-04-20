@@ -69,30 +69,11 @@
 <p><a href="https://github.com/jisotalo/ads-client/milestone/1"><img src="https://img.shields.io/github/milestones/progress-percent/jisotalo/ads-client/1" alt="GitHub milestone"></a></p>
 <p>There is still some work to do for &quot;production ready&quot; version. See this <a href="https://github.com/jisotalo/ads-client/milestone/1">Github milestone for details</a></p>
 <hr>
-<h1>Latest update</h1>
-<h2>[1.1.0] - 16.04.2020</h2>
-<h3>Added</h3>
-<ul>
-<li>Support for pseudo data types (like PVOID, XINT, UXINT etc.)</li>
-<li>Reserved ADS ports to ads-client-ads.js</li>
-</ul>
-<h3>Changed</h3>
-<ul>
-<li>writeSymbol is now case-insensitive (as the PLC system is)</li>
-<li>Fixed bug: Changed iconv-encode unicode to ucs2 at WSTRING</li>
-<li>Fixed bug: Better suppor for arrays when using <code>autoFill = true</code> parameter</li>
-<li>Updated README.md
-<ul>
-<li>array examples</li>
-<li><code>writeSymbol</code> and case-insensitive information</li>
-</ul>
-</li>
-</ul>
-<hr>
 <h1>Table of contents</h1>
 <ul>
-<li><a href="#installation">Features</a></li>
 <li><a href="#installation">Installation</a></li>
+<li><a href="#installation">Features</a></li>
+<li><a href="#supported-platforms-and-setups">Supported platforms and setups</a></li>
 <li><a href="#enabling-localhost-support">Enabling localhost support</a></li>
 <li><a href="#important-note-about-struct-variables">IMPORTANT: Note about STRUCT variables</a></li>
 <li><a href="#important-note-writing-sturct-variables">IMPORTANT: Writing STRUCT variables</a></li>
@@ -133,42 +114,102 @@
 <li><a href="#documentation">Documentation</a></li>
 <li><a href="#license">License</a></li>
 </ul>
-<h1>Features</h1>
-<ul>
-<li>Promises and async/await</li>
-<li>Supports connecting to the local TwinCAT runtime (see <a href="#localhost-support">enabling localhost support</a>)</li>
-<li>Supports multiple connections from the same host</li>
-<li>Reading and writing all kinds of variables by PLC variable name</li>
-<li>Subscribing to variable changes by PLC variable name (ADS notifications)</li>
-<li>Automatic conversion from PLC variables to Javascript objects and vice-versa</li>
-<li>Reading symbol and data type information</li>
-<li>Reading PLC runtime and system manager states</li>
-<li>Caching symbol and data type information (only read at first time when needed)</li>
-<li>Automatic pointer/reference support for 32bit and 64bit systems</li>
-<li>Automatic updating of symbols, data types and subscriptions when PLC program changes or system starts (<em>NOTE: Not 100 % ready yet</em>)</li>
-<li>Tested to work successfully
-<ul>
-<li>Node.js v10.16.3 and newer</li>
-<li>Local computer with TwinCAT 3 4022.27 running on 64bit Windows 10</li>
-<li>Local computer with TwinCAT 3 4024.4 running on 64bit Windows 10</li>
-<li>Beckhoff PLC with TwinCAT 3 4022.27 running on 64bit Windows 7 Embedded</li>
-</ul>
-</li>
-<li>Yet to be tested
-<ul>
-<li>Beckhoff PLC with 32 bit system</li>
-<li>TwinCAT 2 systems</li>
-<li>Running on Linux device with and without ADS router</li>
-<li>Running on Windows device without ADS router</li>
-</ul>
-</li>
-</ul>
 <h1>Installation</h1>
 <p>Install the <a href="https://www.npmjs.com/package/ads-client">npm package</a> using npm command:</p>
 <pre class="prettyprint source lang-bash"><code>npm i ads-client
 </code></pre>
 <p>Include the module in your code</p>
 <pre class="prettyprint source lang-js"><code>const ads = require('ads-client')
+</code></pre>
+<h1>Features</h1>
+<ul>
+<li>Promise and async/await support</li>
+<li>Supports connecting to the local TwinCAT runtime (see <a href="#localhost-support">enabling localhost support</a>)</li>
+<li>Supports multiple connections from the same host</li>
+<li>Reading and writing all any PLC variable</li>
+<li>Subscribing to PLC variables (ADS notifications)</li>
+<li>Automatic conversion between PLC&lt;-&gt;Javascript objects</li>
+<li>PLC symbol and data type handling and caching</li>
+<li>Reading PLC runtime and system manager states</li>
+<li>Automatic 32/64 bit variable support (PVOID, XINT, etc.)</li>
+<li>Automatic cache and subscription refreshing when PLC program changes or system starts (<em>See <a href="">#3</a>, <a href="">#4</a></em>)</li>
+</ul>
+<h1>Supported platforms and setups</h1>
+<p>The ads-client package is tested so far with the following setups:</p>
+<ul>
+<li>TwinCAT 3 4022.27 running on 64bit Windows 10</li>
+<li>TwinCAT 3 4024.4 running on 64bit Windows 10</li>
+<li>TwinCAT 3 4022.27 running on 64bit Windows 7 Embedded @ Beckhoff PLC</li>
+<li>Node.js v10.16.3 and newer</li>
+</ul>
+<p>The ads-client can be used in different system setups:</p>
+<p><img src="https://user-images.githubusercontent.com/13457157/79771661-c59c0d80-8337-11ea-809f-b7c41bcb099d.png" alt="ads-client-setups"></p>
+<h2>Setup 1</h2>
+<p><em>Connect from Windows PC to the PLC.</em></p>
+<p>Requirements:</p>
+<ul>
+<li>UI client has TwinCAT installed</li>
+<li>ADS route is created between the UI and the PLC</li>
+</ul>
+<p>Example connection when PLC has AmsNetId of <code>192.168.1.120.1.1</code>.</p>
+<pre class="prettyprint source lang-js"><code>const client = new ads.Client({
+  targetAmsNetId: '192.168.1.120.1.1',
+  targetAdsPort: 851,
+})
+</code></pre>
+<h2>Setup 2</h2>
+<p><em>Connect from Unix PC to the PLC.</em></p>
+<p>Requirements:</p>
+<ul>
+<li>UI client has <a href="https://www.nuget.org/packages/Beckhoff.TwinCAT.Ads.AdsRouterConsole/5.0.0-preview4">AdsRouterConsole</a> or similar running</li>
+<li>ADS route is created between the UI and the PLC</li>
+</ul>
+<p>Example connection when PLC has AmsNetId of <code>192.168.1.120.1.1</code>.</p>
+<pre class="prettyprint source lang-js"><code>const client = new ads.Client({
+  targetAmsNetId: '192.168.1.120.1.1',
+  targetAdsPort: 851,
+})
+</code></pre>
+<p>Example entry in the PLCs</p>
+<h2>Setup 3</h2>
+<p><em>Connect from Windows PC, Unix PC or other device to the PLC.</em></p>
+<p>Requirements:</p>
+<ul>
+<li>PLC has TCP port 48898 open</li>
+<li>Given <code>localAmsNetId</code> is not already in use</li>
+<li>Given <code>localAdsPort</code> is not already in use</li>
+<li>PLC has ADS route manually created to UI machines IP address and the given <code>localAmsNetId</code></li>
+</ul>
+<p>Example connection when PLC has AmsNetId of <code>192.168.1.120.1.1</code> and IP of <code>192.168.1.120</code>.</p>
+<pre class="prettyprint source lang-js"><code>const client = new ads.Client({
+  localAmsNetId: '192.168.1.10.1.1',
+  localAdsPort: 32750,
+  targetAmsNetId: '192.168.1.120.1.1',
+  targetAdsPort: 851,
+  routerAddress: '192.168.1.120',
+  routerTcpPort: 48898
+})
+</code></pre>
+<p>Example entry in the PLCs <code>TwinCAT\3.1\Target\StaticRoutes.xml</code> file when UI has AmsNetId of <code>192.168.1.10.1.1</code> and IP of <code>192.168.1.10</code>.</p>
+<pre class="prettyprint source lang-xml"><code>&lt;Route>
+  &lt;Name>UI&lt;/Name>
+  &lt;Address>192.168.1.10&lt;/Address>
+  &lt;NetId>192.168.1.10.1.1&lt;/NetId>
+  &lt;Type>TCP_IP&lt;/Type>
+  &lt;Flags>64&lt;/Flags>
+&lt;/Route>
+</code></pre>
+<h2>Setup 4</h2>
+<p><em>Connect from the PLC to the localhost (PLC and UI on the same machine).</em></p>
+<p>Requirements:</p>
+<ul>
+<li>No special requirements</li>
+</ul>
+<pre class="prettyprint source lang-js"><code>const client = new ads.Client({
+  targetAmsNetId: '127.0.0.1.1.1',
+  targetAdsPort: 851,
+})
+
 </code></pre>
 <h1>Enabling localhost support</h1>
 <p><em>NOTE: Only required for TwinCAT versions older than 4024.5. Newer versions have this already enabled.</em></p>
@@ -670,7 +711,7 @@ SOFTWARE.</p></article>
 <br class="clear">
 
 <footer>
-    Documentation generated by <a href="https://github.com/jsdoc3/jsdoc">JSDoc 3.6.4</a> on Mon Apr 20 2020 17:47:00 GMT+0300 (GMT+03:00) using the <a href="https://github.com/clenemt/docdash">docdash</a> theme.
+    Documentation generated by <a href="https://github.com/jsdoc3/jsdoc">JSDoc 3.6.4</a> on Mon Apr 20 2020 19:09:46 GMT+0300 (GMT+03:00) using the <a href="https://github.com/clenemt/docdash">docdash</a> theme.
 </footer>
 
 <script>prettyPrint();</script>

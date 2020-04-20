@@ -24,8 +24,9 @@ There is still some work to do for "production ready" version. See this [Github 
 ---
 # Table of contents
 
-- [Features](#installation)
 - [Installation](#installation)
+- [Features](#installation)
+- [Supported platforms and setups](#supported-platforms-and-setups)
 - [Enabling localhost support](#enabling-localhost-support)
 - [IMPORTANT: Note about STRUCT variables](#important-note-about-struct-variables)
 - [IMPORTANT: Writing STRUCT variables](#important-note-writing-sturct-variables)
@@ -55,6 +56,17 @@ There is still some work to do for "production ready" version. See this [Github 
 - [License](#license)
 
 
+# Installation
+
+Install the [npm package](https://www.npmjs.com/package/ads-client) using npm command:
+```bash
+npm i ads-client
+```
+
+Include the module in your code
+```js
+const ads = require('ads-client')
+```
 # Features
 
 - Promise and async/await support
@@ -78,11 +90,13 @@ The ads-client package is tested so far with the following setups:
   - TwinCAT 3 4022.27 running on 64bit Windows 7 Embedded @ Beckhoff PLC
   - Node.js v10.16.3 and newer
 
-The ads-client can be used in different system setups
+The ads-client can be used in different system setups:
 
 ![ads-client-setups](https://user-images.githubusercontent.com/13457157/79771661-c59c0d80-8337-11ea-809f-b7c41bcb099d.png)
 
 ## Setup 1
+
+*Connect from Windows PC to the PLC.*
 
 Requirements:
 - UI client has TwinCAT installed
@@ -98,6 +112,8 @@ const client = new ads.Client({
 
 ## Setup 2
 
+*Connect from Unix PC to the PLC.*
+
 Requirements:
 - UI client has [AdsRouterConsole](https://www.nuget.org/packages/Beckhoff.TwinCAT.Ads.AdsRouterConsole/5.0.0-preview4) or similar running
 - ADS route is created between the UI and the PLC
@@ -109,8 +125,12 @@ const client = new ads.Client({
   targetAdsPort: 851,
 })
 ```
+Example entry in the PLCs 
+
 
 ## Setup 3
+
+*Connect from Windows PC, Unix PC or other device to the PLC.*
 
 Requirements:
 - PLC has TCP port 48898 open
@@ -130,7 +150,19 @@ const client = new ads.Client({
 })
 ```
 
+Example entry in the PLCs `TwinCAT\3.1\Target\StaticRoutes.xml` file when UI has AmsNetId of `192.168.1.10.1.1` and IP of `192.168.1.10`.
+```xml
+<Route>
+  <Name>UI</Name>
+  <Address>192.168.1.10</Address>
+  <NetId>192.168.1.10.1.1</NetId>
+  <Type>TCP_IP</Type>
+  <Flags>64</Flags>
+</Route>
+```
 ## Setup 4
+
+*Connect from the PLC to the localhost (PLC and UI on the same machine).*
 
 Requirements:
 - No special requirements
@@ -143,20 +175,6 @@ const client = new ads.Client({
 
 ```
 
-
-
-
-# Installation
-
-Install the [npm package](https://www.npmjs.com/package/ads-client) using npm command:
-```bash
-npm i ads-client
-```
-
-Include the module in your code
-```js
-const ads = require('ads-client')
-```
 
 # Enabling localhost support 
 *NOTE: Only required for TwinCAT versions older than 4024.5. Newer versions have this already enabled.*
