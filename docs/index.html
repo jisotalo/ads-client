@@ -58,108 +58,158 @@
 
     <section class="readme usertext">
         <article><h1>ads-client</h1>
-<p><img src="https://img.shields.io/badge/View%20on-GitHub!-brightgreen" alt="npm">
-<img src="https://img.shields.io/npm/v/ads-client" alt="npm">
-<img src="https://img.shields.io/github/license/jisotalo/ads-client" alt="GitHub"></p>
+<p><a href="https://www.npmjs.org/package/ads-cllient"><img src="https://img.shields.io/npm/v/ads-client" alt="npm version"></a>
+<a href="https://img.shields.io/github/license/jisotalo/ads-client"><img src="https://img.shields.io/badge/View%20on-GitHub!-brightgreen" alt="GitHub"></a>
+<a href="https://choosealicense.com/licenses/mit/"><img src="https://img.shields.io/github/license/jisotalo/ads-client" alt="License"></a></p>
 <p>Unofficial node.js ADS library for connecting to Beckhoff TwinCAT automation systems using ADS protocol.</p>
 <p>Coded from scratch using <a href="https://infosys.beckhoff.com/content/1033/tc3_ads_intro/116157835.html?id=124964102706356243">TwinCAT ADS specification</a> and <a href="https://www.nuget.org/packages/Beckhoff.TwinCAT.Ads/5.0.0-preview6">Beckhoff.TwinCAT.Ads nuget package</a>. Inspiration from similar projects like <a href="https://www.npmjs.com/package/node-ads">node-ads</a>, <a href="https://www.npmjs.com/package/beckhoff-js">beckhoff-js</a> and <a href="https://www.npmjs.com/package/iecstruct">iecstruct</a>.</p>
 <hr>
 <h2><em><strong>NOTE:</strong> Readme is still under construction!</em></h2>
 <p><strong>Important note</strong>:</p>
-<p><img src="https://img.shields.io/github/milestones/progress-percent/jisotalo/ads-client/1" alt="GitHub milestone"></p>
+<p><a href="https://github.com/jisotalo/ads-client/milestone/1"><img src="https://img.shields.io/github/milestones/progress-percent/jisotalo/ads-client/1" alt="GitHub milestone"></a></p>
 <p>There is still some work to do for &quot;production ready&quot; version. See this <a href="https://github.com/jisotalo/ads-client/milestone/1">Github milestone for details</a></p>
-<hr>
-<hr>
-<h1>Latest update</h1>
-<h2>[1.1.0] - 16.04.2020</h2>
-<h3>Added</h3>
-<ul>
-<li>Support for pseudo data types (like PVOID, XINT, UXINT etc.)</li>
-<li>Reserved ADS ports to ads-client-ads.js</li>
-</ul>
-<h3>Changed</h3>
-<ul>
-<li>writeSymbol is now case-insensitive (as the PLC system is)</li>
-<li>Fixed bug: Changed iconv-encode unicode to ucs2 at WSTRING</li>
-<li>Fixed bug: Better suppor for arrays when using <code>autoFill = true</code> parameter</li>
-<li>Updated README.md
-<ul>
-<li>array examples</li>
-<li><code>writeSymbol</code> and case-insensitive information</li>
-</ul>
-</li>
-</ul>
 <hr>
 <h1>Table of contents</h1>
 <ul>
-<li><a href="#installation">Features</a></li>
 <li><a href="#installation">Installation</a></li>
+<li><a href="#installation">Features</a></li>
+<li><a href="#supported-platforms-and-setups">Supported platforms and setups</a></li>
 <li><a href="#enabling-localhost-support">Enabling localhost support</a></li>
-<li><a href="#IMPORTANT-Note-about-STRUCT-variables">IMPORTANT: Note about STRUCT variables</a>
+<li><a href="#important-note-about-struct-variables">IMPORTANT: Note about STRUCT variables</a></li>
+<li><a href="#important-note-writing-sturct-variables">IMPORTANT: Writing STRUCT variables</a></li>
+<li><a href="#getting-started">Getting started</a>
 <ul>
-<li><a href="#NOTE-Writing-STURCT-variables">NOTE: Writing STURCT variables</a></li>
+<li><a href="data-types-used-in-getting-started">Data types used in getting started</a></li>
+<li><a href="#creating-a-new-client-instance">Creating a new Client instance</a></li>
+<li><a href="#connecting-and-disconnecting">Connecting and disconnecting</a></li>
+<li><a href="#reading-any-plc-variable">Reading any PLC variable</a>
+<ul>
+<li><a href="#reading-int-type-variable">Reading INT type variable</a></li>
+<li><a href="#reading-string-type-variable">Reading STRING type variable</a></li>
+<li><a href="#reading-enum-type-variable">Reading ENUM type variable</a></li>
+<li><a href="#reading-struct-type-variable">Reading STRUCT type variable</a></li>
+<li><a href="#reading-array-of-int-type-variable">Reading ARRAY OF INT type variable</a></li>
+<li><a href="#reading-array-of-struct-type-variable">Reading ARRAY OF STRUCT type variable</a></li>
 </ul>
 </li>
-<li><a href="#examples">Examples</a>
+<li><a href="#writing-any-plc-variable">Writing any PLC variable</a>
 <ul>
-<li><a href="#Creating-a-new-Client-instance">Creating a new Client instance</a></li>
-<li><a href="#Connecting-and-disconnecting">Connecting and disconnecting</a></li>
-<li><a href="#Reading-any-PLC-variable">Reading any PLC variable</a>
-<ul>
-<li><a href="#reading-a-base-type-plc-variable-int">Reading a base type PLC variable (INT)</a></li>
-<li><a href="#reading-a-struct-type-plc-variable">Reading a STRUCT type PLC variable</a></li>
-<li><a href="#Reading-an-ARRAY-of-base-type-PLC-variable">Reading an ARRAY of base type PLC variable</a></li>
-<li><a href="#Reading-an-ARRAY-of-STRUCT-type-PLC-variable">Reading an ARRAY of STRUCT type PLC variable</a></li>
+<li><a href="#writing-int-type-plc-variable">Writing INT type PLC variable</a></li>
+<li><a href="#writing-string-type-plc-variable">Writing STRING type PLC variable</a></li>
+<li><a href="#writing-enum-type-variable">Writing ENUM type variable</a></li>
+<li><a href="#writing-struct-type-plc-variable">Writing STRUCT type PLC variable</a></li>
+<li><a href="#writing-struct-type-plc-variable-with-autofill-parameter">Writing STRUCT type PLC variable (with autoFill parameter)</a></li>
+<li><a href="#writing-array-of-int-type-variable">Writing ARRAY OF INT type variable</a></li>
+<li><a href="#writing-array-of-struct-type-variable">Writing ARRAY of STRUCT type variable</a></li>
 </ul>
 </li>
-<li><a href="#Writing-any-PLC-variable">Writing any PLC variable</a>
+<li><a href="#subscribing-to-plc-variables-device-notifications">Subscribing to PLC variables (device notifications)</a>
 <ul>
-<li><a href="#writing-a-base-type-plc-variable-int">Writing a base type PLC variable (INT)</a></li>
-<li><a href="#writing-a-struct-type-plc-variable">Writing a STRUCT type PLC variable</a></li>
-<li><a href="#writing-a-struct-type-plc-variable-just-some-members-of-the-struct">Writing a STRUCT type PLC variable (just some members of the struct)</a></li>
-<li><a href="#Writing-an-ARRAY-of-base-type-PLC-variable">Writing an ARRAY of base type PLC variable</a></li>
-<li><a href="#Writing-an-ARRAY-of-STRUCT-type-PLC-variable">Writing an ARRAY of STRUCT type PLC variable</a></li>
+<li><a href="#subcribe-to-variable-value-on-change">Subcribe to variable value (on-change)</a></li>
+<li><a href="#subcribe-to-variable-value-cyclic">Subcribe to variable value (cyclic)</a></li>
 </ul>
 </li>
-<li><a href="#subscribing-to-plc-variable-changes">Subscribing to PLC variable changes</a></li>
 </ul>
 </li>
 <li><a href="#documentation">Documentation</a></li>
 <li><a href="#license">License</a></li>
 </ul>
-<h1>Features</h1>
-<ul>
-<li>Promises and async/await</li>
-<li>Supports connecting to the local TwinCAT runtime (see <a href="#localhost-support">enabling localhost support</a>)</li>
-<li>Supports multiple connections from the same host</li>
-<li>Reading and writing all kinds of variables by PLC variable name</li>
-<li>Subscribing to variable changes by PLC variable name (ADS notifications)</li>
-<li>Automatic conversion from PLC variables to Javascript objects and vice-versa</li>
-<li>Reading symbol and data type information</li>
-<li>Reading PLC runtime and system manager states</li>
-<li>Caching symbol and data type information (only read at first time when needed)</li>
-<li>Automatic pointer/reference support for 32bit and 64bit systems</li>
-<li>Automatic updating of symbols, data types and sunbscriptions when PLC program changes or system starts (<em>NOTE: Not 100 % ready yet</em>)</li>
-<li>Tested to work successfully
-<ul>
-<li>Node.js v10.16.3 and newer</li>
-<li>Local computer with TwinCAT 3 4022.27 running on 64bit Windows 10</li>
-<li>Local computer with TwinCAT 3 4024.4 running on 64bit Windows 10</li>
-<li>Beckhoff PLC with TwinCAT 3 4022.27 running on 64bit Windows 7 Embedded</li>
-</ul>
-</li>
-<li>Yet to be tested
-<ul>
-<li>Beckhoff PLC with 32 bit system</li>
-<li>TwinCAT 2 systems</li>
-<li>Running on Linux device with and without ADS router</li>
-<li>Running on Windows device without ADS router</li>
-</ul>
-</li>
-</ul>
 <h1>Installation</h1>
 <p>Install the <a href="https://www.npmjs.com/package/ads-client">npm package</a> using npm command:</p>
 <pre class="prettyprint source lang-bash"><code>npm i ads-client
+</code></pre>
+<p>Include the module in your code</p>
+<pre class="prettyprint source lang-js"><code>const ads = require('ads-client')
+</code></pre>
+<h1>Features</h1>
+<ul>
+<li>Promise and async/await support</li>
+<li>Supports connecting to the local TwinCAT runtime (see <a href="#localhost-support">enabling localhost support</a>)</li>
+<li>Supports multiple connections from the same host</li>
+<li>Reading and writing all any PLC variable</li>
+<li>Subscribing to PLC variables (ADS notifications)</li>
+<li>Automatic conversion between PLC&lt;-&gt;Javascript objects</li>
+<li>PLC symbol and data type handling and caching</li>
+<li>Reading PLC runtime and system manager states</li>
+<li>Automatic 32/64 bit variable support (PVOID, XINT, etc.)</li>
+<li>Automatic cache and subscription refreshing when PLC program changes or system starts (<em>See <a href="">#3</a>, <a href="">#4</a></em>)</li>
+</ul>
+<h1>Supported platforms and setups</h1>
+<p>The ads-client package is tested so far with the following setups:</p>
+<ul>
+<li>TwinCAT 3 4022.27 running on 64bit Windows 10</li>
+<li>TwinCAT 3 4024.4 running on 64bit Windows 10</li>
+<li>TwinCAT 3 4022.27 running on 64bit Windows 7 Embedded @ Beckhoff PLC</li>
+<li>Node.js v10.16.3 and newer</li>
+</ul>
+<p>The ads-client can be used in different system setups:</p>
+<p><img src="https://user-images.githubusercontent.com/13457157/79771661-c59c0d80-8337-11ea-809f-b7c41bcb099d.png" alt="ads-client-setups"></p>
+<h2>Setup 1</h2>
+<p><em>Connect from Windows PC to the PLC.</em></p>
+<p>Requirements:</p>
+<ul>
+<li>UI client has TwinCAT installed</li>
+<li>ADS route is created between the UI and the PLC</li>
+</ul>
+<p>Example connection when PLC has AmsNetId of <code>192.168.1.120.1.1</code>.</p>
+<pre class="prettyprint source lang-js"><code>const client = new ads.Client({
+  targetAmsNetId: '192.168.1.120.1.1',
+  targetAdsPort: 851,
+})
+</code></pre>
+<h2>Setup 2</h2>
+<p><em>Connect from Unix PC to the PLC.</em></p>
+<p>Requirements:</p>
+<ul>
+<li>UI client has <a href="https://www.nuget.org/packages/Beckhoff.TwinCAT.Ads.AdsRouterConsole/5.0.0-preview4">AdsRouterConsole</a> or similar running</li>
+<li>ADS route is created between the UI and the PLC</li>
+</ul>
+<p>Example connection when PLC has AmsNetId of <code>192.168.1.120.1.1</code>.</p>
+<pre class="prettyprint source lang-js"><code>const client = new ads.Client({
+  targetAmsNetId: '192.168.1.120.1.1',
+  targetAdsPort: 851,
+})
+</code></pre>
+<p>Example entry in the PLCs</p>
+<h2>Setup 3</h2>
+<p><em>Connect from Windows PC, Unix PC or other device to the PLC.</em></p>
+<p>Requirements:</p>
+<ul>
+<li>PLC has TCP port 48898 open</li>
+<li>Given <code>localAmsNetId</code> is not already in use</li>
+<li>Given <code>localAdsPort</code> is not already in use</li>
+<li>PLC has ADS route manually created to UI machines IP address and the given <code>localAmsNetId</code></li>
+</ul>
+<p>Example connection when PLC has AmsNetId of <code>192.168.1.120.1.1</code> and IP of <code>192.168.1.120</code>.</p>
+<pre class="prettyprint source lang-js"><code>const client = new ads.Client({
+  localAmsNetId: '192.168.1.10.1.1',
+  localAdsPort: 32750,
+  targetAmsNetId: '192.168.1.120.1.1',
+  targetAdsPort: 851,
+  routerAddress: '192.168.1.120',
+  routerTcpPort: 48898
+})
+</code></pre>
+<p>Example entry in the PLCs <code>TwinCAT\3.1\Target\StaticRoutes.xml</code> file when UI has AmsNetId of <code>192.168.1.10.1.1</code> and IP of <code>192.168.1.10</code>.</p>
+<pre class="prettyprint source lang-xml"><code>&lt;Route>
+  &lt;Name>UI&lt;/Name>
+  &lt;Address>192.168.1.10&lt;/Address>
+  &lt;NetId>192.168.1.10.1.1&lt;/NetId>
+  &lt;Type>TCP_IP&lt;/Type>
+  &lt;Flags>64&lt;/Flags>
+&lt;/Route>
+</code></pre>
+<h2>Setup 4</h2>
+<p><em>Connect from the PLC to the localhost (PLC and UI on the same machine).</em></p>
+<p>Requirements:</p>
+<ul>
+<li>No special requirements</li>
+</ul>
+<pre class="prettyprint source lang-js"><code>const client = new ads.Client({
+  targetAmsNetId: '127.0.0.1.1.1',
+  targetAdsPort: 851,
+})
+
 </code></pre>
 <h1>Enabling localhost support</h1>
 <p><em>NOTE: Only required for TwinCAT versions older than 4024.5. Newer versions have this already enabled.</em></p>
@@ -170,23 +220,29 @@
 <p>Stop TwinCAT System Service</p>
 </li>
 <li>
-<p>Enable TCP Loopback for TwinCAT via registery:</p>
-</li>
-</ol>
+<p>Enable TCP Loopback for TwinCAT via registery (regedit):</p>
+<ul>
+<li>
 <p>32-Bit Windows Operating System:</p>
 <pre class="prettyprint source"><code>Create following DWORD and set value to 1:
 HKEY_LOCAL_MACHINE\SOFTWARE\Beckhoff\TwinCAT3\System\EnableAmsTcpLoopback
 </code></pre>
+</li>
+<li>
 <p>64-Bit Windows Operating System:</p>
 <pre class="prettyprint source"><code>Create following DWORD and set value to 1:
 HKEY_LOCAL_MACHINE\SOFTWARE\WOW6432Node\Beckhoff\TwinCAT3\System\EnableAmsTcpLoopback
 </code></pre>
-<ol start="3">
-<li>Restart TwinCAT System Service</li>
+</li>
+</ul>
+</li>
+<li>
+<p>Restart TwinCAT System Service</p>
+</li>
 </ol>
-<p>Now the connection to the localhost using <code>localAmsNetId</code> address <code>127.0.0.1.1.1</code> or <code>localhost</code> should work.</p>
+<p>Now you can connect to the localhost using <code>localAmsNetId</code> address of <code>127.0.0.1.1.1</code> or <code>localhost</code>.</p>
 <h1>IMPORTANT: Note about STRUCT variables</h1>
-<p>At the moment all structs need to have attribute <code>{attribute 'pack_mode' := '1'}</code> defined:</p>
+<p>At the moment all structs need to have attribute <code>{attribute 'pack_mode' := '1'}</code> above the definition. This forces the TwinCAT to use 1-byte variable alignment.</p>
 <pre class="prettyprint source"><code>{attribute 'pack_mode' := '1'}
 TYPE ST_Example :
 STRUCT
@@ -194,75 +250,85 @@ STRUCT
 	SomeReal : REAL := 3.14159265359;
 END_STRUCT
 END_TYPE
-
 </code></pre>
 <p>If the attribute is not found, the library will print a warning to the console:</p>
 <pre class="prettyprint source"><code>ads-client: WARNING: PLC data type ST_Example is a STRUCT and has no attribute {attribute 'pack_mode' := '1'} above it's definition -> Read data may be corrupted depending on the struct layout. Disable this warning with setting 'disableStructPackModeWarning: true'
 </code></pre>
-<p>The warning can be hidden using setting <code>'disableStructPackModeWarning: true'</code>. If the pack-mode is not defined, reading or writing data will cause corrupted data and problems depending on the struct layout.</p>
+<p>The warning can be hidden using setting <code>'disableStructPackModeWarning: true'</code>. If the pack-mode is not defined, reading or writing data will cause corrupted data in some cases.</p>
 <p>See <a href="https://github.com/jisotalo/ads-client/issues/13">this GitHub issue</a> for developing support for TwinCAT 3 default byte alignment.</p>
 <hr>
-<h2>NOTE: Writing STURCT variables</h2>
-<p>When writing a struct using <code>writeSymbol</code>, the given Javascript object keys are handled as case-insensitive. The TwinCAT 3 system is case-insensitive, so variables like <code>TestINT</code> and <code>testint</code> are the same.</p>
-<p>Basically this means that the following Javascript objects work the same way when using <code>writeSymbol</code>:</p>
-<pre class="prettyprint source lang-javascript"><code>{
+<h1>IMPORTANT: Writing STRUCT variables</h1>
+<p>When writing a struct using <code>writeSymbol</code>, the given Javascript object keys are handled as case-insensitive because the TwinCAT 3 system is <strong>case-insensitive</strong>.</p>
+<p>Basically this means that the following Javascript objects are used as-equals if passing to the <code>writeSymbol</code> method:</p>
+<pre class="prettyprint source lang-js"><code>{
   sometext: 'hello',
   somereal: 3.14
 }
 </code></pre>
-<pre class="prettyprint source lang-javascript"><code>{
+<pre class="prettyprint source lang-js"><code>{
   SOmeTEXT: 'hello',
   SOMEreal: 3.14
 }
 </code></pre>
-<p><strong>NOTE</strong> If the object has two keys with same name but different case, it depends on the Javascript engine which one is found first using .find() method.</p>
-<pre class="prettyprint source lang-javascript"><code>//You can't be sure which one is selected, when writing PLC variable SomeText!
+<p><strong>NOTE</strong> If the object has multiple keys with same name, <code>writeSymbol</code> tries to find the same case as in PLC. If it's not found, it depends on the <code>Object.find()</code> method which one is selected.</p>
+<pre class="prettyprint source lang-js"><code>//In this case, probably the first one (sometext) is selected and the SOMEtext is skipped.
 {
   sometext: 'hello',
   SOMEtext: 'good day'
 }
 </code></pre>
-<h1>Examples</h1>
-<p>This chapter includes some examples for using the library. See the <a href="#documentation">documentation</a> for detailed description.</p>
+<h1>Getting started</h1>
+<p>This chapter includes some short getting started examples. See the JSDoc <a href="#documentation">documentation</a> for detailed description of library classes and methods.</p>
+<h2>Data types used in getting started</h2>
+<p>These examples assume that the PLC has the following Global Variable List (GVL):</p>
+<pre class="prettyprint source"><code>//GVL_Test
+VAR_GLOBAL
+	TestINT         	: INT := 1234;
+	TestSTRING 	    	: STRING := 'Hello this is a test string';
+	ExampleSTRUCT   	: ST_Example;
+	TestARRAY  			: ARRAY[0..4] OF INT := [0, 10, 200, 3000, 4000];
+	TestARRAY2			: ARRAY[0..4] OF ST_Example := [(SomeText := 'Just for demo purposes')];
+	TestENUM  			: E_TestEnum := E_TestEnum.Running;
+	IncrementingValue 	: INT; //This should change every 500 ms or so
+END_VAR
+</code></pre>
+<p>The <code>ST_Example</code> should be defined as below:</p>
+<pre class="prettyprint source"><code>{attribute 'pack_mode' := '1'}
+TYPE ST_Example :
+STRUCT
+	SomeText : STRING(50) := 'Hello ads-client';
+	SomeReal : REAL := 3.14159265359;
+	SomeDate : DT := DT#2020-4-13-12:25:33;
+END_STRUCT
+END_TYPE
+</code></pre>
+<p>The <code>E_TestEnum</code> should be defined as below:</p>
+<pre class="prettyprint source"><code>TYPE E_TestEnum :
+(
+	Disabled 	:= 0,
+	Starting 	:= 50,
+	Running 	:= 100,
+	Stopping	:= 200	
+);
+END_TYPE
+</code></pre>
 <h2>Creating a new Client instance</h2>
-<p>The constructor takes settings as its parameter. See all settings from the <a href="https://jisotalo.github.io/ads-client/global.html#Settings">Settings documentation</a></p>
-<p><strong>Minimun required</strong></p>
-<p><em>Connects to the given AmsNetId and port using local ADS router</em></p>
-<pre class="prettyprint source lang-javascript"><code>const ads = require('ads-client')
+<p>The constructor takes settings as its parameter. Two settings are mandatory: <code>targetAmsNetId</code> and <code>targetAdsPort</code>. The first is the target PLC system AmsNetId (like <em>127.0.0.1.1.1</em> or <em>192.168.1.10.1.1</em>) and the latter is target system ADS port (<em>like 851 for TwinCAT 3 runtime 1</em>).</p>
+<p>See all settings from the <a href="https://jisotalo.github.io/ads-client/global.html#Settings">Settings documentation</a></p>
+<pre class="prettyprint source lang-js"><code>const ads = require('ads-client')
 
+//Creates a new Client instance and sets the local system and TC3 runtime 1 as target
 const client = new ads.Client({
-  targetAmsNetId: '127.0.0.1.1.1', //could be also 'localhost'
+  targetAmsNetId: '127.0.0.1.1.1', //Loopback address, same as 'localhost' since version 1.1.0
   targetAdsPort: 851,
-})
-</code></pre>
-<p><strong>Example 2</strong></p>
-<p><em>Same as previous but do not convert enumerations to objects and dates to Date objects</em></p>
-<pre class="prettyprint source lang-javascript"><code>const ads = require('ads-client')
-
-const client = new ads.Client({
-  targetAmsNetId: '127.0.0.1.1.1', 
-  targetAdsPort: 851,
-  objectifyEnumerations: false,
-  convertDatesToJavascript: false
-})
-</code></pre>
-<p><strong>Example 3</strong></p>
-<p><em>Cache all PLC runtime data types and symbols when connecting</em></p>
-<pre class="prettyprint source lang-javascript"><code>const ads = require('ads-client')
-
-const client = new ads.Client({
-  targetAmsNetId: '127.0.0.1.1.1',
-  targetAdsPort: 851,
-  readAndCacheDataTypes: true,
-  readAndCacheSymbols: true
 })
 </code></pre>
 <h2>Connecting and disconnecting</h2>
 <p>Connecting to the local TwinCAT 3 runtime 1 (port is 851) using local ADS router (= you have TwinCAT ADS router installed).</p>
-<pre class="prettyprint source lang-javascript"><code>const ads = require('ads-client')
+<pre class="prettyprint source lang-js"><code>const ads = require('ads-client')
 
 const client = new ads.Client({
-  targetAmsNetId: '127.0.0.1.1.1', //Loopback AmsNetId, you could use local AmsNetId too if you know it
+  targetAmsNetId: '127.0.0.1.1.1',
   targetAdsPort: 851
 })
 
@@ -279,207 +345,118 @@ client.connect()
   .catch(err => {
     console.log('Something failed:', err)
   })
-</code></pre>
-<p>Example console output</p>
-<pre class="prettyprint source"><code>Connected to the 127.0.0.1.1.1
+
+/*
+Example console output:
+
+Connected to the 127.0.0.1.1.1
 Router assigned us AmsNetId 192.168.1.1.1.1 and port 36837
 Disconnected
+*/
 </code></pre>
 <h2>Reading any PLC variable</h2>
-<h3>Reading a base type PLC variable (INT)</h3>
-<p>First, we need to have a GVL_Test at the PLC with the following:</p>
-<pre class="prettyprint source"><code>//GVL_Test
-VAR_GLOBAL
-	TestINT : INT := 1234;
-END_VAR
-</code></pre>
-<pre class="prettyprint source lang-javascript"><code>const ads = require('ads-client')
-
-const client = new ads.Client({
-  targetAmsNetId: '127.0.0.1.1.1',
-  targetAdsPort: 851
-})
-
-client.connect()
-  .then(res => {   
-    console.log(`Connected to the ${res.targetAmsNetId}`)
-
-    return client.readSymbol('GVL_Test.TestINT')
-  })
+<p>By using <code>readSymbol</code> method we can read all kind of types from the PLC, including base type variables, structs, arrays and so on. These examples cover just a few cases.</p>
+<p>See full <code>readSymbol</code> documentation <a href="https://jisotalo.github.io/ads-client/Client.html#readSymbol">from the docs</a>.</p>
+<h3>Reading <code>INT</code> type variable</h3>
+<pre class="prettyprint source lang-js"><code>//Using Promises
+client.readSymbol('GVL_Test.TestSTRING')
   .then(res => {
     console.log(`Value read: ${res.value}`)
-
-    return client.disconnect()
-  })
-  .then(() => {
-    console.log('Disconnected')
   })
   .catch(err => {
     console.log('Something failed:', err)
   })
-</code></pre>
-<p>Example console output</p>
-<pre class="prettyprint source"><code>Connected to the 127.0.0.1.1.1
+
+/*
+Example console output:
+
 Value read: 1234
-Disconnected
+*/
 </code></pre>
-<h3>Reading a base type PLC variable (STRING)</h3>
-<p>First, we need to have a GVL_Test at the PLC with the following:</p>
-<pre class="prettyprint source"><code>//GVL_Test
-VAR_GLOBAL
-	TestSTRING 		: STRING := 'Hello this is a test string';
-END_VAR
-</code></pre>
-<pre class="prettyprint source lang-javascript"><code>//...the previous lines are hidden
-
-client.connect()
-  .then(res => {   
-    console.log(`Connected to the ${res.targetAmsNetId}`)
-
-    return client.readSymbol('GVL_Test.TestSTRING')
-  })
+<hr>
+<h3>Reading <code>STRING</code> type variable</h3>
+<pre class="prettyprint source lang-js"><code>client.readSymbol('GVL_Test.TestSTRING')
   .then(res => {
     console.log(`Value read: ${res.value}`)
+  })
+  .catch(err => {
+    console.log('Something failed:', err)
+  })
+/*
+Example console output:
 
-    return client.disconnect()
+Value read: Hello this is a test string
+*/
+</code></pre>
+<hr>
+<h3>Reading <code>ENUM</code> type variable</h3>
+<p>If <code>objectifyEnumerations</code> is set to false, only ENUM value (number) is returned.</p>
+<pre class="prettyprint source lang-js"><code>//objectifyEnumerations: true
+client.readSymbol('GVL_Test.TestENUM')
+  .then(res => {
+    console.log(`Value read: ${res.value}`)
+  })
+  .catch(err => {
+    console.log('Something failed:', err)
   })
 
-//...the next lines are hidden
+/*
+Example console output:
+
+Value read: { name: 'Running', value: 100 }
+*/
 </code></pre>
-<p>Example console output</p>
-<pre class="prettyprint source"><code>Connected to the 127.0.0.1.1.1
-Value read: Hello this is a test string
-Disconnected
-</code></pre>
-<h3>Reading a STRUCT type PLC variable</h3>
 <hr>
+<h3>Reading <code>STRUCT</code> type variable</h3>
 <p><strong>IMPORTANT NOTE:</strong> See chapter <a href="#IMPORTANT-Note-about-STRUCT-variables">IMPORTANT: Note about STRUCT variables</a></p>
-<hr>
-<p>First, we need to have a ST_Example like the following:</p>
-<pre class="prettyprint source"><code>{attribute 'pack_mode' := '1'}
-TYPE ST_Example :
-STRUCT
-	SomeText : STRING(50) := 'Hello ads-client';
-	SomeReal : REAL := 3.14159265359;
-	SomeDate : DT := DT#2020-4-13-12:25:33;
-END_STRUCT
-END_TYPE
-</code></pre>
-<p>Second, we need to have a GVL_Test at the PLC with the following:</p>
-<pre class="prettyprint source"><code>//GVL_Test
-VAR_GLOBAL
-	ExampleSTRUCT   : ST_Example;
-END_VAR
-</code></pre>
-<p>Then reading is simple.</p>
-<p><em>Note: Using async/await just for example purposes</em></p>
-<pre class="prettyprint source lang-javascript"><code>const ads = require('ads-client')
-
-const client = new ads.Client({
-  targetAmsNetId: '127.0.0.1.1.1',
-  targetAdsPort: 851
-}); //Note required ; because of (async()...
-
-(async () => {
-  try {
-    //Connecting
-    const res = await client.connect()
-    console.log(`Connected to the ${res.targetAmsNetId}`)
-
-    //Reading
-    try {
-      const res = await client.readSymbol('GVL_Test.ExampleSTRUCT')
-      console.log('Value read:', res.value)
-    } catch (err) {
-      console.log('Reading failed:', err)
-      return
-    }
-
-    //Disconnecting
-    try {
-      const res = await client.disconnect()
-      console.log('Disconneted')
-    } catch (err) {
-      console.log('Disconnecting failed:', err)
-      return
-    }
-
-  } catch (err) {
-    console.log('Connecting failed:', err)
-    return
-  }
-})()
-</code></pre>
-<p>Example console output</p>
-<pre class="prettyprint source"><code>Connected to the 127.0.0.1.1.1
-Value read: { SomeText: 'Hello ads-client',
-  SomeReal: 3.1415927410125732,
-  SomeDate: 2020-04-13T12:25:33.000Z }     
-Disconneted
-</code></pre>
-<h3>Reading an ARRAY of base type PLC variable</h3>
-<hr>
-<p><strong>NOTE:</strong> Handling multi-dimensional arrays is not supported at the moment. See <a href="https://github.com/jisotalo/ads-client/issues/10">this GitHub issue</a> for the development of the multi-dimensional array support.</p>
-<hr>
-<p>First, we need to have a GVL_Test at the PLC with the following:</p>
-<pre class="prettyprint source"><code>//GVL_Test
-VAR_GLOBAL
-	TestARRAY 		: ARRAY[0..4] OF INT := [0, 10, 200, 3000, 4000];
-END_VAR
-</code></pre>
-<p>Then we can read the whole array at once:</p>
-<pre class="prettyprint source lang-javascript"><code>//...the previous lines are hidden
-
-    try {
-      const res = await client.readSymbol('GVL_Test.TestARRAY')
-      console.log('Value read:', res.value)
-    } catch (err) {
-      console.log('Reading failed:', err)
-      return
-    }
-    
-//...the next lines are hidden
-</code></pre>
-<p>Example console output</p>
-<pre class="prettyprint source"><code>Connected to the 127.0.0.1.1.1
-Value read: [ 0, 10, 200, 3000, 4000 ]
-Disconneted
-</code></pre>
-<h3>Reading an ARRAY of STRUCT type PLC variable</h3>
-<hr>
-<p><strong>NOTE:</strong> Handling multi-dimensional arrays is not supported at the moment. See <a href="https://github.com/jisotalo/ads-client/issues/10">this GitHub issue</a> for the development of the multi-dimensional array support.</p>
-<hr>
-<p>First, we need to have a ST_Example like the following:</p>
-<pre class="prettyprint source"><code>{attribute 'pack_mode' := '1'}
-TYPE ST_Example :
-STRUCT
-	SomeText : STRING(50) := 'Hello ads-client';
-	SomeReal : REAL := 3.14159265359;
-	SomeDate : DT := DT#2020-4-13-12:25:33;
-END_STRUCT
-END_TYPE
-</code></pre>
-<p>Second, we need to have a GVL_Test at the PLC with the following:</p>
-<pre class="prettyprint source"><code>//GVL_Test
-VAR_GLOBAL
-	TestARRAY		: ARRAY[0..4] OF ST_Example := [(SomeText := 'Just for demo purposes')];
-END_VAR
-</code></pre>
-<p>Then we can read the whole array at once:</p>
-<pre class="prettyprint source lang-javascript"><code>//...the previous lines are hidden
-
+<pre class="prettyprint source lang-js"><code>//Using await for example purposes
 try {
-  const res = await client.readSymbol('GVL_Test.TestARRAY')
+  const res = await client.readSymbol('GVL_Test.ExampleSTRUCT')
+
   console.log('Value read:', res.value)
 } catch (err) {
   console.log('Reading failed:', err)
-  return
 }
-    
-//...the next lines are hidden
+
+/*
+Example console output:
+
+Value read: { SomeText: 'Hello ads-client',
+  SomeReal: 3.1415927410125732,
+  SomeDate: 2020-04-13T12:25:33.000Z }   
+*/
 </code></pre>
-<p>Example console output</p>
-<pre class="prettyprint source"><code>Connected to the 127.0.0.1.1.1
+<hr>
+<h3>Reading <code>ARRAY OF INT</code> type variable</h3>
+<p><strong>NOTE:</strong> Handling multi-dimensional arrays is not supported at the moment. See <a href="https://github.com/jisotalo/ads-client/issues/10">this GitHub issue</a> for the development of the multi-dimensional array support.</p>
+<pre class="prettyprint source lang-js"><code>try {
+  const res = await client.readSymbol('GVL_Test.TestARRAY')
+
+  console.log('Value read:', res.value)
+} catch (err) {
+  console.log('Reading failed:', err)
+}
+
+/*
+Example console output:
+
+Value read: [ 0, 10, 200, 3000, 4000 ] 
+*/
+</code></pre>
+<hr>
+<h3>Reading <code>ARRAY OF STRUCT</code> type variable</h3>
+<p><strong>NOTE:</strong> Handling multi-dimensional arrays is not supported at the moment. See <a href="https://github.com/jisotalo/ads-client/issues/10">this GitHub issue</a> for the development of the multi-dimensional array support.</p>
+<pre class="prettyprint source lang-javascript"><code>try {
+  const res = await client.readSymbol('GVL_Test.TestARRAY2')
+
+  console.log('Value read:', res.value)
+} catch (err) {
+  console.log('Reading failed:', err)
+}
+
+/*
+Example console output:
+
 Value read: [ { SomeText: 'Just for demo purposes',
     SomeReal: 3.1415927410125732,
     SomeDate: 2020-04-13T12:25:33.000Z },
@@ -495,282 +472,117 @@ Value read: [ { SomeText: 'Just for demo purposes',
   { SomeText: 'Hello ads-client',
     SomeReal: 3.1415927410125732,
     SomeDate: 2020-04-13T12:25:33.000Z } ]
-Disconneted
+*/
 </code></pre>
+<hr>
 <h2>Writing any PLC variable</h2>
-<h3>Writing a base type PLC variable (INT)</h3>
-<p>First, we need to have a GVL_Test at the PLC with the following:</p>
-<pre class="prettyprint source"><code>//GVL_Test
-VAR_GLOBAL
-	TestINT : INT := 1234;
-END_VAR
-</code></pre>
-<p>Let's read the value, change it and read again:</p>
-<pre class="prettyprint source lang-javascript"><code>
-//...the previous lines are hidden
-try {
-  
-  //Reading the value
-  let res = await client.readSymbol('GVL_Test.TestINT')
-  console.log('Value read:', res.value)
-
-  //Writing the value
-  res = await client.writeSymbol('GVL_Test.TestINT', 5)
-  console.log('Value written:', res.value)
-
-  //Reading the value again to be sure
-  res = await client.readSymbol('GVL_Test.TestINT')
-  console.log('Value read:', res.value)
-
-} catch (err) {
-  console.log('Something failed:', err)
-  return
-}
-
-//...the next lines are hidden
-</code></pre>
-<p>Example console output</p>
-<pre class="prettyprint source"><code>Connected to the 127.0.0.1.1.1
-Value read: 1234
-Value written: 5
-Value read: 5
-</code></pre>
-<h3>Writing a base type PLC variable (STRING)</h3>
-<p>First, we need to have a GVL_Test at the PLC with the following:</p>
-<pre class="prettyprint source"><code>//GVL_Test
-VAR_GLOBAL
-	TestSTRING : STRING := 'Hello this is a test string';
-END_VAR
-</code></pre>
-<p>Let's read the value, change it and read again:</p>
-<pre class="prettyprint source lang-javascript"><code>//...the previous lines are hidden
-
-try {
-  
-  //Reading the value
-  let res = await client.readSymbol('GVL_Test.TestSTRING')
-  console.log('Value read:', res.value)
-
-  //Writing the value
-  res = await client.writeSymbol('GVL_Test.TestSTRING', 'Changing the string value to this')
-  console.log('Value written:', res.value)
-
-  //Reading the value again to be sure
-  res = await client.readSymbol('GVL_Test.TestSTRING')
-  console.log('Value read:', res.value)
-
-} catch (err) {
-  console.log('Something failed:', err)
-  return
-}
-
-//...the next lines are hidden
-</code></pre>
-<p>Example console output</p>
-<pre class="prettyprint source"><code>Connected to the 127.0.0.1.1.1
-Value read: Hello this is a test string
-Value written: Changing the string value to this
-Value read: Changing the string value to this   
-Disconneted
-</code></pre>
-<h3>Writing a STRUCT type PLC variable</h3>
+<p>By using <code>writeSymbol</code> method we can write all kind of types to the PLC, including base type variables, structs, arrays and so on. These examples cover just a few cases.</p>
+<p>See full <code>writeSymbol</code> documentation <a href="https://jisotalo.github.io/ads-client/Client.html#writeSymbol">from the docs</a>.</p>
 <hr>
+<h3>Writing <code>INT</code> type PLC variable</h3>
+<pre class="prettyprint source lang-js"><code>try {
+  const res = await client.writeSymbol('GVL_Test.TestINT', 5)
+
+  console.log('Value written:', res.value)
+} catch (err) {
+  console.log('Something failed:', err)
+}
+</code></pre>
+<hr>
+<h3>Writing <code>STRING</code> type PLC variable</h3>
+<pre class="prettyprint source lang-js"><code>
+try {
+  const res = await client.writeSymbol('GVL_Test.TestSTRING', 'Changing the string value to this')
+
+  console.log('Value written:', res.value)
+} catch (err) {
+  console.log('Something failed:', err)
+}
+</code></pre>
+<hr>
+<h3>Writing <code>ENUM</code> type variable</h3>
+<p>When writing <code>ENUM</code> value, it can always be given as number or string.</p>
+<pre class="prettyprint source lang-js"><code>try {
+  const res = await client.writeSymbol('GVL_Test.TestENUM', 'Starting')
+  //The following does the same:
+  //const res = await client.writeSymbol('GVL_Test.TestENUM', 50)
+
+  console.log('Value written:', res.value)
+} catch (err) {
+  console.log('Something failed:', err)
+}
+</code></pre>
+<hr>
+<h3>Writing <code>STRUCT</code> type PLC variable</h3>
 <p><strong>IMPORTANT NOTE:</strong> See chapter <a href="#IMPORTANT-Note-about-STRUCT-variables">IMPORTANT: Note about STRUCT variables</a></p>
-<hr>
-<p>First, we need to have a ST_Example like the following:</p>
-<pre class="prettyprint source"><code>{attribute 'pack_mode' := '1'}
-TYPE ST_Example :
-STRUCT
-	SomeText : STRING(50) := 'Hello ads-client';
-	SomeReal : REAL := 3.14159265359;
-	SomeDate : DT := DT#2020-4-13-12:25:33;
-END_STRUCT
-END_TYPE
-</code></pre>
-<p>Second, we need to have a GVL_Test at the PLC with the following:</p>
-<pre class="prettyprint source"><code>//GVL_Test
-VAR_GLOBAL
-	ExampleSTRUCT   : ST_Example;
-END_VAR
-</code></pre>
-<pre class="prettyprint source lang-javascript"><code>//...the previous lines are hidden
-
-try {
-  //Reading the value
-  let res = await client.readSymbol('GVL_Test.ExampleSTRUCT')
-  console.log('Value read:', res.value)
-
-  //Writing the value
-  res = await client.writeSymbol('GVL_Test.ExampleSTRUCT', {
+<pre class="prettyprint source lang-js"><code>try {
+  const res = await client.writeSymbol('GVL_Test.ExampleSTRUCT', {
     SomeText: 'Hello to you too, Mr. PLC!',
     SomeReal: 5456.06854,
     SomeDate: new Date()
   })
+
   console.log('Value written:', res.value)
-
-  //Reading the value to be sure
-  res = await client.readSymbol('GVL_Test.ExampleSTRUCT')
-  console.log('Value read:', res.value)
-
 } catch (err) {
   console.log('Something failed:', err)
-  return
 }
-
-//...the next lines are hidden
 </code></pre>
-<p>Example console output</p>
-<pre class="prettyprint source"><code>Connected to the 127.0.0.1.1.1
-Value read: { SomeText: 'Hello ads-client',
-  SomeReal: 3.1415927410125732,
-  SomeDate: 2020-04-13T12:25:33.000Z }     
-Value written: { SomeText: 'Hello to you too, Mr. PLC!',
-  SomeReal: 5456.06854,
-  SomeDate: 2020-04-13T09:32:24.933Z }
-Value read: { SomeText: 'Hello to you too, Mr. PLC!',   
-  SomeReal: 5456.068359375,
-  SomeDate: 2020-04-13T09:32:24.000Z }
-Disconneted
-</code></pre>
-<h3>Writing a STRUCT type PLC variable (some members of the struct)</h3>
+<h3>Writing <code>STRUCT</code> type PLC variable (with autoFill parameter)</h3>
 <hr>
 <p><strong>IMPORTANT NOTE:</strong> See chapter <a href="#IMPORTANT-Note-about-STRUCT-variables">IMPORTANT: Note about STRUCT variables</a></p>
-<hr>
-<p>First, we need to have a ST_Example like the following:</p>
-<pre class="prettyprint source"><code>{attribute 'pack_mode' := '1'}
-TYPE ST_Example :
-STRUCT
-	SomeText : STRING(50) := 'Hello ads-client';
-	SomeReal : REAL := 3.14159265359;
-	SomeDate : DT := DT#2020-4-13-12:25:33;
-END_STRUCT
-END_TYPE
-</code></pre>
-<p>Second, we need to have a GVL_Test at the PLC with the following:</p>
-<pre class="prettyprint source"><code>//GVL_Test
-VAR_GLOBAL
-	ExampleSTRUCT   : ST_Example;
-END_VAR
-</code></pre>
-<p>We can also write just some members of the struct if we like.</p>
-<p>The following will throw an error:</p>
-<pre class="prettyprint source lang-javascript"><code>//...the previous lines are hidden
+<p>The following code will not work. The PLC struct has three members but we provide only two, which causes an exception.</p>
+<pre class="prettyprint source lang-js"><code>//NOTE: This won't work
+try {
+  const res = await client.writeSymbol('GVL_Test.ExampleSTRUCT', {
+    SomeReal: 123.45,
+    SomeText: 'This will not work...'
+  })
 
-//Writing the value
-res = await client.writeSymbol('GVL_Test.ExampleSTRUCT', {
-  SomeReal: 123.45,
-  SomeText: 'This will not work...'
-})
+} catch (err) {
+  console.log('Something failed:', err)
+}
 
-//...the next lines are hidden
-</code></pre>
-<p>Example console output</p>
-<pre class="prettyprint source"><code>Connected to the 127.0.0.1.1.1
-Value read: { SomeText: 'Hello ads-client',
-  SomeReal: 3.1415927410125732,
-  SomeDate: 2020-04-13T12:25:33.000Z }     
+/*
+Example console output
+
 Something failed: { ClientException: Writing symbol GVL_Test.ExampleSTRUCT failed: Given Javascript object is missing key/value for at least &quot;.SomeDate&quot; (DATE_AND_TIME) - Set writeSymbol() 3rd parameter (autoFill) to true to allow uncomplete objects
     at Promise ...
+*/
 </code></pre>
-<p>We need to tell the <code>WriteSymbol</code> that we <em>indeed</em> want to write just some members and the rest will stay the same. This happens by providing the 3rd parameter <code>autoFill</code>, which causes the method first read the newest value and then overwrite only the given members.</p>
-<pre class="prettyprint source lang-javascript"><code>//...the previous lines are hidden
+<p>We need to tell the <code>WriteSymbol</code> that we <em>indeed</em> want to write just some members and the rest will stay the same. This happens by setting the 3rd parameter <code>autoFill</code> to true.</p>
+<p>If <code>autoFill</code> is true, the method first reads the latest value and then writes it with only the new given changes.</p>
+<pre class="prettyprint source lang-js"><code>try {
+  const res = await client.writeSymbol('GVL_Test.ExampleSTRUCT', {
+    SomeReal: 123.45,
+    SomeText: 'But this works!'
+  }, true) //Note this!
 
-//Writing the value
-res = await client.writeSymbol('GVL_Test.ExampleSTRUCT', {
-  SomeReal: 123.45,
-  SomeText: 'But this works!'
-}, true)
-
-//...the next lines are hidden
-</code></pre>
-<p>Example console output</p>
-<pre class="prettyprint source"><code>Connected to the 127.0.0.1.1.1
-Value read: { SomeText: 'Hello ads-client',
-  SomeReal: 3.1415927410125732,
-  SomeDate: 2020-04-13T12:25:33.000Z }     
-Value written: { SomeText: 'But this works!',
-  SomeReal: 123.45,
-  SomeDate: 2020-04-13T12:25:33.000Z }       
-Value read: { SomeText: 'But this works!',
-  SomeReal: 123.44999694824219,
-  SomeDate: 2020-04-13T12:25:33.000Z }    
-Disconneted
-</code></pre>
-<p>Of course, it would be possible to do with two separate commands:</p>
-<pre class="prettyprint source lang-javascript"><code>//...the previous lines are hidden
-
-//Writing the value
-res = await client.writeSymbol('GVL_Test.ExampleSTRUCT.SomeReal', 123.45)
-res = await client.writeSymbol('GVL_Test.ExampleSTRUCT.SomeText', 'This is also possible')
-
-//...the next lines are hidden
-</code></pre>
-<h3>Writing an ARRAY of base type PLC variable</h3>
-<p>First, we need to have a GVL_Test at the PLC with the following:</p>
-<pre class="prettyprint source"><code>//GVL_Test
-VAR_GLOBAL
-	TestARRAY 		: ARRAY[0..4] OF INT := [0, 10, 200, 3000, 4000];
-END_VAR
-</code></pre>
-<p>Let's read the value, change it and read again:</p>
-<pre class="prettyprint source lang-javascript"><code>//...the previous lines are hidden
-
-try {
-  
-  //Reading the value
-  let res = await client.readSymbol('GVL_Test.TestArray')
-  console.log('Value read:', res.value)
-
-  //Writing the value
-  res = await client.writeSymbol('GVL_Test.TestArray', [9999, 8888, 6666, 5555, 4444])
   console.log('Value written:', res.value)
 
-  //Reading the value again to be sure
-  res = await client.readSymbol('GVL_Test.TestArray')
-  console.log('Value read:', res.value)
+} catch (err) {
+  console.log('Something failed:', err)
+}
+</code></pre>
+<p>Of course, it would be possible to do with two separate commands too:</p>
+<pre class="prettyprint source lang-js"><code>res = await client.writeSymbol('GVL_Test.ExampleSTRUCT.SomeReal', 123.45)
+res = await client.writeSymbol('GVL_Test.ExampleSTRUCT.SomeText', 'This is also possible')
+</code></pre>
+<hr>
+<h3>Writing <code>ARRAY OF INT</code> type variable</h3>
+<pre class="prettyprint source lang-js"><code>try {
+  const res = await client.writeSymbol('GVL_Test.TestArray', [9999, 8888, 6666, 5555, 4444])
+
+  console.log('Value written:', res.value)
 
 } catch (err) {
   console.log('Something failed:', err)
   return
 }
-
-//...the next lines are hidden
 </code></pre>
-<p>Example console output</p>
-<pre class="prettyprint source"><code>Connected to the 127.0.0.1.1.1
-Value read: [ 0, 10, 200, 3000, 4000 ]
-Value written: [ 9999, 8888, 6666, 5555, 4444 ]
-Value read: [ 9999, 8888, 6666, 5555, 4444 ]   
-Disconneted
-</code></pre>
-<h3>Writing an ARRAY of STRUCT type PLC variable</h3>
-<p>First, we need to have a ST_Example like the following:</p>
-<pre class="prettyprint source"><code>{attribute 'pack_mode' := '1'}
-TYPE ST_Example :
-STRUCT
-	SomeText : STRING(50) := 'Hello ads-client';
-	SomeReal : REAL := 3.14159265359;
-	SomeDate : DT := DT#2020-4-13-12:25:33;
-END_STRUCT
-END_TYPE
-</code></pre>
-<p>Second, we need to have a GVL_Test at the PLC with the following:</p>
-<pre class="prettyprint source"><code>//GVL_Test
-VAR_GLOBAL
-	TestARRAY		: ARRAY[0..4] OF ST_Example := [(SomeText := 'Just for demo purposes')];
-END_VAR
-</code></pre>
-<p>Let's read the value, change it and read again:</p>
-<pre class="prettyprint source lang-javascript"><code>//...the previous lines are hidden
-
-try {
-  
-  //Reading the value
-  let res = await client.readSymbol('GVL_Test.TestArray')
-  console.log('Value read:', res.value)
-
-  //Writing the value
-  res = await client.writeSymbol('GVL_Test.TestArray', 
+<hr>
+<h3>Writing <code>ARRAY of STRUCT</code> type variable</h3>
+<pre class="prettyprint source lang-js"><code>try {
+  const res = await client.writeSymbol('GVL_Test.TestArray', 
     [ { SomeText: 'First value',
         SomeReal: 1.0,
         SomeDate: new Date()},
@@ -787,282 +599,83 @@ try {
         SomeReal: 40.40,
         SomeDate: new Date()}]
   )
-  console.log('Value written:', res.value)
 
-  //Reading the value again to be sure
-  res = await client.readSymbol('GVL_Test.TestArray')
-  console.log('Value read:', res.value)
+  console.log('Value written:', res.value)
+  
+} catch (err) {
+  console.log('Something failed:', err)
+  return
+}
+</code></pre>
+<h2>Subscribing to PLC variables (device notifications)</h2>
+<p>By using <code>subscribe</code> method, we can receive variable values automatically from the PLC if they change or periodically.</p>
+<p>See full <code>subscribe</code> documentation <a href="https://jisotalo.github.io/ads-client/Client.html#subscribe">from the docs</a>.</p>
+<hr>
+<h3>Subcribe to variable value (on-change)</h3>
+<p>The following wants the PLC to check if the value has changed every 1000 milliseconds. If it has changed, callback is called with the latest value in <code>data</code> parameter.</p>
+<p>After 10 seconds the subscription is unsubscribed.</p>
+<pre class="prettyprint source lang-js"><code>try {
+  let subscription = await client.subscribe('GVL_Test.IncrementingValue', (data, sub) => {
+    //Note: The sub parameter is the same as returned by client.subcribe()
+    console.log(`${data.timeStamp}: Value changed to ${data.value}`)
+
+  }, 1000)
+
+  console.log(`Subscribed to ${subscription.target}`)
+
+  //Unsubscribe and disconnect after 10 seconds
+  setTimeout((async () => {
+    //The subscribe() returns object that contains unsubscribe() method
+    await subscription.unsubscribe()
+
+    console.log('Unsubscribed')
+  }), 10000)
 
 } catch (err) {
   console.log('Something failed:', err)
   return
 }
 
-//...the next lines are hidden
-</code></pre>
-<p>Example console output</p>
-<pre class="prettyprint source"><code>Connected to the 127.0.0.1.1.1
-Value read: [ { SomeText: 'Just for demo purposes',
-    SomeReal: 3.1415927410125732,
-    SomeDate: 2020-04-13T12:25:33.000Z },
-  { SomeText: 'Hello ads-client',
-    SomeReal: 3.1415927410125732,
-    SomeDate: 2020-04-13T12:25:33.000Z },
-  { SomeText: 'Hello ads-client',
-    SomeReal: 3.1415927410125732,
-    SomeDate: 2020-04-13T12:25:33.000Z },
-  { SomeText: 'Hello ads-client',
-    SomeReal: 3.1415927410125732,
-    SomeDate: 2020-04-13T12:25:33.000Z },
-  { SomeText: 'Hello ads-client',
-    SomeReal: 3.1415927410125732,
-    SomeDate: 2020-04-13T12:25:33.000Z } ]
-Value written: [ { SomeText: 'First value',
-    SomeReal: 1,
-    SomeDate: 2020-04-16T19:02:38.836Z },  
-  { SomeText: 'Second',
-    SomeReal: 10.1,
-    SomeDate: 2020-04-16T19:02:38.836Z },  
-  { SomeText: 'Third',
-    SomeReal: 20.2,
-    SomeDate: 2020-04-16T19:02:38.836Z },
-  { SomeText: 'Fourth',
-    SomeReal: 30.3,
-    SomeDate: 2020-04-16T19:02:38.836Z },
-  { SomeText: 'Fifth',
-    SomeReal: 40.4,
-    SomeDate: 2020-04-16T19:02:38.836Z } ]
-Value read: [ { SomeText: 'First value',
-    SomeReal: 1,
-    SomeDate: 2020-04-16T19:02:38.000Z },
-  { SomeText: 'Second',
-    SomeReal: 10.100000381469727,
-    SomeDate: 2020-04-16T19:02:38.000Z },
-  { SomeText: 'Third',
-    SomeReal: 20.200000762939453,
-    SomeDate: 2020-04-16T19:02:38.000Z },
-  { SomeText: 'Fourth',
-    SomeReal: 30.299999237060547,
-    SomeDate: 2020-04-16T19:02:38.000Z },
-  { SomeText: 'Fifth',
-    SomeReal: 40.400001525878906,
-    SomeDate: 2020-04-16T19:02:38.000Z } ]
-Disconneted
-</code></pre>
-<h2>Subscribing to PLC variable changes</h2>
-<p>Lets create a PROGRAM to our PLC for testing and then call it from a task. It will increase a number every 500 ms.</p>
-<pre class="prettyprint source"><code>PROGRAM PRG_Test
-VAR
-	Increment : UDINT;
-	tonTimer : TON;
-END_VAR
+/*
+Example console output
 
-tonTimer(
-	IN := TRUE, 
-	PT := T#500MS
-);
-
-IF tonTimer.Q THEN
-	Increment := Increment + 1;	
-
-	tonTimer(IN := FALSE);
-	tonTimer(IN := TRUE);
-END_IF
-</code></pre>
-<p>Now we can subscribe to the <code>Increment</code> variable. Let's ask the PLC to monitor it for us every 1000 ms using <code>subscribe()</code>. We also want to <code>unsubscribe()</code> after 10 seconds for testing purposes using <code>setTimeout</code>.</p>
-<pre class="prettyprint source lang-javascript"><code>const ads = require('ads-client')
-
-const client = new ads.Client({
-  targetAmsNetId: '127.0.0.1.1.1',
-  targetAdsPort: 851
-}); //Note required ; because of (async()...
-
-(async () => {
-  try {
-    //Connecting
-    const res = await client.connect()
-    console.log(`Connected to the ${res.targetAmsNetId}`)
-
-    try {
-      //Subscribing to variable and ask PLC to check changes every 1000 ms
-      let subscription = await client.subscribe('PRG_Test.Increment', (data, sub) => {
-        console.log(`${data.timeStamp}: Value changed to ${data.value}`)
-
-      }, 1000)
-
-      console.log(`Subscribed to ${subscription.target}`)
-
-      //Unsubscribe and disconnect after 10 seconds
-      setTimeout((async () => {
-        //The subscribe() returns object that contains unsubscribe() method
-        await subscription.unsubscribe()
-        console.log('Unsubscribed')
-            
-        //Disconnecting
-        try {
-          const res = await client.disconnect()
-          console.log('Disconneted')
-        } catch (err) {
-          console.log('Disconnecting failed:', err)
-          return
-        }
-        
-      }), 10000)
-
-    } catch (err) {
-      console.log('Something failed:', err)
-      return
-    }
-  } catch (err) {
-    console.log('Connecting failed:', err)
-    return
-  }
-})()
-</code></pre>
-<p>Example console output</p>
-<pre class="prettyprint source"><code>Connected to the 127.0.0.1.1.1
-Subscribed to PRG_Test.Increment
+Subscribed to GVL_Test.IncrementingValue
 Mon Apr 13 2020 13:02:26 GMT+0300 (GMT+03:00): Value changed to 1586
 Mon Apr 13 2020 13:02:27 GMT+0300 (GMT+03:00): Value changed to 1588
 Mon Apr 13 2020 13:02:28 GMT+0300 (GMT+03:00): Value changed to 1590
-Mon Apr 13 2020 13:02:29 GMT+0300 (GMT+03:00): Value changed to 1592
-Mon Apr 13 2020 13:02:30 GMT+0300 (GMT+03:00): Value changed to 1594
-Mon Apr 13 2020 13:02:31 GMT+0300 (GMT+03:00): Value changed to 1596
-Mon Apr 13 2020 13:02:32 GMT+0300 (GMT+03:00): Value changed to 1598
-Mon Apr 13 2020 13:02:33 GMT+0300 (GMT+03:00): Value changed to 1600
+...
 Mon Apr 13 2020 13:02:34 GMT+0300 (GMT+03:00): Value changed to 1602
 Unsubscribed
-Disconneted
 </code></pre>
-<p>We could also use the <code>sub</code> object that is always returned to subscription callback. This example unsubscribes if <code>Increment</code> is over 20:</p>
-<pre class="prettyprint source lang-javascript"><code>const ads = require('ads-client')
-
-const client = new ads.Client({
-  targetAmsNetId: '127.0.0.1.1.1',
-  targetAdsPort: 851
-}); //Note required ; because of (async()...
-
-(async () => {
-  try {
-    //Connecting
-    const res = await client.connect()
-    console.log(`Connected to the ${res.targetAmsNetId}`)
-
-    try {
-      //Subscribing to variable and ask PLC to check changes every 1000 ms
-      let subscription = await client.subscribe('PRG_Test.Increment', async (data, sub) => { //NOTE: async
-        console.log(`${data.timeStamp}: Value changed to ${data.value}`)
-
-        if (data.value >= 20) {
-          console.log('Value is over 20, quit.')
-
-          await sub.unsubscribe()
-          console.log('Unsubscribed')
-          
-          //Disconnecting
-          try {
-            const res = await client.disconnect()
-            console.log('Disconneted')
-          } catch (err) {
-            console.log('Disconnecting failed:', err)
-            return
-          }
-        }
-      }, 1000)
-
-      console.log(`Subscribed to ${subscription.target}`)
-
-    } catch (err) {
-      console.log('Something failed:', err)
-      return
-    }
-  } catch (err) {
-    console.log('Connecting failed:', err)
-    return
-  }
-})()
-</code></pre>
-<p>Example console output</p>
-<pre class="prettyprint source"><code>Connected to the 127.0.0.1.1.1
-Subscribed to PRG_Test.Increment
-Mon Apr 13 2020 13:06:51 GMT+0300 (GMT+03:00): Value changed to 8
-Mon Apr 13 2020 13:06:52 GMT+0300 (GMT+03:00): Value changed to 10
-Mon Apr 13 2020 13:06:53 GMT+0300 (GMT+03:00): Value changed to 12
-Mon Apr 13 2020 13:06:54 GMT+0300 (GMT+03:00): Value changed to 14
-Mon Apr 13 2020 13:06:55 GMT+0300 (GMT+03:00): Value changed to 16
-Mon Apr 13 2020 13:06:56 GMT+0300 (GMT+03:00): Value changed to 18
-Mon Apr 13 2020 13:06:57 GMT+0300 (GMT+03:00): Value changed to 20
-Value is over 20, quit.
-Unsubscribed
-Disconneted
-</code></pre>
-<p>The subscription callback can of course be defined elsewhere:</p>
-<pre class="prettyprint source lang-javascript"><code>
-const ads = require('ads-client')
-
-const client = new ads.Client({
-  targetAmsNetId: '127.0.0.1.1.1',
-  targetAdsPort: 851
-})
-
-//Called when PRG_Test.Increment has changed
-const onIncrement = (data, sub) => {
+<hr>
+<h3>Subcribe to variable value (cyclic)</h3>
+<p>The following wants the PLC to send the variable value every 1000 milliseconds. The callback is called with the latest value in <code>data</code> parameter (it might have changed or not).</p>
+<pre class="prettyprint source lang-js"><code>//Our callback function
+const onChange = (data, sub) => {
   console.log(`${data.timeStamp}: ${sub.target} changed to ${data.value}`)
+
+  //We can call sub.unsubscribe() here if we want
 }
 
-(async () => {
-  try {
-    //Connecting
-    const res = await client.connect()
-    console.log(`Connected to the ${res.targetAmsNetId}`)
+try {
+  let subscription = await client.subscribe('GVL_Test.IncrementingValue', onChange, 1000, false)
 
-    try {
-      //Subscribing to variable and ask PLC to check changes every 1000 ms
-      let subscription = await client.subscribe('PRG_Test.Increment', onIncrement, 1000)
+  console.log(`Subscribed to ${subscription.target}`)
 
-      console.log(`Subscribed to ${subscription.target}`)
+} catch (err) {
+  console.log('Something failed:', err)
+  return
+}
 
-      //Unsubscribe and disconnect after 10 seconds
-      setTimeout((async () => {
-        //The subscribe() returns object that contains unsubscribe() method
-        await subscription.unsubscribe()
-        console.log('Unsubscribed')
-            
-        //Disconnecting
-        try {
-          const res = await client.disconnect()
-          console.log('Disconneted')
-        } catch (err) {
-          console.log('Disconnecting failed:', err)
-          return
-        }
-        
-      }), 10000)
+/*
+Example console output
 
-    } catch (err) {
-      console.log('Something failed:', err)
-      return
-    }
-  } catch (err) {
-    console.log('Connecting failed:', err)
-    return
-  }
-})()
-</code></pre>
-<p>Example console output</p>
-<pre class="prettyprint source"><code>Connected to the 127.0.0.1.1.1
-Subscribed to PRG_Test.Increment
-Mon Apr 13 2020 13:09:04 GMT+0300 (GMT+03:00): PRG_Test.Increment changed to 273
-Mon Apr 13 2020 13:09:05 GMT+0300 (GMT+03:00): PRG_Test.Increment changed to 275
-Mon Apr 13 2020 13:09:06 GMT+0300 (GMT+03:00): PRG_Test.Increment changed to 277
-Mon Apr 13 2020 13:09:07 GMT+0300 (GMT+03:00): PRG_Test.Increment changed to 279
-Mon Apr 13 2020 13:09:08 GMT+0300 (GMT+03:00): PRG_Test.Increment changed to 281
-Mon Apr 13 2020 13:09:09 GMT+0300 (GMT+03:00): PRG_Test.Increment changed to 283
-Mon Apr 13 2020 13:09:10 GMT+0300 (GMT+03:00): PRG_Test.Increment changed to 285
-Mon Apr 13 2020 13:09:11 GMT+0300 (GMT+03:00): PRG_Test.Increment changed to 287
-Mon Apr 13 2020 13:09:12 GMT+0300 (GMT+03:00): PRG_Test.Increment changed to 289
-Unsubscribed
-Disconneted
+
+Subscribed to GVL_Test.IncrementingValue
+Mon Apr 13 2020 13:09:04 GMT+0300 (GMT+03:00): GVL_Test.IncrementingValue changed to 273
+Mon Apr 13 2020 13:09:05 GMT+0300 (GMT+03:00): GVL_Test.IncrementingValue changed to 275
+Mon Apr 13 2020 13:09:06 GMT+0300 (GMT+03:00): GVL_Test.IncrementingValue changed to 277
+...
 </code></pre>
 <h1>Documentation</h1>
 <p>You can find the full html documentation from the project <a href="https://jisotalo.github.io/ads-client/">GitHub home page</a> as well as from <code>./docs/</code> folder in the repository.</p>
@@ -1098,7 +711,7 @@ SOFTWARE.</p></article>
 <br class="clear">
 
 <footer>
-    Documentation generated by <a href="https://github.com/jsdoc3/jsdoc">JSDoc 3.6.4</a> on Thu Apr 16 2020 22:20:30 GMT+0300 (GMT+03:00) using the <a href="https://github.com/clenemt/docdash">docdash</a> theme.
+    Documentation generated by <a href="https://github.com/jsdoc3/jsdoc">JSDoc 3.6.4</a> on Mon Apr 20 2020 19:09:46 GMT+0300 (GMT+03:00) using the <a href="https://github.com/clenemt/docdash">docdash</a> theme.
 </footer>
 
 <script>prettyPrint();</script>
