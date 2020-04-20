@@ -22,72 +22,128 @@ There is still some work to do for "production ready" version. See this [Github 
 
 
 ---
-# Latest update
-
-## [1.1.0] - 16.04.2020
-### Added
-- Support for pseudo data types (like PVOID, XINT, UXINT etc.)
-- Reserved ADS ports to ads-client-ads.js
-
-### Changed
-- writeSymbol is now case-insensitive (as the PLC system is)
-- Fixed bug: Changed iconv-encode unicode to ucs2 at WSTRING
-- Fixed bug: Better suppor for arrays when using `autoFill = true` parameter
-- Updated README.md
-  - array examples
-  - `writeSymbol` and case-insensitive information
-
-
----
 # Table of contents
 
 - [Features](#installation)
 - [Installation](#installation)
 - [Enabling localhost support](#enabling-localhost-support)
-- [IMPORTANT: Note about STRUCT variables](#IMPORTANT-Note-about-STRUCT-variables)
-- [IMPORTANT: Writing STRUCT variables](#IMPORTANT-Writing-STRUCT-variables)
+- [IMPORTANT: Note about STRUCT variables](#important-note-about-struct-variables)
+- [IMPORTANT: Writing STRUCT variables](#important-note-writing-sturct-variables)
 - [Getting started](#getting-started)
-  - [Creating a new Client instance](#Creating-a-new-Client-instance)
-  - [Connecting and disconnecting](#Connecting-and-disconnecting)
-  - [Reading any PLC variable](#Reading-any-PLC-variable)
-    - [Reading a base type PLC variable (INT)](#reading-a-base-type-plc-variable-int)
-    - [Reading a STRUCT type PLC variable](#reading-a-struct-type-plc-variable)
-    - [Reading an ARRAY of base type PLC variable](#Reading-an-ARRAY-of-base-type-PLC-variable)
-    - [Reading an ARRAY of STRUCT type PLC variable](#Reading-an-ARRAY-of-STRUCT-type-PLC-variable)
-  - [Writing any PLC variable](#Writing-any-PLC-variable)
-    - [Writing a base type PLC variable (INT)](#writing-a-base-type-plc-variable-int)
-    - [Writing a STRUCT type PLC variable](#writing-a-struct-type-plc-variable)
-    - [Writing a STRUCT type PLC variable (just some members of the struct)](#writing-a-struct-type-plc-variable-just-some-members-of-the-struct)
-    - [Writing an ARRAY of base type PLC variable](#Writing-an-ARRAY-of-base-type-PLC-variable)
-    - [Writing an ARRAY of STRUCT type PLC variable](#Writing-an-ARRAY-of-STRUCT-type-PLC-variable)
-  - [Subscribing to PLC variable changes](#subscribing-to-plc-variable-changes)
+  - [Data types used in getting started](data-types-used-in-getting-started)
+  - [Creating a new Client instance](#creating-a-new-client-instance)
+  - [Connecting and disconnecting](#connecting-and-disconnecting)
+  - [Reading any PLC variable](#reading-any-plc-variable)
+    - [Reading INT type variable](#reading-int-type-variable)
+    - [Reading STRING type variable](#reading-string-type-variable)
+    - [Reading ENUM type variable](#reading-enum-type-variable)
+    - [Reading STRUCT type variable](#reading-struct-type-variable)
+    - [Reading ARRAY OF INT type variable](#reading-array-of-int-type-variable)
+    - [Reading ARRAY OF STRUCT type variable](#reading-array-of-struct-type-variable)
+  - [Writing any PLC variable](#writing-any-plc-variable)
+    - [Writing INT type PLC variable](#writing-int-type-plc-variable)
+    - [Writing STRING type PLC variable](#writing-string-type-plc-variable)
+    - [Writing ENUM type variable](#writing-enum-type-variable)
+    - [Writing STRUCT type PLC variable](#writing-struct-type-plc-variable)
+    - [Writing STRUCT type PLC variable (with autoFill parameter)](#writing-struct-type-plc-variable-with-autofill-parameter)
+    - [Writing ARRAY OF INT type variable](#writing-array-of-int-type-variable)
+    - [Writing ARRAY of STRUCT type variable](#writing-array-of-struct-type-variable)
+  - [Subscribing to PLC variables (device notifications)](#subscribing-to-plc-variables-device-notifications)
+    - [Subcribe to variable value (on-change)](#subcribe-to-variable-value-on-change)
+    - [Subcribe to variable value (cyclic)](#subcribe-to-variable-value-cyclic)
 - [Documentation](#documentation)
 - [License](#license)
 
 
 # Features
 
-- Promises and async/await
+- Promise and async/await support
 - Supports connecting to the local TwinCAT runtime (see [enabling localhost support](#localhost-support))
 - Supports multiple connections from the same host
-- Reading and writing all kinds of variables by PLC variable name
-- Subscribing to variable changes by PLC variable name (ADS notifications)
-- Automatic conversion from PLC variables to Javascript objects and vice-versa
-- Reading symbol and data type information
+- Reading and writing all any PLC variable
+- Subscribing to PLC variables (ADS notifications)
+- Automatic conversion between PLC<->Javascript objects
+- PLC symbol and data type handling and caching
 - Reading PLC runtime and system manager states
-- Caching symbol and data type information (only read at first time when needed)
-- Automatic pointer/reference support for 32bit and 64bit systems
-- Automatic updating of symbols, data types and subscriptions when PLC program changes or system starts (*NOTE: Not 100 % ready yet*)
-- Tested to work successfully
+- Automatic 32/64 bit variable support (PVOID, XINT, etc.)
+- Automatic cache and subscription refreshing when PLC program changes or system starts (*See [#3](), [#4]()*)
+
+
+
+# Supported platforms and setups
+
+The ads-client package is tested so far with the following setups:
+  - TwinCAT 3 4022.27 running on 64bit Windows 10
+  - TwinCAT 3 4024.4 running on 64bit Windows 10
+  - TwinCAT 3 4022.27 running on 64bit Windows 7 Embedded @ Beckhoff PLC
   - Node.js v10.16.3 and newer
-  - Local computer with TwinCAT 3 4022.27 running on 64bit Windows 10
-  - Local computer with TwinCAT 3 4024.4 running on 64bit Windows 10
-  - Beckhoff PLC with TwinCAT 3 4022.27 running on 64bit Windows 7 Embedded
-- Yet to be tested
-  - Beckhoff PLC with 32 bit system 
-  - TwinCAT 2 systems
-  - Running on Linux device with and without ADS router
-  - Running on Windows device without ADS router
+
+The ads-client can be used in different system setups
+
+![ads-client-setups](https://user-images.githubusercontent.com/13457157/79771661-c59c0d80-8337-11ea-809f-b7c41bcb099d.png)
+
+## Setup 1
+
+Requirements:
+- UI client has TwinCAT installed
+- ADS route is created between the UI and the PLC
+
+Example connection when PLC has AmsNetId of `192.168.1.120.1.1`.
+```js
+const client = new ads.Client({
+  targetAmsNetId: '192.168.1.120.1.1',
+  targetAdsPort: 851,
+})
+```
+
+## Setup 2
+
+Requirements:
+- UI client has [AdsRouterConsole](https://www.nuget.org/packages/Beckhoff.TwinCAT.Ads.AdsRouterConsole/5.0.0-preview4) or similar running
+- ADS route is created between the UI and the PLC
+
+Example connection when PLC has AmsNetId of `192.168.1.120.1.1`.
+```js
+const client = new ads.Client({
+  targetAmsNetId: '192.168.1.120.1.1',
+  targetAdsPort: 851,
+})
+```
+
+## Setup 3
+
+Requirements:
+- PLC has TCP port 48898 open
+- Given `localAmsNetId` is not already in use
+- Given `localAdsPort` is not already in use
+- PLC has ADS route manually created to UI machines IP address and the given `localAmsNetId`
+
+Example connection when PLC has AmsNetId of `192.168.1.120.1.1` and IP of `192.168.1.120`.
+```js
+const client = new ads.Client({
+  localAmsNetId: '192.168.1.10.1.1',
+  localAdsPort: 32750,
+  targetAmsNetId: '192.168.1.120.1.1',
+  targetAdsPort: 851,
+  routerAddress: '192.168.1.120',
+  routerTcpPort: 48898
+})
+```
+
+## Setup 4
+
+Requirements:
+- No special requirements
+
+```js
+const client = new ads.Client({
+  targetAmsNetId: '127.0.0.1.1.1',
+  targetAdsPort: 851,
+})
+
+```
+
+
 
 
 # Installation
@@ -191,13 +247,13 @@ These examples assume that the PLC has the following Global Variable List (GVL):
 ```
 //GVL_Test
 VAR_GLOBAL
-	TestINT         : INT := 1234;
-	TestSTRING 	    : STRING := 'Hello this is a test string';
-	ExampleSTRUCT   : ST_Example;
-	TestARRAY  		: ARRAY[0..4] OF INT := [0, 10, 200, 3000, 4000];
-	TestARRAY2		: ARRAY[0..4] OF ST_Example := [(SomeText := 'Just for demo purposes')];
-  TestENUM  		: E_TestEnum := E_TestEnum.Running;
-  IncrementingValue : INT; //This should change every 500 ms or so
+	TestINT         	: INT := 1234;
+	TestSTRING 	    	: STRING := 'Hello this is a test string';
+	ExampleSTRUCT   	: ST_Example;
+	TestARRAY  			: ARRAY[0..4] OF INT := [0, 10, 200, 3000, 4000];
+	TestARRAY2			: ARRAY[0..4] OF ST_Example := [(SomeText := 'Just for demo purposes')];
+	TestENUM  			: E_TestEnum := E_TestEnum.Running;
+	IncrementingValue 	: INT; //This should change every 500 ms or so
 END_VAR
 ```
 
@@ -355,7 +411,7 @@ Value read: { name: 'Running', value: 100 }
 
 
 ```js
-//Using await
+//Using await for example purposes
 try {
   const res = await client.readSymbol('GVL_Test.ExampleSTRUCT')
 
@@ -520,6 +576,9 @@ try {
 **IMPORTANT NOTE:** See chapter [IMPORTANT: Note about STRUCT variables](#IMPORTANT-Note-about-STRUCT-variables)
 
 
+The following code will not work. The PLC struct has three members but we provide only two, which causes an exception.
+
+
 ```js
 //NOTE: This won't work
 try {
@@ -540,8 +599,6 @@ Something failed: { ClientException: Writing symbol GVL_Test.ExampleSTRUCT faile
 */
 ```
 
-The PLC struct has three members but we provided only two, which caused an exception.
-
 We need to tell the `WriteSymbol` that we *indeed* want to write just some members and the rest will stay the same. This happens by setting the 3rd parameter `autoFill` to true.
 
 If `autoFill` is true, the method first reads the latest value and then writes it with only the new given changes.
@@ -551,7 +608,7 @@ try {
   const res = await client.writeSymbol('GVL_Test.ExampleSTRUCT', {
     SomeReal: 123.45,
     SomeText: 'But this works!'
-  }, true)
+  }, true) //Note this!
 
   console.log('Value written:', res.value)
 
@@ -624,7 +681,7 @@ See full `subscribe` documentation [from the docs](https://jisotalo.github.io/ad
 
 ---
 
-### Subcribe to variable value changes
+### Subcribe to variable value (on-change)
 
 
 The following wants the PLC to check if the value has changed every 1000 milliseconds. If it has changed, callback is called with the latest value in `data` parameter.
@@ -668,7 +725,7 @@ Unsubscribed
 
 ---
 
-### Subcribe to variable periodically
+### Subcribe to variable value (cyclic)
 
 The following wants the PLC to send the variable value every 1000 milliseconds. The callback is called with the latest value in `data` parameter (it might have changed or not).
 
