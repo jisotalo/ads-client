@@ -122,7 +122,7 @@ class Client {
     }
 
     //Loopback address
-    if (this.settings.localAmsNetId === 'localhost') {
+    if (this.settings.localAmsNetId && this.settings.localAmsNetId.trim().toLowerCase() === 'localhost') {
       this.settings.localAmsNetId = '127.0.0.1.1.1'
     }
 
@@ -1337,10 +1337,13 @@ class Client {
       pos += 4
 
       //16..n Data
-      data.write(variableName, pos, variableName.length, 'ascii')
+      iconv.encode(variableName, 'cp1252').copy(data, pos)
       pos += variableName.length
-    
 
+      //String end mark
+      data.writeUInt8(0, pos)
+      pos += 1
+    
       _sendAdsCommand.call(this, ADS.ADS_COMMAND.ReadWrite, data)
         .then((res) => {
           debug(`readRawByName(): Data read - ${res.ads.data.byteLength} bytes received for ${variableName}`)
@@ -1606,8 +1609,12 @@ class Client {
       pos += 4
 
       //16..n Data
-      data.write(variableName, pos, variableName.length, 'ascii')
+      iconv.encode(variableName, 'cp1252').copy(data, pos)
       pos += variableName.length
+
+      //String end mark
+      data.writeUInt8(0, pos)
+      pos += 1
    
       _sendAdsCommand.call(this, ADS.ADS_COMMAND.ReadWrite, data)
         .then((res) => {
@@ -1630,7 +1637,7 @@ class Client {
           pos += 2
 
           //10..n Data type name
-          result.type = _trimPlcString(data.toString('ascii', pos, pos + dataTypeNameLength + 1))
+          result.type =  _trimPlcString(iconv.decode(data.slice(pos, pos + dataTypeNameLength + 1), 'cp1252'))
 
           debug(`createVariableHandle(): Handle created and size+type obtained for ${variableName}: %o`, result)
 
@@ -2586,15 +2593,15 @@ async function _parseDataType(data) {
   pos += 2
 
   //43.... Name
-  dataType.name = _trimPlcString(data.toString('ascii', pos, pos + dataType.nameLength + 1))
+  dataType.name = _trimPlcString(iconv.decode(data.slice(pos, pos + dataType.nameLength + 1), 'cp1252'))
   pos += dataType.nameLength + 1
 
   //...... Type
-  dataType.type = _trimPlcString(data.toString('ascii', pos, pos + dataType.typeLength + 1))
+  dataType.type = _trimPlcString(iconv.decode(data.slice(pos, pos + dataType.typeLength + 1), 'cp1252'))
   pos += dataType.typeLength + 1
   
   //...... Comment
-  dataType.comment = _trimPlcString(data.toString('ascii', pos, pos + dataType.commentLength + 1))
+  dataType.comment = _trimPlcString(iconv.decode(data.slice(pos, pos + dataType.commentLength + 1), 'cp1252'))
   pos += dataType.commentLength + 1
 
 
@@ -4419,3 +4426,4 @@ function _amsNedIdStrToByteArray(str) {
 
 exports.ADS = ADS
 exports.Client = Client
+exports._getDataTypeInfo = _getDataTypeInfo
