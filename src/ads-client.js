@@ -838,7 +838,7 @@ class Client {
   getDataType(dataTypeName) {
     return new Promise(async (resolve, reject) => {
       //Wrapper for _getDataTypeRecursive
-      _getDataTypeRecursive.call(this, dataTypeName)
+      _getDataTypeRecursive.call(this, dataTypeName.trim())
         .then(res => resolve(res))
         .catch(err => reject(new ClientException('getDataType()', `Finding data type ${dataTypeName} failed`, err)))
     })
@@ -875,7 +875,7 @@ class Client {
         return resolve(this.metaData.symbols[varName])
       } else {
         //Read from PLC and cache it
-        _readSymbolInfo.call(this, variableName)
+        _readSymbolInfo.call(this, variableName.trim())
           .then((symbol) => {
             this.metaData.symbols[varName] = symbol
 
@@ -916,6 +916,7 @@ class Client {
     return new Promise(async (resolve, reject) => {
       debug(`readSymbol(): Reading symbol ${variableName}`)
 
+      variableName = variableName.trim()
 
       //1. Get symbol from cache or from PLC
       let symbol = {}
@@ -991,6 +992,7 @@ class Client {
     return new Promise(async (resolve, reject) => {
       debug(`writeSymbol(): Writing symbol ${variableName}`)
 
+      variableName = variableName.trim()
 
       //1. Get symbol from cache or from PLC
       let symbol = {}
@@ -1109,7 +1111,7 @@ class Client {
 
       _subscribe.call(
         this,
-        variableName,
+        variableName.trim(),
         callback,
         {
           transmissionMode: (onChange === true ? ADS.ADS_TRANS_MODE.OnChange : ADS.ADS_TRANS_MODE.Cyclic),
@@ -1313,6 +1315,8 @@ class Client {
       if (variableName == null) {
         return reject(new ClientException('readRawByName()', `Required parameter variableName is not assigned`))
       }
+
+      variableName = variableName.trim()
     
       debug(`readRawByName(): Reading data from ${variableName} using ADS command READ_SYMVAL_BYNAME)}`)
 
@@ -1584,6 +1588,8 @@ class Client {
       if (variableName == null) {
         return reject(new ClientException('createVariableHandle()', `Parameter variableName is not assigned`))
       }
+
+      variableName = variableName.trim()
 
       debug(`createVariableHandle(): Creating variable handle to ${variableName}`)
 
@@ -2682,11 +2688,11 @@ async function _parseDataType(data) {
       pos += 1
 
       //Name
-      attr.name = _trimPlcString(data.slice(pos, pos + nameLen + 1).toString('ascii'))
+      attr.name = _trimPlcString(iconv.decode(data.slice(pos, pos + nameLen + 1), 'cp1252'))
       pos += (nameLen + 1)
 
       //Value
-      attr.value = _trimPlcString(data.slice(pos, pos + valueLen + 1).toString('ascii'))
+      attr.value = _trimPlcString(iconv.decode(data.slice(pos, pos + valueLen + 1), 'cp1252'))
       pos += (valueLen + 1)
 
       dataType.attributes.push(attr)
@@ -2704,13 +2710,12 @@ async function _parseDataType(data) {
     for (let i = 0; i < dataType.enumInfoCount; i++) {
       let enumInfo = { }
       
-
       //Name length
       let nameLen = data.readUInt8(pos)
       pos += 1
 
       //Name
-      enumInfo.name = _trimPlcString(data.slice(pos, pos + nameLen + 1).toString('ascii'))
+      enumInfo.name = _trimPlcString(iconv.decode(data.slice(pos, pos + nameLen + 1), 'cp1252'))
       pos += (nameLen + 1)
 
       //Value
@@ -2787,15 +2792,15 @@ function _parseSymbolInfo(data) {
   pos += 2
 
   //30.... Symbol name & system name
-  symbol.name = _trimPlcString(data.toString('ascii', pos, pos + symbol.nameLength + 1))
+  symbol.name = _trimPlcString(iconv.decode(data.slice(pos, pos + symbol.nameLength + 1), 'cp1252'))
   pos += symbol.nameLength + 1
 
   //...... Symbol type
-  symbol.type = _trimPlcString(data.toString('ascii', pos, pos + symbol.typeLength + 1))
+  symbol.type = _trimPlcString(iconv.decode(data.slice(pos, pos + symbol.typeLength + 1), 'cp1252'))
   pos += symbol.typeLength + 1
   
   //...... Symbol comment
-  symbol.comment = _trimPlcString(data.toString('ascii', pos, pos + symbol.commentLength + 1))
+  symbol.comment = _trimPlcString(iconv.decode(data.slice(pos, pos + symbol.commentLength + 1), 'cp1252'))
   pos += symbol.commentLength + 1
 
   //The rest of the data would contain ArrayInfo, TypeGuid, Attributes and reserved bytes
@@ -2846,7 +2851,7 @@ function _readSymbolInfo(variableName) {
     pos += 4
 
     //16..n Data
-    data.write(variableName, pos, variableName.length, 'ascii')
+    iconv.encode(variableName, 'cp1252').copy(data, pos)
     pos += variableName.length
 
     _sendAdsCommand.call(this, ADS.ADS_COMMAND.ReadWrite, data)
@@ -3170,7 +3175,7 @@ function _readDataTypeInfo(dataTypeName) {
     pos += 4
 
     //16..n Data
-    data.write(dataTypeName, pos, dataTypeName.length, 'ascii')
+    iconv.encode(dataTypeName, 'cp1252').copy(data, pos)
     pos += dataTypeName.length
 
     _sendAdsCommand.call(this, ADS.ADS_COMMAND.ReadWrite, data)
@@ -3656,7 +3661,7 @@ function _parseAdsData(packet, data) {
       pos += 2
 
       //8..24 Device name
-      ads.data.deviceName = _trimPlcString(data.toString('ascii', pos))
+      ads.data.deviceName = _trimPlcString(iconv.decode(data.slice(pos, pos + 16), 'cp1252'))
 
       break
 
@@ -4426,4 +4431,3 @@ function _amsNedIdStrToByteArray(str) {
 
 exports.ADS = ADS
 exports.Client = Client
-exports._getDataTypeInfo = _getDataTypeInfo
