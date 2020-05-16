@@ -69,6 +69,9 @@ class Client {
    * @property {number} [timeoutDelay=2000] - Time (milliseconds) after connecting to the router or waiting for command response is canceled to timeout - Optional (**default**: 2000 ms)
    * @property {boolean} [hideConsoleWarnings=false] - If true, no warnings are written to console (=nothing is ever written to console) - Optional (**default**: false)
    * @property {boolean} [autoReconnect=true] - If true and connection is lost, the client tries to reconnect automatically - Optional (**default**: true)
+   * @property {number} [reconnectInterval=2000] - Time (milliseconds) how often the lost connection is tried to re-establish - Optional (**default**: 2000 ms)
+   * @property {number} [checkStateInterval=1000] - Time (milliseconds) how often the system manager state is read to see if connection is OK - Optional (**default**: 1000 ms)
+   * @property {number} [connectionDownDelay=5000] - Time (milliseconds) after no successful reading of the system manager state the connection is determined to be lost - Optional (**default**: 5000 ms)
    * @property {boolean} [allowHalfOpen=false] - If true, connect() is successful even if no PLC runtime is found (but target and system manager are available) - Can be useful if it's ok that after connect() the PLC runtime is not immediately available (example: connecting before uploading PLC code and reading data later)
    */
 
@@ -95,6 +98,9 @@ class Client {
       timeoutDelay: 2000,
       hideConsoleWarnings: false, 
       autoReconnect: true,
+      reconnectInterval: 2000,
+      checkStateInterval: 1000,
+      connectionDownDelay: 5000,
       allowHalfOpen: false,
     }
   }
@@ -150,9 +156,10 @@ class Client {
       activeSubscriptions: {}, //Active device notifications
       symbolVersionNotification: null, //Notification handle of the symbol version changed subscription (used to unsubscribe)
       systemManagerStatePoller: null, //Timer that reads the system manager state (run/config) - This is not available through ADS notifications
-      firstConnectionFaultTime: null, //todo
-      socketConnectionLostHandler: null, //todo
-      oldSubscriptions: null, //todo
+      firstStateReadFaultTime: null, //Date when system manager state read failed for the first time
+      socketConnectionLostHandler: null, //Handler for socket connection lost event
+      oldSubscriptions: null, //Old subscriptions that were active before connection was lost
+      reconnectionTimer: null, //Timer that tries to reconnect intervally
     }
     
 
@@ -169,6 +176,7 @@ class Client {
      * @property {object} symbols - Object containing all so far cached symbols
      * @property {boolean} allDataTypesCached - True if all data types are cached (so we know to re-cache all during symbol version change)
      * @property {object} dataTypes - Object containing all so far cached data types
+     * @property {object} routerState - Local AMS router state (RUN, STOP etc)
      */
     
     /**
@@ -224,6 +232,43 @@ class Client {
 
 
 
+  /**
+   * Sets debugging using debug package on/off. 
+   * Another way for environment variable DEBUG:
+   *  - 0 = no debugging
+   *  - 1 = Extended exception stack trace
+   *  - 2 = basic debugging (same as $env:DEBUG='ads-client')
+   *  - 3 = detailed debugging (same as $env:DEBUG='ads-client,ads-client:details')
+   *  - 4 = full debugging (same as $env:DEBUG='ads-client,ads-client:details,ads-client:raw-data')
+   * 
+   * @param {number} level 0 = none, 1 = extended stack traces, 2 = basic, 3 = detailed, 4 = detailed + raw data
+   */
+  setDebugging(level) {
+    debug.enabled = false
+    debugD.enabled = false
+    debugIO.enabled = false
+    this._internals.debugLevel = level
+
+    if (level === 0) {
+      //See ClientException
+    }
+    else if (level === 2) {
+      debug.enabled = true
+
+    } else if (level === 3) {
+      debug.enabled = true
+      debugD.enabled = true
+      
+    } else if (level === 4) {
+      debug.enabled = true
+      debugD.enabled = true
+      debugIO.enabled = true
+    }
+  }
+
+
+
+
 
 
 
@@ -234,7 +279,8 @@ class Client {
    * - If resolved, client is connected successfully and connection info is returned (object)
    * - If rejected, something went wrong and error info is returned (object)
    */
-  connect() {
+  connect(allowHalfOpen = this.settings.allowHalfOpen) {
+    
     return new Promise(async (resolve, reject) => {
 
       if (this._internals.socket !== null) {
@@ -346,7 +392,7 @@ class Client {
         try {
           //Try to read system manager state - If it's OK, connection is successful to the target
           await this.readSystemManagerState()
-          _startSystemManagerStatePoller.call(this)
+          _systemManagerStatePoller.call(this)
 
         } catch (err) {
           try {
@@ -362,7 +408,7 @@ class Client {
           await _reInitializeInternals.call(this)
 
         } catch (err) { 
-          if (this.settings.allowHalfOpen !== true) {
+          if (allowHalfOpen !== true) {
             try {
               await this.disconnect()
             } catch (err) {
@@ -428,9 +474,28 @@ class Client {
    * - If resolved, disconnect was successful 
    * - If rejected, connection is still closed but something went wrong during disconnecting and error info is returned
    */
-  disconnect() {
+  disconnect(forceDisconnect = false) {
     return new Promise(async (resolve, reject) => {
       debug(`disconnect(): Starting to close connection`)
+
+      if (this._internals.socketConnectionLostHandler) {
+        this._internals.socket.off('close', this._internals.socketConnectionLostHandler)
+        this._internals.socket.off('end', this._internals.socketConnectionLostHandler)
+      }
+
+      //Clear system manager state poller
+      clearTimeout(this._internals.systemManagerStatePoller)
+
+      if (forceDisconnect) {
+        this._internals.socket.removeAllListeners()
+        this._internals.socket.destroy()
+
+        this.connection.connected = false
+        this.connection.localAdsPort = null
+        this._internals.socket = null
+
+        return resolve()
+      }
 
       let error = null
 
@@ -440,8 +505,6 @@ class Client {
         error = new ClientException(this, 'disconnect()', err)
       }
 
-      //Clear system manager state poller
-      clearTimeout(this._internals.systemManagerStatePoller)
 
       try {
         await _unsubscribeAllInternals.call(this)
@@ -482,45 +545,54 @@ class Client {
   }
 
 
- 
- 
+
+
+
+
+
 
   /**
-   * Sets debugging using debug package on/off. 
-   * Another way for environment variable DEBUG:
-   *  - 0 = no debugging
-   *  - 1 = Extended exception stack trace
-   *  - 2 = basic debugging (same as $env:DEBUG='ads-client')
-   *  - 3 = detailed debugging (same as $env:DEBUG='ads-client,ads-client:details')
-   *  - 4 = full debugging (same as $env:DEBUG='ads-client,ads-client:details,ads-client:raw-data')
+   * Disconnects and reconnects again
    * 
-   * @param {number} level 0 = none, 1 = extended stack traces, 2 = basic, 3 = detailed, 4 = detailed + raw data
+   * NOTE: Does NOT reinitialize subscriptions, everything is lost
+   * 
+   * @returns {Promise} Returns a promise (async function)
+   * - If resolved, connection to PLC runtime is successful
+   * - If rejected, connection to PLC runtime failed
    */
-  setDebugging(level) {
-    debug.enabled = false
-    debugD.enabled = false
-    debugIO.enabled = false
-    this._internals.debugLevel = level
+  reconnect(forceDisconnect = false) {
+    return new Promise(async (resolve, reject) => {
 
-    if (level === 0) {
-      //See ClientException
-    }
-    else if (level === 2) {
-      debug.enabled = true
+      if (this.connection.connected && this._internals.socket != null) {
+        try {
+          debug(`reconnect(): Trying to disconnect`)
 
-    } else if (level === 3) {
-      debug.enabled = true
-      debugD.enabled = true
-      
-    } else if (level === 4) {
-      debug.enabled = true
-      debugD.enabled = true
-      debugIO.enabled = true
-    }
+          await this.disconnect(forceDisconnect)
+
+        } catch (err) {
+          debug(`reconnect(): Disconnecting failed: %o`, err)
+        }
+      }
+
+      debug(`reconnect(): Trying to connect`)
+
+      return this.connect(false)
+        .then(res => {
+          debug(`reconnect(): Connected!`)
+          resolve(res)
+        })
+        .catch(err => {
+          debug(`reconnect(): Connecting failed`)
+          reject(err)
+        })
+    })
   }
 
 
 
+
+ 
+ 
    
 
 
@@ -1323,14 +1395,14 @@ class Client {
           unSubCount++
 
         } catch (err) {
-          debug(`unsubscribeAll(): Unsubscribing from notification ${JSON.stringify(this._internals.activeSubscriptions[sub])} failed`)
+          debug(`unsubscribeAll(): Unsubscribing from notification ${JSON.stringify(this._internals.activeSubscriptions[sub].target)} failed`)
           
           firstError = new ClientException(this, 'unsubscribeAll()', err)
         }
       }
       
       if (firstError != null) {
-        debug(`unsubscribeAll(): Unsubscribed from ${unSubCount} notifications but unsubscribing from some notifications failed failed`)
+        debug(`unsubscribeAll(): Unsubscribed from ${unSubCount} notifications but unsubscribing from some notifications failed`)
 
         return reject(firstError)
       }
@@ -2093,32 +2165,64 @@ function _unregisterAdsPort() {
 
 
 
-async function _onConnectionLost(socketFailure = false) {
-  //Clear system manager poller, if it's still active
-  clearTimeout(this._internals.systemManagerStatePoller)
 
-  //Save active subscriptions to memory 
+
+
+/**
+ * Called when connection to the remote is lost
+ * 
+ * @param {boolean} socketFailure - If true, connection was lost due socket/tcp problem -> Just destroy the socket
+ * 
+ * @memberof _LibraryInternals
+ */
+async function _onConnectionLost(socketFailure = false) {
+  debug(`_onConnectionLost(): Connection was lost. Socket failure: ${socketFailure}`)
+  _console.call(this, 'WARNING: Connection was lost. Trying to reconnect...')
+
+  //Clear timers
+  clearTimeout(this._internals.systemManagerStatePoller)
+  clearTimeout(this._internals.reconnectionTimer)
+
+  //Clear all cached symbols and data types (might be incorrect)
+  this.metaData.symbols = {}
+  this.metaData.dataTypes = {}
+
+  //Save active subscriptions to memory and delete olds
   if (this._internals.oldSubscriptions == null) {
     this._internals.oldSubscriptions = {}
-    //The following copies all subscriptions, even though we won't need internal ones
     Object.assign(this._internals.oldSubscriptions, this._internals.activeSubscriptions)
 
     debugD(`_onConnectionLost(): Total of ${Object.keys(this._internals.activeSubscriptions).length} subcriptions saved for reinitializing`)
-    
-    console.log('Saved subscriptions:', Object.keys(this._internals.activeSubscriptions).length)
-  }
+  } 
   
-  /*Todo: 
-    Old subs
-    caches etc
-    reconnecting
-    system manager
-    plc runtime
-    success
-    */
-  
+  this._internals.activeSubscriptions = {}
 
-  console.log('Connection is LOST - socket:', socketFailure)
+
+  const tryToReconnect = async (firstTime) => {
+    this.reconnect(socketFailure)
+      .then(res => {
+         
+        _reInitializeSubscriptions.call(this, this._internals.oldSubscriptions)
+          .then(() => {
+            _console.call(this, `PLC runtime reconnected successfully and all subscriptions were restored!`)
+            
+            debug(`_onConnectionLost(): Connection and subscriptions reinitialized. Connection is back.`)
+          })
+          .catch(err => {
+            _console.call(this, `PLC runtime reconnected successfully but not all subscriptions were restored. Error info:`, JSON.stringify(err))
+
+            debug(`_onConnectionLost(): Connection and some subscriptions reinitialized. Connection is back.`)
+          })
+      })
+      .catch(err => {
+        if (firstTime)
+          _console.call(this, `WARNING: Reconnecting failed. Keeping trying in the background every ${this.settings.reconnectInterval} ms...`)
+        
+        reconnectionTimer = setTimeout(tryToReconnect, this.settings.reconnectInterval)
+    })
+  }
+
+  tryToReconnect(true)
 }
 
 
@@ -2136,37 +2240,78 @@ async function _onConnectionLost(socketFailure = false) {
  * @memberof _LibraryInternals
  */
 async function _reInitializeInternals() {
-  try {
-    await _unsubscribeAllInternals.call(this)
 
-    //Read device status and subscribe to its changes
-    await this.readPlcRuntimeState()
-    await _subcribeToPlcRuntimeStateChanges.call(this)
+  //Read device status and subscribe to its changes
+  await this.readPlcRuntimeState()
+  await _subcribeToPlcRuntimeStateChanges.call(this)
 
-    //Read symbol version and subscribe to its changes
-    if (!this.settings.disableSymbolVersionMonitoring) await this.readSymbolVersion()
-    if (!this.settings.disableSymbolVersionMonitoring) await _subscribeToSymbolVersionChanges.call(this)
+  //Read symbol version and subscribe to its changes
+  if (!this.settings.disableSymbolVersionMonitoring) await this.readSymbolVersion()
+  if (!this.settings.disableSymbolVersionMonitoring) await _subscribeToSymbolVersionChanges.call(this)
 
-    //Cache data 
-    if (this.settings.readAndCacheSymbols) await this.readAndCacheSymbols()
-    if (this.settings.readAndCacheDataTypes) await this.readAndCacheDataTypes()
+  //Cache data 
+  if (this.settings.readAndCacheSymbols || this.metaData.allSymbolsCached) await this.readAndCacheSymbols()
+  if (this.settings.readAndCacheDataTypes|| this.metaData.allDataTypesCached) await this.readAndCacheDataTypes()
+  
+}
+
+ 
+
+
+
+
+
+
+
+/**
+ * Reinitializes user-made subscriptions (not internal ones)
+ *  
+ * @throws {Error} If failed, error is thrown
+ * 
+ * @memberof _LibraryInternals
+ */
+async function _reInitializeSubscriptions(previousSubscriptions) {
+  try {    
+    debug(`_reInitializeSubscriptions(): Reinitializing subscriptions`)
+
+    const errors = []    
     
-  } catch (err) {/*
-    //If we get ADS error and target port not found
-    if (err.errorType === 'ADS error' && err.errorCode === 6) {
-      if (this.metaData.systemManagerState.adsStateStr === 'Run') {
-        //PLC system is running
-        err.message = `System was connected but target port ${this.connection.targetAdsPort} is not found - Is the PLC software downloaded? - ADS error 6 (Target port not found)`
-      } else {
-        //PLS system is not in RUN mode
-        err.message = `System was connected but system is not in RUN mode (mode: ${this.metaData.systemManagerState.adsStateStr}) and target port ${this.connection.targetAdsPort} not found - ADS error 6 (Target port not found)`
+    for (let sub in previousSubscriptions) {
+      if (previousSubscriptions[sub].internal === true) continue
+
+      const oldSub = previousSubscriptions[sub]
+      debugD(`_reInitializeSubscriptions(): Reinitializing subscription: ${oldSub.target}`)
+
+      //Subscribe again
+      try {
+        const newSub = await _subscribe.call(this, oldSub.target, oldSub.callback, oldSub.settings)
+
+        debugD(`_reInitializeSubscriptions(): Reinitializing successful: ${oldSub.target} - Old handle was ${oldSub.notificationHandle} - Handle is now ${newSub.notificationHandle}`)
+        //Success. Change old object values before deleting as there might still be some references
+        //NOTE: Sometimes the handle will be the same, so do not delete the new one
+        if (oldSub.notificationHandle !== newSub.notificationHandle) {
+          Object.assign(previousSubscriptions[sub], newSub)
+          //delete this._internals.activeSubscriptions[sub]
+        }
+        
+      } catch (err) {
+        debug(`_reInitializeSubscriptions(): Reinitializing subscription failed: ${oldSub.target}`)
+        errors.push(err)
       }
-    }*/
+    }
+
+    if (errors.length > 0) {
+      debug(`_reInitializeSubscriptions(): Some subscriptions were not reinitialized`)
+      throw errors
+    } else {
+      debug(`_reInitializeSubscriptions(): All subscriptions successfully reinitialized`)
+    }
+
+  } catch (err) {
     throw err
   }
 }
-
-
+ 
 
 
 
@@ -2307,6 +2452,26 @@ async function _onSymbolVersionChanged(data) {
       }
     }
 
+    //Reinitialize all subscriptions
+    this._internals.oldSubscriptions = {}
+    Object.assign(this._internals.oldSubscriptions, this._internals.activeSubscriptions)
+    this._internals.activeSubscriptions = {}
+    
+    try {
+      await _reInitializeSubscriptions.call(this, this._internals.oldSubscriptions)
+
+      debug(`_onSymbolVersionChanged(): All subscriptions reinitialized successfully`)
+    } catch (err) {
+      _console.call(this, `WARNING: PLC symbol version changed and not all subscriptions were reinitialized. Error info: ${JSON.stringify(err)}`)
+      debug(`_onSymbolVersionChanged(): Some subscriptions weren't reinitialized`)
+    }
+    
+    try {
+      if (!this.settings.disableSymbolVersionMonitoring) await _subscribeToSymbolVersionChanges.call(this)
+    } catch (err) {
+      debug(`_onSymbolVersionChanged(): _subscribeToSymbolVersionChanges failed: %O`, err)
+    }
+
     debug(`_onSymbolVersionChanged(): Finished`)
   }
   else {
@@ -2320,59 +2485,56 @@ async function _onSymbolVersionChanged(data) {
 
 
 /**
- * Starts a poller that reads system manager state 
+ * Starts a poller that reads system manager state to see 
+ * if connection is ok and if the manager state has changed
  * 
  * @memberof _LibraryInternals
  */
-function _startSystemManagerStatePoller() {  
-  //Clear old timer if exists
+function _systemManagerStatePoller() {  
   clearTimeout(this._internals.systemManagerStatePoller)
 
   const poller = async () => {
-    let startAgain = true
-    const oldState = this.metaData.systemManagerState
+    let startAgain = true, oldState = this.metaData.systemManagerState
 
     try {
       await this.readSystemManagerState()
-      console.log('Reading system manager done')
-      this._internals.firstConnectionFaultTime = null
 
       //Read success
+      this._internals.firstStateReadFaultTime = null
+
       if (oldState.adsState !== this.metaData.systemManagerState.adsState) {
-        console.log(`System manager state changed to ${this.metaData.systemManagerState.adsStateStr}`)
+        //TODO: Throw event (system manager state changed)
+        debug(`_systemManagerStatePoller(): System manager state has changed to ${this.metaData.systemManagerState.adsStateStr}`)
 
         if (this.metaData.systemManagerState.adsState !== ADS.ADS_STATE.Run) {
-          //Now state is config -> connection is lost
-          startAgain = false
-          console.log(`System manager is not in RUN -> connection lost`)
-          _onConnectionLost.call(this)
+          //Now state is config/something else -> connection is lost
+          debug(`_systemManagerStatePoller(): System manager state is not run -> connection lost`)
 
+          startAgain = false
+          _onConnectionLost.call(this)
         }
       }
     } catch (err) {
-      console.log('Reading system manager failed:', err)
-      
-      if (this._internals.firstConnectionFaultTime == null) {
-        this._internals.firstConnectionFaultTime = new Date()
-      }
+      debug(`_systemManagerStatePoller(): Reading system manager state failed: %o`, err)
 
-      let time = 0
-      if ((time = (new Date()).getTime() - this._internals.firstConnectionFaultTime) > 5000) {
-        //No connection for TODO seconds
+      if (this._internals.firstStateReadFaultTime == null)
+        this._internals.firstStateReadFaultTime = new Date()
+      
+      let failedFor = (new Date()).getTime() - this._internals.firstStateReadFaultTime.getTime()
+
+      if (failedFor > this.settings.connectionDownDelay) {
+        debug(`_systemManagerStatePoller(): No system manager state read for longer than ${this.settings.connectionDownDelay} ms. Connection lost.`)
+
         startAgain = false
-        console.log(`No target system manager found in last ${time} ms. Connection is down.`)
         _onConnectionLost.call(this)
       }
-
     }
 
     if (startAgain)
-      this._internals.systemManagerStatePoller = setTimeout(poller, 1000)
+      this._internals.systemManagerStatePoller = setTimeout(poller, this.settings.checkStateInterval)
   }
-  
 
-  this._internals.systemManagerStatePoller = setTimeout(poller, 1000)
-
+  this._internals.systemManagerStatePoller = setTimeout(poller, this.settings.checkStateInterval)
 }
 
 
