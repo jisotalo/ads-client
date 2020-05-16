@@ -179,7 +179,7 @@ class Client {
      * @property {object} symbols - Object containing all so far cached symbols
      * @property {boolean} allDataTypesCached - True if all data types are cached (so we know to re-cache all during symbol version change)
      * @property {object} dataTypes - Object containing all so far cached data types
-     * @property {object} routerState - Local AMS router state (RUN, STOP etc)
+     * @property {object} routerState - Local AMS router state (RUN, STOP etc) - Updated only if router sends notification (debug/run change etc)
      */
     
     /**
@@ -403,7 +403,7 @@ class Client {
           try {
             await this.disconnect()
           } catch (err) {
-            //TODO: Add debug
+            debug(`connect(): Reading target system manager failed -> Connection closed`)
           }
           return reject(new ClientException(this, 'connect()', `Connection failed: ${err.message}`, err))
         }
@@ -417,7 +417,7 @@ class Client {
             try {
               await this.disconnect()
             } catch (err) {
-              //TODO: Add debug
+              debug(`connect(): Connecting to target PLC runtime failed -> Connection closed`)
             }
             return reject(new ClientException(this, 'connect()', `Target and system manager found but couldn't connect to the PLC runtime (see setting allowHalfOpen): ${err.message}`, err))
           }
@@ -642,7 +642,6 @@ class Client {
   /**
     * Reads target device system status (run/config/etc)
     * Uses ADS port 10000, which is system manager
-    * TODO: Somehow we would like to subscribe system status changes, but notifications won't work -> polling?
     * 
     * @returns {Promise<object>} Returns a promise (async function)
     * - If resolved, system status is returned (object)
@@ -756,7 +755,7 @@ class Client {
       pos += 4
     
       //8..11 Write data length
-      data.writeUInt32LE(24, pos) //todo add constant
+      data.writeUInt32LE(24, pos)
       pos += 4
 
     
@@ -2193,6 +2192,16 @@ function _unregisterAdsPort() {
  */
 async function _onConnectionLost(socketFailure = false) {
   debug(`_onConnectionLost(): Connection was lost. Socket failure: ${socketFailure}`)
+
+  if (this.settings.autoReconnect !== true) {
+    _console.call(this, 'WARNING: Connection was lost and setting autoReconnect=false. Quiting.')
+    try {
+      await this.disconnect(true)
+    } catch { }
+    
+    return
+  }
+  
   _console.call(this, 'WARNING: Connection was lost. Trying to reconnect...')
   
   this.connection.connected = false

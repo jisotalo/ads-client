@@ -52,6 +52,8 @@ There is still some work to do for "production ready" version. See this [Github 
   - [Subscribing to PLC variables (device notifications)](#subscribing-to-plc-variables-device-notifications)
     - [Subcribe to variable value (on-change)](#subcribe-to-variable-value-on-change)
     - [Subcribe to variable value (cyclic)](#subcribe-to-variable-value-cyclic)
+- [Debugging](#debugging)
+- [FAQ](#faq)
 - [Documentation](#documentation)
 - [License](#license)
 
@@ -166,6 +168,7 @@ Example entry in the PLCs `TwinCAT\3.1\Target\StaticRoutes.xml` file when UI has
 
 Requirements:
 - No special requirements
+- AMS router TCP loopback enabled (see "Enabling localhost support")
 
 ```js
 const client = new ads.Client({
@@ -776,6 +779,51 @@ Mon Apr 13 2020 13:09:06 GMT+0300 (GMT+03:00): GVL_Test.IncrementingValue change
 ...
 ```
 
+# Debugging
+If you have problems or you are interested, you can enabled debug output to console. The ads-client uses `debug` package for debugging.
+
+Debugging can be enabled from terminal or from Javascript code.
+
+## Enabling debug from code
+
+You can change the debug level with method `setDebugging(level)`:
+```js
+client.setDebugging(2)
+```
+Different debug levels explained:
+- 0: No debugging (default)
+- 1: Errors have full stack traces, no debug printing
+- 2: Basic debug printing (same as `DEBUG=ads-client`) 
+- 3: Detailed debug printing (same as `DEBUG=ads-client,ads-client:details`)
+- 4: Detailed debug printing and raw I/O data (same as `DEBUG=ads-client*`)
+
+## Enabling debugging from terminal
+See [debug package](https://www.npmjs.com/package/debug) for instructions.
+
+Example for Visual Studio Code (PowerShell):
+```bash
+$env:DEBUG='ads-client,ads-client:details'
+```
+
+Different debug levels explained:
+- Basic debug printing `DEBUG='ads-client'`
+- Basic and detailed debug printing `DEBUG='ads-client,ads-client:details'`
+- Basic, detailed and raw I/O data: `DEBUG='ads-client*'`
+
+# FAQ 
+
+### Connection is working very badly and lot's of timeouts
+Possible fixes: 
+- Remove all routes and create them again
+- Increase timeout delay setting (`timeoutDelay`)
+
+
+### Can I connect from Raspberry Pi to TwinCAT?
+
+Absolutely. See chapter "Supported platforms and setups", but basically:
+1. Open a TCP port 48898 from your PLC
+2. Edit StaticRoutes.xml file from your PLC
+3. Connect from Raspberry using the PLC IP address as router address and the local AMS Net Id you wrote to StaticRoutes.xml
 
 # Documentation
 
