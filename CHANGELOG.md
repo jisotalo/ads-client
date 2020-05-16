@@ -5,6 +5,27 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## [1.2.0] - 16.05.2020
+### Added
+- Automatic reconnection
+  - If connection is lost, the ads-client tries to reconnect automatically
+  - When/if connection is resumed, all previously active subscriptions are reinitialized/continued
+  - Will be optimized in future updates as well
+  - Works in all cases:
+    - Connected to localhost directly
+    - Connected to remote through local router 
+    - Connected to remote through remote router (directly)
+  - New setting added relating this:
+    - `autoReconnect`, `reconnectInterval`, `checkStateInterval`, `connectionDownDelay`
+- System manager state is polled intervally (used for connection checking)
+  - Latest state always in client.metaData.systemManagerState
+- New method `setDebugging` for setting debug modes
+
+### Changed
+- connect(): Connecting now fails if remote PLC runtime is not found. This can be disabled with setting `allowHalfOpen` 
+- Bug fix: `localhost` as target AMS net id works
+
+
 ## [1.1.2] - 23.04.2020
 ### Changed
 - Changed all string encoding/decoding from ascii to cp1252

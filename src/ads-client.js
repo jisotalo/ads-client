@@ -68,7 +68,11 @@ class Client {
    * @property {number} [localAdsPort='(from AMS router)'] - Local ADS port to use - Optional (**default**: From AMS router)
    * @property {number} [timeoutDelay=2000] - Time (milliseconds) after connecting to the router or waiting for command response is canceled to timeout - Optional (**default**: 2000 ms)
    * @property {boolean} [hideConsoleWarnings=false] - If true, no warnings are written to console (=nothing is ever written to console) - Optional (**default**: false)
-   *
+   * @property {boolean} [autoReconnect=true] - If true and connection is lost, the client tries to reconnect automatically - Optional (**default**: true)
+   * @property {number} [reconnectInterval=2000] - Time (milliseconds) how often the lost connection is tried to re-establish - Optional (**default**: 2000 ms)
+   * @property {number} [checkStateInterval=1000] - Time (milliseconds) how often the system manager state is read to see if connection is OK - Optional (**default**: 1000 ms)
+   * @property {number} [connectionDownDelay=5000] - Time (milliseconds) after no successful reading of the system manager state the connection is determined to be lost - Optional (**default**: 5000 ms)
+   * @property {boolean} [allowHalfOpen=false] - If true, connect() is successful even if no PLC runtime is found (but target and system manager are available) - Can be useful if it's ok that after connect() the PLC runtime is not immediately available (example: connecting before uploading PLC code and reading data later)
    */
 
   
@@ -92,10 +96,17 @@ class Client {
       localAmsNetId: null,
       localAdsPort: null,
       timeoutDelay: 2000,
-      hideConsoleWarnings: false
+      hideConsoleWarnings: false, 
+      autoReconnect: true,
+      reconnectInterval: 2000,
+      checkStateInterval: 1000,
+      connectionDownDelay: 5000,
+      allowHalfOpen: false,
     }
   }
 
+
+  
 
 
   
@@ -109,10 +120,10 @@ class Client {
   constructor(settings) {
     //Check the required settings
     if (settings.targetAmsNetId == null) {
-      throw new ClientException('Client()', 'Required setting "targetAmsNetId" is missing.')
+      throw new ClientException(this, 'Client()', 'Required setting "targetAmsNetId" is missing.')
     }
     if (settings.targetAdsPort == null) {
-      throw new ClientException('Client()', 'Required setting "targetAdsPort" is missing.')
+      throw new ClientException(this, 'Client()', 'Required setting "targetAdsPort" is missing.')
     }
     
     //Taking the default settings and then adding the user-defined ones
@@ -121,9 +132,11 @@ class Client {
       ...settings
     }
 
+    this.settings.targetAmsNetId = this.settings.targetAmsNetId.trim()
+
     //Loopback address
-    if (this.settings.localAmsNetId && this.settings.localAmsNetId.trim().toLowerCase() === 'localhost') {
-      this.settings.localAmsNetId = '127.0.0.1.1.1'
+    if (this.settings.targetAmsNetId.toLowerCase() === 'localhost') {
+      this.settings.targetAmsNetId = '127.0.0.1.1.1'
     }
 
     /**
@@ -132,6 +145,8 @@ class Client {
      * @readonly
      */
     this._internals = {
+      debugLevel: 0,
+
       //Socket connection and data receiving
       receiveDataBuffer: Buffer.alloc(0),
       socket: null,
@@ -142,7 +157,12 @@ class Client {
       activeAdsRequests: {}, //Active ADS requests that wait for answer from router
       activeSubscriptions: {}, //Active device notifications
       symbolVersionNotification: null, //Notification handle of the symbol version changed subscription (used to unsubscribe)
-      systemManagerStatePoller: null //SetTimeout timer that reads the system manager state (run/config) - This is not available through ADS notifications..
+      systemManagerStatePoller: null, //Timer that reads the system manager state (run/config) - This is not available through ADS notifications
+      firstStateReadFaultTime: null, //Date when system manager state read failed for the first time
+      socketConnectionLostHandler: null, //Handler for socket connection lost event
+      socketErrorHandler: null, //Handler for socket error event
+      oldSubscriptions: null, //Old subscriptions that were active before connection was lost
+      reconnectionTimer: null, //Timer that tries to reconnect intervally
     }
     
 
@@ -159,6 +179,7 @@ class Client {
      * @property {object} symbols - Object containing all so far cached symbols
      * @property {boolean} allDataTypesCached - True if all data types are cached (so we know to re-cache all during symbol version change)
      * @property {object} dataTypes - Object containing all so far cached data types
+     * @property {object} routerState - Local AMS router state (RUN, STOP etc) - Updated only if router sends notification (debug/run change etc)
      */
     
     /**
@@ -183,7 +204,8 @@ class Client {
     /**
      * 
      * @typedef Connection
-     * @property {boolean} connected - True if target is connected
+     * @property {boolean} connected - True if target is connected 
+     * @property {boolean} isLocal - True if target is local runtime / loopback connection
      * @property {string} localAmsNetId - Local system AmsNetId
      * @property {number} localAdsPort - Local system ADS port
      * @property {string} targetAmsNetId - Target system AmsNetId
@@ -197,7 +219,8 @@ class Client {
      * @type {Connection}
      */
     this.connection = {
-      connected: false,
+      connected: false, 
+      isLocal: false,
       localAmsNetId: null,
       localAdsPort: null,
       targetAmsNetId: this.settings.targetAmsNetId,
@@ -212,6 +235,45 @@ class Client {
 
 
 
+  /**
+   * Sets debugging using debug package on/off. 
+   * Another way for environment variable DEBUG:
+   *  - 0 = no debugging
+   *  - 1 = Extended exception stack trace
+   *  - 2 = basic debugging (same as $env:DEBUG='ads-client')
+   *  - 3 = detailed debugging (same as $env:DEBUG='ads-client,ads-client:details')
+   *  - 4 = full debugging (same as $env:DEBUG='ads-client,ads-client:details,ads-client:raw-data')
+   * 
+   * @param {number} level 0 = none, 1 = extended stack traces, 2 = basic, 3 = detailed, 4 = detailed + raw data
+   */
+  setDebugging(level) {
+    debug(`setDebugging(): Debug level set to ${level}`)
+
+    debug.enabled = false
+    debugD.enabled = false
+    debugIO.enabled = false
+    this._internals.debugLevel = level
+
+    if (level === 0) {
+      //See ClientException
+    }
+    else if (level === 2) {
+      debug.enabled = true
+
+    } else if (level === 3) {
+      debug.enabled = true
+      debugD.enabled = true
+      
+    } else if (level === 4) {
+      debug.enabled = true
+      debugD.enabled = true
+      debugIO.enabled = true
+    }
+  }
+
+
+
+
 
 
 
@@ -223,19 +285,23 @@ class Client {
    * - If rejected, something went wrong and error info is returned (object)
    */
   connect() {
+    
     return new Promise(async (resolve, reject) => {
 
       if (this._internals.socket !== null) {
         debug(`connect(): Socket already assigned`)
-        return reject(new ClientException('connect()', 'Connection is already opened. Close the connection first using disconnect()'))
+        return reject(new ClientException(this, 'connect()', 'Connection is already opened. Close the connection first using disconnect()'))
       }
 
       debug(`connect(): Starting to connect ${this.settings.routerAddress}:${this.settings.routerTcpPort}`)
 
       //Creating a socket and setting it up
-      const socket = new net.Socket()
+      let socket = new net.Socket()
       socket.setNoDelay(true) //Sends data without delay
+ 
 
+
+      //----- Connecting error events -----
 
       //Listening error event during connection
       socket.once('error', err => {
@@ -243,8 +309,9 @@ class Client {
 
         //Remove all events from socket
         socket.removeAllListeners()
+        socket = null
 
-        reject(new ClientException('connect()', `Connection to ${this.settings.routerAddress}:${this.settings.routerTcpPort} failed (socket error ${err.errno})`, err))
+        reject(new ClientException(this, 'connect()', `Connection to ${this.settings.routerAddress}:${this.settings.routerTcpPort} failed (socket error ${err.errno})`, err))
       })
 
 
@@ -255,45 +322,44 @@ class Client {
 
         //Remove all events from socket
         socket.removeAllListeners()
+        socket = null
 
-        reject(new ClientException('connect()', `Connection to ${this.settings.routerAddress}:${this.settings.routerTcpPort} failed - socket closed by remote (hadError = ${hadError})`))
+        reject(new ClientException(this, 'connect()', `Connection to ${this.settings.routerAddress}:${this.settings.routerTcpPort} failed - socket closed by remote (hadError = ${hadError})`))
       })
 
+  
+      //Listening end event during connection
+      socket.once('end', () => {
+        debug(`connect(): Socket connection ended by remote, connection failed.`)
+ 
+        //Remove all events from socket
+        socket.removeAllListeners()
+ 
+ 
+        if (this.settings.localAdsPort != null)
+          reject(new ClientException(this, 'connect()', `Connection to ${this.settings.routerAddress}:${this.settings.routerTcpPort} failed - socket ended by remote (is the given local ADS port ${this.settings.localAdsPort} already in use?)`))
+        else
+          reject(new ClientException(this, 'connect()', `Connection to ${this.settings.routerAddress}:${this.settings.routerTcpPort} failed - socket ended by remote`))
+      })
 
       //Listening timeout event during connection
-      socket.once('timeout', hadError => {
+      socket.once('timeout', () => {
         debug(`connect(): Socket timeout`)
 
         //No more timeout needed
         socket.setTimeout(0);
-
         socket.destroy()
         
         //Remove all events from socket
         socket.removeAllListeners()
 
-        reject(new ClientException('connect()', `Connection to ${this.settings.routerAddress}:${this.settings.routerTcpPort} failed (timeout) - No response from router in ${this.settings.timeoutDelay} ms`))
+        socket = null
+
+        reject(new ClientException(this, 'connect()', `Connection to ${this.settings.routerAddress}:${this.settings.routerTcpPort} failed (timeout) - No response from router in ${this.settings.timeoutDelay} ms`))
       })
+      
+      //----- Connecting error events end -----
 
-
-      //Listening end event during connection
-      socket.once('end', () => {
-        debug(`connect(): Socket connection ended by remote, connection failed.`)
-
-        //Remove all events from socket
-        socket.removeAllListeners()
-
-
-        if (this.settings.localAdsPort != null)
-          reject(new ClientException('connect()', `Connection to ${this.settings.routerAddress}:${this.settings.routerTcpPort} failed - socket ended by remote (is the given local ADS port ${this.settings.localAdsPort} already in use?)`))
-        else
-          reject(new ClientException('connect()', `Connection to ${this.settings.routerAddress}:${this.settings.routerTcpPort} failed - socket ended by remote`))
-      })
-
-      //Listening data event
-      socket.on('data', data => {
-        _socketReceive.call(this, data)
-      })
 
       //Listening for connect event
       socket.once('connect', async () => {
@@ -312,14 +378,15 @@ class Client {
           this.connection.connected = true
           this.connection.localAmsNetId = res.amsTcp.data.localAmsNetId
           this.connection.localAdsPort = res.amsTcp.data.localAdsPort
-
+          this.connection.isLocal = this.settings.targetAmsNetId === '127.0.0.1.1.1' || this.settings.targetAmsNetId === this.connection.localAmsNetId
+ 
           debug(`connect(): ADS port registered from router. We are ${this.connection.localAmsNetId}:${this.connection.localAdsPort}`)
         } catch (err) {
 
           socket.destroy()
           //Remove all events from socket
           socket.removeAllListeners()
-          reject(new ClientException('connect()', `Registering ADS port from router failed`, err))
+          return reject(new ClientException(this, 'connect()', `Registering ADS port from router failed`, err))
         }
 
         //Remove the socket events that were used only during connect()
@@ -330,32 +397,54 @@ class Client {
         try {
           //Try to read system manager state - If it's OK, connection is successful to the target
           await this.readSystemManagerState()
+          _systemManagerStatePoller.call(this)
 
         } catch (err) {
-          this.connection.connected = false
-          this.connection.localAmsNetId = null
-          this.connection.localAdsPort = null
-          
-          //Remove all events from socket
-          socket.removeAllListeners()
-
-          reject(new ClientException('connect()', `Connection failed: ${err.message}`, err))
+          try {
+            await this.disconnect()
+          } catch (err) {
+            debug(`connect(): Reading target system manager failed -> Connection closed`)
+          }
+          return reject(new ClientException(this, 'connect()', `Connection failed: ${err.message}`, err))
         }
 
+
         try {
-          //Try to initialize internal system to the target PLC runtime
-          //If it fails, we are still connected
           await _reInitializeInternals.call(this)
 
-        } catch (err) {
+        } catch (err) { 
+          if (this.settings.allowHalfOpen !== true) {
+            try {
+              await this.disconnect()
+            } catch (err) {
+              debug(`connect(): Connecting to target PLC runtime failed -> Connection closed`)
+            }
+            return reject(new ClientException(this, 'connect()', `Target and system manager found but couldn't connect to the PLC runtime (see setting allowHalfOpen): ${err.message}`, err))
+          }
+
+          //Todo: Redesign this
           if(this.metaData.systemManagerState.adsState !== ADS.ADS_STATE.Run)
             _console.call(this, `WARNING: Target is connected but not in RUN mode (mode: ${this.metaData.systemManagerState.adsStateStr}) - connecting to runtime (ADS port ${this.settings.targetAdsPort}) failed`)
           else
-            _console.call(this, `WARNING: Target is connected but connecting to runtime (ADS port ${this.settings.targetAdsPort}) failed - Check the port number and that the target system is state (${this.metaData.systemManagerState.adsStateStr}) is valid.`)
+            _console.call(this, `WARNING: Target is connected but connecting to runtime (ADS port ${this.settings.targetAdsPort}) failed - Check the port number and that the target system state (${this.metaData.systemManagerState.adsStateStr}) is valid.`)
         }
+ 
+        //Listening connection lost events
+        this._internals.socketConnectionLostHandler = _onConnectionLost.bind(this, true)
+        socket.on('close', this._internals.socketConnectionLostHandler)
+        socket.on('end', this._internals.socketConnectionLostHandler)
 
-        //Anyways, we are connected to the server
+        //TODO: If socket error happens, should something to be done? Now probably close/end is called afterwards.
+        this._internals.socketErrorHandler = err => _console.call(this, `WARNING: Socket connection error: ${JSON.stringify(err)}`)
+        socket.on('error', this._internals.socketErrorHandler)
+
+        //We are connected to the target
         resolve(this.connection)
+      })
+
+      //Listening data event
+      socket.on('data', data => {
+        _socketReceive.call(this, data)
       })
 
       //Timeout only during connecting, other timeouts are handled elsewhere
@@ -370,7 +459,7 @@ class Client {
           localAddress: (this.settings.localAddress ? this.settings.localAddress : null),
         })
       } catch (err) {
-        reject(new ClientException('connect()', `Opening socket connection to ${this.settings.routerAddress}:${this.settings.routerTcpPort} failed`, err))
+        reject(new ClientException(this, 'connect()', `Opening socket connection to ${this.settings.routerAddress}:${this.settings.routerTcpPort} failed`, err))
       }
     })
   }
@@ -388,29 +477,50 @@ class Client {
    * Unsubscribes all notifications, unregisters ADS port from router (if it was registered) 
    * and disconnects target system and ADS router 
    * 
+   * @param {boolean} [forceDisconnect] - If true, the connection is dropped immediately (default = false)  
+   * 
    * @returns {Promise} Returns a promise (async function)
    * - If resolved, disconnect was successful 
    * - If rejected, connection is still closed but something went wrong during disconnecting and error info is returned
    */
-  disconnect() {
+  disconnect(forceDisconnect = false) {
     return new Promise(async (resolve, reject) => {
-      debug(`disconnect(): Starting to close connection`)
+      debug(`disconnect(): Starting to close connection (force: ${forceDisconnect})`)
 
-      let error = null
-
-      try {
-        await this.unsubscribeAll()
-      } catch (err) {
-        error = new ClientException('disconnect()', err)
+      if (this._internals.socketConnectionLostHandler) {
+        this._internals.socket.off('close', this._internals.socketConnectionLostHandler)
+        this._internals.socket.off('end', this._internals.socketConnectionLostHandler)
+      }
+      if (this._internals.socketErrorHandler) {
+        this._internals.socket.off('error', this._internals.socketErrorHandler)
       }
 
       //Clear system manager state poller
       clearTimeout(this._internals.systemManagerStatePoller)
 
+      //If forced, then just destroy the socket
+      if (forceDisconnect) {
+        this._internals.socket.removeAllListeners()
+        this._internals.socket.destroy()
+
+        this.connection.connected = false
+        this.connection.localAdsPort = null
+        this._internals.socket = null
+
+        return resolve()
+      }
+
+
+      let error = null
+      try {
+        await this.unsubscribeAll()
+      } catch (err) {
+        error = new ClientException(this, 'disconnect()', err)
+      }
       try {
         await _unsubscribeAllInternals.call(this)
       } catch (err) {
-        error = new ClientException('disconnect()', err)
+        error = new ClientException(this, 'disconnect()', err)
       }
 
       try {
@@ -419,8 +529,12 @@ class Client {
         //Done
         this.connection.connected = false
         this.connection.localAdsPort = null
-        this._internals.socket.removeAllListeners()
-        this._internals.socket = null
+
+        if (this._internals.socket != null) {
+          this._internals.socket.removeAllListeners()
+          this._internals.socket.destroy() //Just incase
+          this._internals.socket = null
+        }
 
         debug(`disconnect(): Connection closed successfully`)
 
@@ -432,7 +546,7 @@ class Client {
         this.connection.localAdsPort = null
         this._internals.socket = null
 
-        error = new ClientException('disconnect()', err)
+        error = new ClientException(this, 'disconnect()', err)
         
         debug(`disconnect(): Connection closing failed, connection forced to close`)
       }
@@ -447,6 +561,54 @@ class Client {
 
 
 
+
+
+
+
+
+  /**
+   * Disconnects and reconnects again. At the moment does NOT reinitialize subscriptions, everything is lost
+   * 
+   * @param {boolean} [forceDisconnect] - If true, the connection is dropped immediately (default = false)  
+   * 
+   * @returns {Promise} Returns a promise (async function)
+   * - If resolved, connection to PLC runtime is successful
+   * - If rejected, connection to PLC runtime failed
+   */
+  reconnect(forceDisconnect = false) {
+    return new Promise(async (resolve, reject) => {
+
+      if (this._internals.socket != null) {
+        try {
+          debug(`reconnect(): Trying to disconnect`)
+
+          await this.disconnect(forceDisconnect)
+
+        } catch (err) {
+          debug(`reconnect(): Disconnecting failed: %o`, err)
+        }
+      }
+
+      debug(`reconnect(): Trying to connect`)
+
+      return this.connect()
+        .then(res => {
+          debug(`reconnect(): Connected!`)
+          resolve(res)
+        })
+        .catch(err => {
+          debug(`reconnect(): Connecting failed`)
+          reject(err)
+        })
+    })
+  }
+
+
+
+
+ 
+ 
+   
 
 
 
@@ -470,7 +632,7 @@ class Client {
         .catch((res) => {
           debug(`readDeviceInfo(): Device info read failed`)
           
-          reject(new ClientException('readDeviceInfo()', 'Reading device info failed', res))
+          reject(new ClientException(this, 'readDeviceInfo()', 'Reading device info failed', res))
         })
     })
   }
@@ -480,7 +642,6 @@ class Client {
   /**
     * Reads target device system status (run/config/etc)
     * Uses ADS port 10000, which is system manager
-    * TODO: Somehow we would like to subscribe system status changes, but notifications won't work -> polling?
     * 
     * @returns {Promise<object>} Returns a promise (async function)
     * - If resolved, system status is returned (object)
@@ -499,7 +660,7 @@ class Client {
         })
         .catch((res) => {
           debug(`readSystemManagerState(): Device system manager state read failed`)
-          reject(new ClientException('readSystemManagerState()', 'Device system manager state read failed', res))
+          reject(new ClientException(this, 'readSystemManagerState()', 'Device system manager state read failed', res))
         })
     })
   }
@@ -529,7 +690,7 @@ class Client {
         })
         .catch((res) => {
           debug(`readPlcRuntimeState(): Reading PLC runtime (${this.connection.targetAdsPort}) state failed`)
-          reject(new ClientException('readPlcRuntimeState()', `Reading PLC runtime (${this.connection.targetAdsPort}) state failed`, res))
+          reject(new ClientException(this, 'readPlcRuntimeState()', `Reading PLC runtime (${this.connection.targetAdsPort}) state failed`, res))
         })
     })
   }
@@ -558,7 +719,7 @@ class Client {
         })
         .catch((res) => {
           debug(`readSymbolVersion(): Symbol version read failed`)
-          reject(new ClientException('readSymbolVersion()', `Reading PLC symbol version failed`, res))
+          reject(new ClientException(this, 'readSymbolVersion()', `Reading PLC symbol version failed`, res))
         })
     })
   }
@@ -594,7 +755,7 @@ class Client {
       pos += 4
     
       //8..11 Write data length
-      data.writeUInt32LE(24, pos) //todo add constant
+      data.writeUInt32LE(24, pos)
       pos += 4
 
     
@@ -636,7 +797,7 @@ class Client {
           resolve(result)
         })
         .catch((res) => {
-          reject(new ClientException('readUploadInfo()', `Reading PLC upload info failed`, res))
+          reject(new ClientException(this, 'readUploadInfo()', `Reading PLC upload info failed`, res))
         })
     })
   }
@@ -668,7 +829,7 @@ class Client {
       } catch (err) {
         if (this.metaData.uploadInfo === null) {
           debug(`readAndCacheSymbols(): Updating upload info failed, no old data available`)
-          return reject(new ClientException('readAndCacheSymbols()', `Downloading symbols to cache failed (updating upload info failed)`, err))
+          return reject(new ClientException(this, 'readAndCacheSymbols()', `Downloading symbols to cache failed (updating upload info failed)`, err))
         } else {
           debug(`readAndCacheSymbols(): Updating upload info failed, using old data`)
         }
@@ -721,7 +882,7 @@ class Client {
           resolve(symbols)
         })
         .catch((res) => {
-          return reject(new ClientException('readAndCacheSymbols()', `Downloading symbols to cache failed`, res))
+          return reject(new ClientException(this, 'readAndCacheSymbols()', `Downloading symbols to cache failed`, res))
         })
     })
   }
@@ -757,7 +918,7 @@ class Client {
       } catch (err) {
         if (this.metaData.uploadInfo === null) {
           debug(`readAndCacheDataTypes(): Updating upload info failed, no old data available`)
-          return reject(new ClientException('readAndCacheDataTypes()', `Downloading data types to cache failed (updating upload info failed)`, err))
+          return reject(new ClientException(this, 'readAndCacheDataTypes()', `Downloading data types to cache failed (updating upload info failed)`, err))
         } else {
           debug(`readAndCacheDataTypes(): Updating upload info failed, using old data`)
         }
@@ -810,7 +971,7 @@ class Client {
         })
       
         .catch((res) => {
-          reject(new ClientException('readAndCacheDataTypes()', `Downloading data types to cache failed`, res))
+          reject(new ClientException(this, 'readAndCacheDataTypes()', `Downloading data types to cache failed`, res))
         })
     })
   }
@@ -840,7 +1001,7 @@ class Client {
       //Wrapper for _getDataTypeRecursive
       _getDataTypeRecursive.call(this, dataTypeName.trim())
         .then(res => resolve(res))
-        .catch(err => reject(new ClientException('getDataType()', `Finding data type ${dataTypeName} failed`, err)))
+        .catch(err => reject(new ClientException(this, 'getDataType()', `Finding data type ${dataTypeName} failed`, err)))
     })
   }
 
@@ -882,7 +1043,7 @@ class Client {
             debugD(`getSymbolInfo(): Symbol info read and cached from PLC for ${variableName}`)
             return resolve(symbol)
           })
-          .catch(err => reject(new ClientException('getSymbolInfo()', `Reading symbol info for ${variableName} failed`, err))) 
+          .catch(err => reject(new ClientException(this, 'getSymbolInfo()', `Reading symbol info for ${variableName} failed`, err))) 
       }
     })
   }
@@ -925,7 +1086,7 @@ class Client {
 
         symbol = await this.getSymbolInfo(variableName)
       } catch (err) {
-        return reject(new ClientException('readSymbol()', `Reading symbol ${variableName} failed: Reading symbol info failed`, err))
+        return reject(new ClientException(this, 'readSymbol()', `Reading symbol ${variableName} failed: Reading symbol info failed`, err))
       }
 
       //2. Read the value
@@ -935,7 +1096,7 @@ class Client {
 
         value = await this.readRaw(symbol.indexGroup, symbol.indexOffset, symbol.size)
       } catch (err) {
-        return reject(new ClientException('readSymbol()', `Reading symbol ${variableName} failed: Reading value failed`, err))
+        return reject(new ClientException(this, 'readSymbol()', `Reading symbol ${variableName} failed: Reading value failed`, err))
       }
     
       //3. Create the data type
@@ -945,7 +1106,7 @@ class Client {
 
         dataType = await this.getDataType(symbol.type)
       } catch (err) {
-        return reject(new ClientException('readSymbol()', `Reading symbol ${variableName} failed: Reading data type failed`, err))
+        return reject(new ClientException(this, 'readSymbol()', `Reading symbol ${variableName} failed: Reading data type failed`, err))
       }
           
       //4. Parse the data to javascript object
@@ -955,7 +1116,7 @@ class Client {
 
         data = _parsePlcDataToObject.call(this, value, dataType)
       } catch (err) {
-        return reject(new ClientException('readSymbol()', `Reading symbol ${variableName} failed: Parsing data type to Javascript failed`, err))
+        return reject(new ClientException(this, 'readSymbol()', `Reading symbol ${variableName} failed: Parsing data type to Javascript failed`, err))
       }
 
       debug(`readSymbol(): Reading symbol for ${variableName} done`)
@@ -1001,7 +1162,7 @@ class Client {
 
         symbol = await this.getSymbolInfo(variableName)
       } catch (err) {
-        return reject(new ClientException('writeSymbol()', `Writing symbol ${variableName} failed: Reading symbol info failed`, err))
+        return reject(new ClientException(this, 'writeSymbol()', `Writing symbol ${variableName} failed: Reading symbol info failed`, err))
       }
 
       //2. Create full data type recursively
@@ -1011,7 +1172,7 @@ class Client {
 
         dataType = await this.getDataType(symbol.type)
       } catch (err) {
-        return reject(new ClientException('writeSymbol()', `Writing symbol ${variableName} failed: Reading data type failed`, err))
+        return reject(new ClientException(this, 'writeSymbol()', `Writing symbol ${variableName} failed: Reading data type failed`, err))
       }
       
       //3. Create data buffer packet (parse the value to a byte Buffer)
@@ -1027,7 +1188,7 @@ class Client {
           if (!autoFill) {
             debug(`writeSymbol(): Given Javascript object does not match the PLC variable - autoFill not given so quiting`)
 
-            return reject(new ClientException('writeSymbol()',`Writing symbol ${variableName} failed: ${err.message} - Set writeSymbol() 3rd parameter (autoFill) to true to allow uncomplete objects`))
+            return reject(new ClientException(this, 'writeSymbol()',`Writing symbol ${variableName} failed: ${err.message} - Set writeSymbol() 3rd parameter (autoFill) to true to allow uncomplete objects`))
           }
           debug(`writeSymbol(): Given Javascript object does not match the PLC variable - autoFill given so continuing`)
 
@@ -1043,7 +1204,7 @@ class Client {
 
           } catch (err) {
             //Still failing
-            return reject(new ClientException('writeSymbol()', `Writing symbol ${variableName} failed: Parsing the Javascript object to PLC failed`, err))
+            return reject(new ClientException(this, 'writeSymbol()', `Writing symbol ${variableName} failed: Parsing the Javascript object to PLC failed`, err))
           }
 
         } else {
@@ -1058,7 +1219,7 @@ class Client {
         await this.writeRaw(symbol.indexGroup, symbol.indexOffset, dataBuffer)
 
       } catch (err) {
-        return reject(new ClientException('writeSymbol()', `Writing symbol ${variableName} failed: Writing the data failed`, err))
+        return reject(new ClientException(this, 'writeSymbol()', `Writing symbol ${variableName} failed: Writing the data failed`, err))
       }
 
       debug(`writeSymbol(): Writing symbol ${variableName} done`)
@@ -1120,7 +1281,7 @@ class Client {
         }
       )
       .then(res => resolve(res))
-      .catch(err => reject(new ClientException('subscribe()', `Subscribing to ${variableName} failed`, err)))
+      .catch(err => reject(new ClientException(this, 'subscribe()', `Subscribing to ${variableName} failed`, err)))
     })
   }
 
@@ -1163,7 +1324,7 @@ class Client {
         }
       )
       .then(res => resolve(res))
-      .catch(err => reject(new ClientException('subscribeRaw()', `Subscribing to ${JSON.stringify(target)} failed`, err)))
+      .catch(err => reject(new ClientException(this, 'subscribeRaw()', `Subscribing to ${JSON.stringify(target)} failed`, err)))
     })
   }
   
@@ -1191,7 +1352,7 @@ class Client {
 
       if (!sub) {
         debug(`unsubscribe(): Unsubscribing failed - Unknown notification handle ${notificationHandle}`)
-        return reject(new ClientException('unsubscribe()', `Unsubscribing from notification handle "${notificationHandle}" failed: Unknown handle`))
+        return reject(new ClientException(this, 'unsubscribe()', `Unsubscribing from notification handle "${notificationHandle}" failed: Unknown handle`))
       }
 
       debug(`unsubscribe(): Unsubscribing from %o (notification handle: ${notificationHandle})`, sub.target)
@@ -1213,7 +1374,7 @@ class Client {
         })
         .catch((res) => {
           debug(`unsubscribe(): Unsubscribing from notification ${notificationHandle} failed`)
-          reject(new ClientException('unsubscribe()', `Unsubscribing from notification ${JSON.stringify(this._internals.activeSubscriptions[notificationHandle].target)} failed`, res))
+          reject(new ClientException(this, 'unsubscribe()', `Unsubscribing from notification ${JSON.stringify(this._internals.activeSubscriptions[notificationHandle].target)} failed`, res))
         })
     })
   }
@@ -1248,14 +1409,14 @@ class Client {
           unSubCount++
 
         } catch (err) {
-          debug(`unsubscribeAll(): Unsubscribing from notification ${JSON.stringify(this._internals.activeSubscriptions[sub])} failed`)
+          debug(`unsubscribeAll(): Unsubscribing from notification ${JSON.stringify(this._internals.activeSubscriptions[sub].target)} failed`)
           
-          firstError = new ClientException('unsubscribeAll()', err)
+          firstError = new ClientException(this, 'unsubscribeAll()', err)
         }
       }
       
       if (firstError != null) {
-        debug(`unsubscribeAll(): Unsubscribed from ${unSubCount} notifications but unsubscribing from some notifications failed failed`)
+        debug(`unsubscribeAll(): Unsubscribed from ${unSubCount} notifications but unsubscribing from some notifications failed`)
 
         return reject(firstError)
       }
@@ -1287,7 +1448,7 @@ class Client {
       debug(`readRawByHandle(): Reading data using handle "${handle}" ${(size !== 0xFFFFFFFF ? `and size of ${size} bytes` : ``)}`)
 
       if (handle == null) {
-        return reject(new ClientException('readRawByHandle()', `Required parameter handle is not assigned`))
+        return reject(new ClientException(this, 'readRawByHandle()', `Required parameter handle is not assigned`))
       } else if (typeof handle === 'object' && handle.handle && handle.size) {
         size = handle.size
         handle = handle.handle
@@ -1295,7 +1456,7 @@ class Client {
 
       this.readRaw(ADS.ADS_RESERVED_INDEX_GROUPS.SymbolValueByHandle, handle, size)
         .then(res => resolve(res))
-        .catch(err => reject(new ClientException('readRawByHandle()', `Reading data using handle "${handle}"`, err)))
+        .catch(err => reject(new ClientException(this, 'readRawByHandle()', `Reading data using handle "${handle}"`, err)))
     })
   }
 
@@ -1313,7 +1474,7 @@ class Client {
   readRawByName(variableName) {
     return new Promise(async (resolve, reject) => {
       if (variableName == null) {
-        return reject(new ClientException('readRawByName()', `Required parameter variableName is not assigned`))
+        return reject(new ClientException(this, 'readRawByName()', `Required parameter variableName is not assigned`))
       }
 
       variableName = variableName.trim()
@@ -1356,7 +1517,7 @@ class Client {
         })
         .catch((res) => {
           debug(`readRawByName(): Reading data from ${variableName} failed %o`, res)
-          reject(new ClientException('readRawByName()', `Reading ${variableName} failed`, res))
+          reject(new ClientException(this, 'readRawByName()', `Reading ${variableName} failed`, res))
         })
     })
   }
@@ -1378,12 +1539,12 @@ class Client {
   readRawBySymbol(symbol) {
     return new Promise(async (resolve, reject) => {
       if (symbol == null) {
-        return reject(new ClientException('readRawBySymbol()', `Required parameter symbol is not assigned`))
+        return reject(new ClientException(this, 'readRawBySymbol()', `Required parameter symbol is not assigned`))
       }
 
       this.readRaw(symbol.indexGroup, symbol.indexOffset, symbol.size)
         .then(res => resolve(res))
-        .catch(err => reject(new ClientException('readRawBySymbol()', err)))
+        .catch(err => reject(new ClientException(this, 'readRawBySymbol()', err)))
     })
   }
 
@@ -1410,7 +1571,7 @@ class Client {
     return new Promise(async (resolve, reject) => {
 
       if (indexGroup == null || indexOffset == null || size == null) {
-        return reject(new ClientException('readRaw()', `Some of parameters (indexGroup, indexOffset, size) are not assigned`))
+        return reject(new ClientException(this, 'readRaw()', `Some of parameters (indexGroup, indexOffset, size) are not assigned`))
       }
 
       debug(`readRaw(): Reading data from ${JSON.stringify({ indexGroup, indexOffset, size })}`)
@@ -1439,7 +1600,7 @@ class Client {
         })
         .catch((res) => {
           debug(`readRaw(): Reading data from ${JSON.stringify({ indexGroup, indexOffset, size })} failed: %o`, res)
-          reject(new ClientException('readRaw()', `Reading data failed`, res))
+          reject(new ClientException(this, 'readRaw()', `Reading data failed`, res))
         })
     })
   }
@@ -1459,10 +1620,10 @@ class Client {
   writeRawByHandle(handle, dataBuffer) {
     return new Promise(async (resolve, reject) => {
       if (handle == null || dataBuffer == null) {
-        return reject(new ClientException('writeRawByHandle()', `Some of required parameters (handle, dataBuffer) are not assigned`))
+        return reject(new ClientException(this, 'writeRawByHandle()', `Some of required parameters (handle, dataBuffer) are not assigned`))
 
       } else if (!(dataBuffer instanceof Buffer)) {
-        return reject(new ClientException('writeRawByHandle()', `Required parameter dataBuffer is not a Buffer type`))
+        return reject(new ClientException(this, 'writeRawByHandle()', `Required parameter dataBuffer is not a Buffer type`))
 
       } else if (typeof handle === 'object' && handle.handle) {
         handle = handle.handle
@@ -1472,7 +1633,7 @@ class Client {
 
       return this.writeRaw(ADS.ADS_RESERVED_INDEX_GROUPS.SymbolValueByHandle, handle, dataBuffer)
         .then(res => resolve(res))
-        .catch(err => reject(new ClientException('writeRawByHandle()', err)))
+        .catch(err => reject(new ClientException(this, 'writeRawByHandle()', err)))
     })
   }
 
@@ -1490,15 +1651,15 @@ class Client {
   writeRawBySymbol(symbol, dataBuffer) {
     return new Promise(async (resolve, reject) => {
       if (symbol == null || dataBuffer == null) {
-        return reject(new ClientException('writeRawBySymbol()', `Some of required parameters (symbol, dataBuffer) are not assigned`))
+        return reject(new ClientException(this, 'writeRawBySymbol()', `Some of required parameters (symbol, dataBuffer) are not assigned`))
 
       } else if (!(dataBuffer instanceof Buffer)) {
-        return reject(new ClientException('writeRawBySymbol()', `Required parameter dataBuffer is not a Buffer type`))
+        return reject(new ClientException(this, 'writeRawBySymbol()', `Required parameter dataBuffer is not a Buffer type`))
       }
 
       this.writeRaw(symbol.indexGroup, symbol.indexOffset, dataBuffer)
         .then(res => resolve(res))
-        .catch(err => reject(new ClientException('writeRawBySymbol()', err)))
+        .catch(err => reject(new ClientException(this, 'writeRawBySymbol()', err)))
     })
   }
 
@@ -1523,10 +1684,10 @@ class Client {
     return new Promise(async (resolve, reject) => {
 
       if (indexGroup == null || indexOffset == null || dataBuffer == null) {
-        return reject(new ClientException('writeRaw()', `Some of parameters (indexGroup, indexOffset, dataBuffer) are not assigned`))
+        return reject(new ClientException(this, 'writeRaw()', `Some of parameters (indexGroup, indexOffset, dataBuffer) are not assigned`))
 
       } else if (!(dataBuffer instanceof Buffer)) {
-        return reject(new ClientException('writeRaw()', `Required parameter dataBuffer is not a Buffer type`))
+        return reject(new ClientException(this, 'writeRaw()', `Required parameter dataBuffer is not a Buffer type`))
       }
 
       debug(`writeRaw(): Writing ${dataBuffer.byteLength} bytes of data to ${JSON.stringify({ indexGroup, indexOffset })}`)
@@ -1559,7 +1720,7 @@ class Client {
         })
         .catch((res) => {
           debug(`writeRaw(): Writing ${dataBuffer.byteLength} bytes of data to ${JSON.stringify({ indexGroup, indexOffset })} failed %o`, res)
-          reject(new ClientException('writeRaw()', `Writing data failed`, res))
+          reject(new ClientException(this, 'writeRaw()', `Writing data failed`, res))
         })
     })
   }
@@ -1586,7 +1747,7 @@ class Client {
   createVariableHandle(variableName) {
     return new Promise(async (resolve, reject) => {
       if (variableName == null) {
-        return reject(new ClientException('createVariableHandle()', `Parameter variableName is not assigned`))
+        return reject(new ClientException(this, 'createVariableHandle()', `Parameter variableName is not assigned`))
       }
 
       variableName = variableName.trim()
@@ -1651,7 +1812,7 @@ class Client {
         })
         .catch((res) => {
           debug(`createVariableHandle(): Creating handle to ${variableName} failed: %o`, res)
-          reject(new ClientException('createVariableHandle()', `Creating handle to ${variableName} failed`, res))
+          reject(new ClientException(this, 'createVariableHandle()', `Creating handle to ${variableName} failed`, res))
         })
     })
   }
@@ -1671,7 +1832,7 @@ class Client {
   deleteVariableHandle(handle) {
     return new Promise(async (resolve, reject) => {
       if (handle == null) {
-        return reject(new ClientException('deleteVariableHandle()', `Parameter handle is not assigned`))
+        return reject(new ClientException(this, 'deleteVariableHandle()', `Parameter handle is not assigned`))
       }
     
       debug(`deleteVariableHandle(): Deleting variable handle ${handle}`)
@@ -1705,7 +1866,7 @@ class Client {
         })
         .catch((err) => {
           debug(`deleteVariableHandle(): Deleting handle "${handle}" failed:  %o`, err)
-          reject(new ClientException('createVariableHandle()', `Deleting vaiable handle failed`, err))
+          reject(new ClientException(this, 'createVariableHandle()', `Deleting vaiable handle failed`, err))
         })
     })
   }
@@ -1736,11 +1897,12 @@ class ClientException extends Error{
   
   /**
    * @constructor
+   * @param {Client} client AdsClient instance
    * @param {string} sender The method name that threw the error
    * @param {string|Error|ClientException} messageOrError Error message or another Error/ClientException instance
    * @param {...*} errData Inner exceptions, AMS/ADS responses or any other metadata
    */
-  constructor(sender, messageOrError, ...errData) {
+  constructor(client, sender, messageOrError, ...errData) {
 
     //The 2nd parameter can be either message or another Error or ClientException
     if (messageOrError instanceof ClientException) {
@@ -1762,8 +1924,7 @@ class ClientException extends Error{
       Error.captureStackTrace(this, this.constructor)
     } else {
       this.stack = (new Error(message)).stack
-    }
-
+    }    
 
     /** 
      * Error class name
@@ -1817,9 +1978,12 @@ class ClientException extends Error{
 
         //Modifying the stack trace so it contains all previous ones too
         //Source: Matt @ https://stackoverflow.com/a/42755876/8140625
-        let message_lines =  (this.message.match(/\n/g)||[]).length + 1
-        this.stack = this.stack.split('\n').slice(0, message_lines+1).join('\n') + '\n' +
-                 this.getInnerException().stack
+        
+        if (client._internals && client._internals.debugLevel > 0) {
+          let message_lines = (this.message.match(/\n/g) || []).length + 1
+          this.stack = this.stack.split('\n').slice(0, message_lines + 1).join('\n') + '\n' +
+            this.getInnerException().stack
+        }
 
       } else if (data instanceof Error && this.getInnerException == null) {
         
@@ -1829,9 +1993,11 @@ class ClientException extends Error{
         
         //Modifying the stack trace so it contains all previous ones too
         //Source: Matt @ https://stackoverflow.com/a/42755876/8140625
-        let message_lines =  (this.message.match(/\n/g)||[]).length + 1
-        this.stack = this.stack.split('\n').slice(0, message_lines+1).join('\n') + '\n' +
-                 this.getInnerException().stack
+        if (client._internals && client._internals.debugLevel > 0) {
+          let message_lines = (this.message.match(/\n/g) || []).length + 1
+          this.stack = this.stack.split('\n').slice(0, message_lines + 1).join('\n') + '\n' +
+            this.getInnerException().stack
+        }
 
       } else if (data.ams && data.ams.error) {
         //AMS reponse with error code
@@ -1996,14 +2162,15 @@ function _unregisterAdsPort() {
     })
 
     //When socket emits close event, the ads port is unregistered and connection closed
-    this._internals.socket.once('close', function (hadError) {
+    this._internals.socket.once('close', hadError => {
       debugD(`_unregisterAdsPort(): Ads port unregistered and socket connection closed.`)
       resolve()
     })
 
     //Sometimes close event is not received, so resolve already here
-    this._internals.socket.once('end', function () {
+    this._internals.socket.once('end', () => {
       debugD(`_unregisterAdsPort(): Socket connection ended. Connection closed.`)
+      this._internals.socket.destroy()
       resolve()
     })
 
@@ -2013,6 +2180,77 @@ function _unregisterAdsPort() {
 
 
 
+
+
+
+/**
+ * Called when connection to the remote is lost
+ * 
+ * @param {boolean} socketFailure - If true, connection was lost due socket/tcp problem -> Just destroy the socket
+ * 
+ * @memberof _LibraryInternals
+ */
+async function _onConnectionLost(socketFailure = false) {
+  debug(`_onConnectionLost(): Connection was lost. Socket failure: ${socketFailure}`)
+
+  if (this.settings.autoReconnect !== true) {
+    _console.call(this, 'WARNING: Connection was lost and setting autoReconnect=false. Quiting.')
+    try {
+      await this.disconnect(true)
+    } catch { }
+    
+    return
+  }
+  
+  _console.call(this, 'WARNING: Connection was lost. Trying to reconnect...')
+  
+  this.connection.connected = false
+
+  //Clear timers
+  clearTimeout(this._internals.systemManagerStatePoller)
+  clearTimeout(this._internals.reconnectionTimer)
+
+  //Clear all cached symbols and data types (might be incorrect)
+  this.metaData.symbols = {}
+  this.metaData.dataTypes = {}
+
+  //Save active subscriptions to memory and delete olds
+  if (this._internals.oldSubscriptions == null) {
+    this._internals.oldSubscriptions = {}
+    Object.assign(this._internals.oldSubscriptions, this._internals.activeSubscriptions)
+
+    debugD(`_onConnectionLost(): Total of ${Object.keys(this._internals.activeSubscriptions).length} subcriptions saved for reinitializing`)
+  } 
+  
+  this._internals.activeSubscriptions = {}
+
+
+  const tryToReconnect = async (firstTime) => {
+    this.reconnect(socketFailure)
+      .then(res => {
+         
+        _reInitializeSubscriptions.call(this, this._internals.oldSubscriptions)
+          .then(() => {
+            _console.call(this, `PLC runtime reconnected successfully and all subscriptions were restored!`)
+            
+            debug(`_onConnectionLost(): Connection and subscriptions reinitialized. Connection is back.`)
+          })
+          .catch(err => {
+            _console.call(this, `PLC runtime reconnected successfully but not all subscriptions were restored. Error info:`, JSON.stringify(err))
+
+            debug(`_onConnectionLost(): Connection and some subscriptions reinitialized. Connection is back.`)
+          })
+      })
+      .catch(err => {
+        if (firstTime)
+          _console.call(this, `WARNING: Reconnecting failed. Keeping trying in the background every ${this.settings.reconnectInterval} ms...`)
+        
+        reconnectionTimer = setTimeout(tryToReconnect, this.settings.reconnectInterval)
+    })
+  }
+
+  tryToReconnect(true)
+}
 
 
 
@@ -2029,37 +2267,75 @@ function _unregisterAdsPort() {
  * @memberof _LibraryInternals
  */
 async function _reInitializeInternals() {
-  try {
-    await _unsubscribeAllInternals.call(this)
 
-    //Read device status and subscribe to its changes
-    await this.readPlcRuntimeState()
-    await _subcribeToPlcRuntimeStateChanges.call(this)
+  //Read device status and subscribe to its changes
+  await this.readPlcRuntimeState()
+  await _subcribeToPlcRuntimeStateChanges.call(this)
 
-    //Read symbol version and subscribe to its changes
-    if (!this.settings.disableSymbolVersionMonitoring) await this.readSymbolVersion()
-    if (!this.settings.disableSymbolVersionMonitoring) await _subscribeToSymbolVersionChanges.call(this)
+  //Read symbol version and subscribe to its changes
+  if (!this.settings.disableSymbolVersionMonitoring) await this.readSymbolVersion()
+  if (!this.settings.disableSymbolVersionMonitoring) await _subscribeToSymbolVersionChanges.call(this)
 
-    //Cache data 
-    if (this.settings.readAndCacheSymbols) await this.readAndCacheSymbols()
-    if (this.settings.readAndCacheDataTypes) await this.readAndCacheDataTypes()
-    
-  } catch (err) {/*
-    //If we get ADS error and target port not found
-    if (err.errorType === 'ADS error' && err.errorCode === 6) {
-      if (this.metaData.systemManagerState.adsStateStr === 'Run') {
-        //PLC system is running
-        err.message = `System was connected but target port ${this.connection.targetAdsPort} is not found - Is the PLC software downloaded? - ADS error 6 (Target port not found)`
-      } else {
-        //PLS system is not in RUN mode
-        err.message = `System was connected but system is not in RUN mode (mode: ${this.metaData.systemManagerState.adsStateStr}) and target port ${this.connection.targetAdsPort} not found - ADS error 6 (Target port not found)`
-      }
-    }*/
-    throw err
-  }
+  //Cache data 
+  if (this.settings.readAndCacheSymbols || this.metaData.allSymbolsCached) await this.readAndCacheSymbols()
+  if (this.settings.readAndCacheDataTypes|| this.metaData.allDataTypesCached) await this.readAndCacheDataTypes()
+  
 }
 
+ 
 
+
+
+
+
+
+
+/**
+ * Reinitializes user-made subscriptions (not internal ones)
+ *  
+ * @throws {Error} If failed, array of errors is thrown
+ * 
+ * @memberof _LibraryInternals
+ */
+async function _reInitializeSubscriptions(previousSubscriptions) { 
+  debug(`_reInitializeSubscriptions(): Reinitializing subscriptions`)
+
+  const errors = []    
+  
+  for (let sub in previousSubscriptions) {
+    if (previousSubscriptions[sub].internal === true) continue
+
+    const oldSub = previousSubscriptions[sub]
+    debugD(`_reInitializeSubscriptions(): Reinitializing subscription: ${oldSub.target}`)
+
+    //Subscribe again
+    try {
+      const newSub = await _subscribe.call(this, oldSub.target, oldSub.callback, oldSub.settings)
+
+      debugD(`_reInitializeSubscriptions(): Reinitializing successful: ${oldSub.target} - Old handle was ${oldSub.notificationHandle} - Handle is now ${newSub.notificationHandle}`)
+      //Success. Change old object values before deleting as there might still be some references
+      //NOTE: Sometimes the handle will be the same, so do not delete the new one
+      if (oldSub.notificationHandle !== newSub.notificationHandle) {
+        Object.assign(previousSubscriptions[sub], newSub)
+      }
+      
+    } catch (err) {
+      debug(`_reInitializeSubscriptions(): Reinitializing subscription failed: ${oldSub.target}`)
+      errors.push(err)
+    }
+  }
+  
+  //We should clear the temporary data now
+  this._internals.oldSubscriptions = null
+  
+  if (errors.length > 0) {
+    debug(`_reInitializeSubscriptions(): Some subscriptions were not reinitialized`)
+    throw errors
+  }
+
+  debug(`_reInitializeSubscriptions(): All subscriptions successfully reinitialized`)
+}
+ 
 
 
 
@@ -2129,7 +2405,9 @@ function _socketReceive(data) {
  * 
  * @memberof _LibraryInternals
  */
-function _subscribeToSymbolVersionChanges() {
+function _subscribeToSymbolVersionChanges() { 
+  debugD(`_subscribeToSymbolVersionChanges(): Subscribing to PLC symbol version changes`)
+
   return _subscribe.call(
     this,
     {
@@ -2198,6 +2476,26 @@ async function _onSymbolVersionChanged(data) {
       }
     }
 
+    //Reinitialize all subscriptions
+    this._internals.oldSubscriptions = {}
+    Object.assign(this._internals.oldSubscriptions, this._internals.activeSubscriptions)
+    this._internals.activeSubscriptions = {}
+    
+    try {
+      await _reInitializeSubscriptions.call(this, this._internals.oldSubscriptions)
+
+      debug(`_onSymbolVersionChanged(): All subscriptions reinitialized successfully`)
+    } catch (err) {
+      _console.call(this, `WARNING: PLC symbol version changed and not all subscriptions were reinitialized. Error info: ${JSON.stringify(err)}`)
+      debug(`_onSymbolVersionChanged(): Some subscriptions weren't reinitialized`)
+    }
+    
+    try {
+      if (!this.settings.disableSymbolVersionMonitoring) await _subscribeToSymbolVersionChanges.call(this)
+    } catch (err) {
+      debug(`_onSymbolVersionChanged(): _subscribeToSymbolVersionChanges failed: %O`, err)
+    }
+
     debug(`_onSymbolVersionChanged(): Finished`)
   }
   else {
@@ -2211,29 +2509,56 @@ async function _onSymbolVersionChanged(data) {
 
 
 /**
- * Starts a poller that reads system manager state 
+ * Starts a poller that reads system manager state to see 
+ * if connection is ok and if the manager state has changed
  * 
  * @memberof _LibraryInternals
  */
-function _startSystemManagerStatePoller() {  
-  if(this._internals.systemManagerStatePoller != null)
-    clearTimeout(this._internals.systemManagerStatePoller)
+function _systemManagerStatePoller() {  
+  clearTimeout(this._internals.systemManagerStatePoller)
 
-  this._internals.systemManagerStatePoller = setTimeout(async () => {
-    const oldState = this.metaData.systemManagerState
+  const poller = async () => {
+    let startAgain = true, oldState = this.metaData.systemManagerState
 
     try {
       await this.readSystemManagerState()
 
-      console.log(this.metaData.systemManagerState)
+      //Read success
+      this._internals.firstStateReadFaultTime = null
+
+      if (oldState.adsState !== this.metaData.systemManagerState.adsState) {
+        //TODO: Throw event (system manager state changed)
+        debug(`_systemManagerStatePoller(): System manager state has changed to ${this.metaData.systemManagerState.adsStateStr}`)
+
+        if (this.metaData.systemManagerState.adsState !== ADS.ADS_STATE.Run) {
+          //Now state is config/something else -> connection is lost
+          debug(`_systemManagerStatePoller(): System manager state is not run -> connection lost`)
+
+          startAgain = false
+          _onConnectionLost.call(this)
+        }
+      }
     } catch (err) {
-      console.log('_startSystemManagerStatePoller failed')
+      debug(`_systemManagerStatePoller(): Reading system manager state failed: %o`, err)
+
+      if (this._internals.firstStateReadFaultTime == null)
+        this._internals.firstStateReadFaultTime = new Date()
+      
+      let failedFor = (new Date()).getTime() - this._internals.firstStateReadFaultTime.getTime()
+
+      if (failedFor > this.settings.connectionDownDelay) {
+        debug(`_systemManagerStatePoller(): No system manager state read for longer than ${this.settings.connectionDownDelay} ms. Connection lost.`)
+
+        startAgain = false
+        _onConnectionLost.call(this)
+      }
     }
 
-    //Start again
-    _startSystemManagerStatePoller.call(this)
+    if (startAgain)
+      this._internals.systemManagerStatePoller = setTimeout(poller, this.settings.checkStateInterval)
+  }
 
-  }, 5000)
+  this._internals.systemManagerStatePoller = setTimeout(poller, this.settings.checkStateInterval)
 }
 
 
@@ -2252,7 +2577,9 @@ function _startSystemManagerStatePoller() {
  * 
  * @memberof _LibraryInternals
  */
-function _subcribeToPlcRuntimeStateChanges() {
+function _subcribeToPlcRuntimeStateChanges() { 
+  debugD(`_subcribeToPlcRuntimeStateChanges(): Subscribing to PLC runtime state changes`)
+
   return _subscribe.call(
     this,
     {
@@ -2284,27 +2611,37 @@ function _subcribeToPlcRuntimeStateChanges() {
 
 
 /**
- * Called when AMS router status has changed (example: TwinCAT changes from Config to Run etc)
+ * Called when local AMS router status has changed (Router notification received)
+ * For example router state changes when local TwinCAT changes from Config to Run state and vice-versa
  * 
  * @param data Buffer that contains the new router state
  * 
  * @memberof _LibraryInternals
  */
 async function _onRouterStateChanged(data) {
-  const state = data.amsTcp.data.routerState
-  debug(`_onRouterStateChanged(): AMS router state has changed from ${this.metaData.routerState.stateStr} to ${ADS.AMS_ROUTER_STATE.toString(state)} (${state})`)
-  
+  const state = data.amsTcp.data.routerState 
+
+  debug(`_onRouterStateChanged(): Local AMS router state has changed${(this.metaData.routerState.stateStr ? ` from ${this.metaData.routerState.stateStr}` : '')} to ${ADS.AMS_ROUTER_STATE.toString(state)} (${state})`)
+   
   this.metaData.routerState = {
     state: state,
     stateStr: ADS.AMS_ROUTER_STATE.toString(state)
   }
 
-  //If state has changed to start then re-initialize everything
-  if (this.metaData.routerState === ADS.AMS_ROUTER_STATE.START) {
-    try {
-      await _reInitializeInternals.call(this)
-    } catch {
+  //If we have a local connection, connection needs to be reinitialized
+  if (this.connection.isLocal === true) {
+    //We should stop polling system manager, it will be reinitialized later
+    clearTimeout(this._internals.systemManagerStatePoller)
+ 
+    debug(`_onRouterStateChanged(): Local loopback connection active, monitoring router state`)
+  
+    if (this.metaData.routerState.state === ADS.AMS_ROUTER_STATE.START) {
+      _console.call(this, `WARNING: Local AMS router state has changed to ${ADS.AMS_ROUTER_STATE.toString(state)}. Reconnecting...`)
+      _onConnectionLost.call(this)
 
+    } else {
+      //Nothing to do, just wait until router has started again..
+      _console.call(this, `WARNING: Local AMS router state has changed to ${ADS.AMS_ROUTER_STATE.toString(state)}. Connection and active subscriptions might have been lost.`)
     }
   }
 }
@@ -2374,7 +2711,7 @@ async function _onPlcRuntimeStateChanged(data, sub) {
       //If target is object, it should contain indexGroup, indexOffset and size
       if (typeof target === 'object') {
         if (target.indexGroup == null || target.indexOffset == null) {
-          return reject(new ClientException('_subscribe()', `Target is an object but some of the required values (indexGroup, indexOffset) are not assigned`))
+          return reject(new ClientException(this, '_subscribe()', `Target is an object but some of the required values (indexGroup, indexOffset) are not assigned`))
 
         } else if (target.size == null) {
           target.size = 0xFFFFFFFF
@@ -2386,10 +2723,10 @@ async function _onPlcRuntimeStateChanged(data, sub) {
         try {
           symbolInfo = await this.getSymbolInfo(target)
         } catch (err) {
-          return reject(new ClientException('_subscribe()', err))
+          return reject(new ClientException(this, '_subscribe()', err))
         }
       } else {
-        return reject(new ClientException('_subscribe()', `Given target parameter is unknown type`))
+        return reject(new ClientException(this, '_subscribe()', `Given target parameter is unknown type`))
       }
 
 
@@ -2474,7 +2811,7 @@ async function _onPlcRuntimeStateChanged(data, sub) {
         })
         .catch((res) => {
           debug(`_subscribe(): Subscribing to %o failed: %o`, target, res)
-          reject(new ClientException('_subscribe()', `Subscribing to ${JSON.stringify(target)} failed`, res))
+          reject(new ClientException(this, '_subscribe()', `Subscribing to ${JSON.stringify(target)} failed`, res))
         })
     })
   }
@@ -2511,8 +2848,8 @@ function _unsubscribeAllInternals() {
         unSubCount++
 
       } catch (err) {
-        debug(`_unsubscribeAllInternals(): Unsubscribing from notification ${JSON.stringify(this._internals.activeSubscriptions[sub])} failed`)
-        firstError = new ClientException('_unsubscribeAllInternals()', err)
+        debug(`_unsubscribeAllInternals(): Unsubscribing from notification ${JSON.stringify(this._internals.activeSubscriptions[sub].target)} failed`)
+        firstError = new ClientException(this, '_unsubscribeAllInternals()', err)
       }
     }
     
@@ -2863,7 +3200,7 @@ function _readSymbolInfo(variableName) {
       })
       .catch((res) => {
         debug(`_readSymbolInfo(): Reading symbol info for ${variableName} failed: %o`, res)
-        return reject(new ClientException('_readSymbolInfo()', `Reading symbol information for ${variableName} failed`, res))
+        return reject(new ClientException(this, '_readSymbolInfo()', `Reading symbol information for ${variableName} failed`, res))
       })
   })
 }
@@ -3187,7 +3524,7 @@ function _readDataTypeInfo(dataTypeName) {
       })
       .catch((res) => {
         debug(`_readDataTypeInfo(): Reading data type info for ${dataTypeName} failed: %o`, res)
-        reject(new ClientException('_readDataTypeInfo()', `Reading data type info for ${dataTypeName} failed`, res))
+        reject(new ClientException(this, '_readDataTypeInfo()', `Reading data type info for ${dataTypeName} failed`, res))
       })
   })
 }
@@ -3217,7 +3554,7 @@ function _readDataTypeInfo(dataTypeName) {
       try {
         dataType = await _getDataTypeInfo.call(this, dataTypeName)
       } catch (err) {
-        return reject(new ClientException('_getDataTypeRecursive()', err))
+        return reject(new ClientException(this, '_getDataTypeRecursive()', err))
       }
 
       //Select default values. Edit this to add more to the end-user data type object
@@ -3365,7 +3702,7 @@ function _getDataTypeInfo(dataTypeName) {
 
           return resolve(dataType)
         })
-        .catch(err => reject(new ClientException('_getDataTypeInfo()', err)))
+        .catch(err => reject(new ClientException(this, '_getDataTypeInfo()', err)))
     }
   })
 }
@@ -4058,7 +4395,7 @@ function _sendAdsCommand(adsCommand, adsData, targetAdsPort = null) {
     try {
       var request = _createAmsTcpRequest.call(this, packet)
     } catch (err) {
-      return reject(new ClientException('_sendAdsCommand()', err))
+      return reject(new ClientException(this, '_sendAdsCommand()', err))
     }
 
     //Registering callback for response handling
@@ -4070,9 +4407,9 @@ function _sendAdsCommand(adsCommand, adsData, targetAdsPort = null) {
         delete this._internals.activeAdsRequests[packet.ams.invokeId]
 
         if (response.ams.error) {
-          return reject(new ClientException('_sendAdsCommand()', 'Response with AMS error received', response))
+          return reject(new ClientException(this, '_sendAdsCommand()', 'Response with AMS error received', response))
         } else if (response.ads.error) {
-          return reject(new ClientException('_sendAdsCommand()', 'Response with ADS error received', response))
+          return reject(new ClientException(this, '_sendAdsCommand()', 'Response with ADS error received', response))
         }
 
         return resolve(response)
@@ -4092,13 +4429,17 @@ function _sendAdsCommand(adsCommand, adsData, targetAdsPort = null) {
             errorStr: `Timeout - no response in ${client.settings.timeoutDelay} ms`
           }
         }
-        return reject(new ClientException('_sendAdsCommand()', `Timeout - no response in ${client.settings.timeoutDelay} ms`, adsError))
+        return reject(new ClientException(this, '_sendAdsCommand()', `Timeout - no response in ${client.settings.timeoutDelay} ms`, adsError))
 
       }, this.settings.timeoutDelay, this)
     }
 
-    //Write the data
-    _socketWrite.call(this, request)
+    //Write the data 
+    try {
+      _socketWrite.call(this, request)
+    } catch (err) {
+      return reject(new ClientException(this, '_sendAdsCommand()', `Error - Socket is not available`, err))
+    }
   })
 }
 
