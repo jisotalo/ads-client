@@ -106,6 +106,8 @@ class Client {
   }
 
 
+  
+
 
   
   /**
@@ -158,6 +160,7 @@ class Client {
       systemManagerStatePoller: null, //Timer that reads the system manager state (run/config) - This is not available through ADS notifications
       firstStateReadFaultTime: null, //Date when system manager state read failed for the first time
       socketConnectionLostHandler: null, //Handler for socket connection lost event
+      socketErrorHandler: null, //Handler for socket error event
       oldSubscriptions: null, //Old subscriptions that were active before connection was lost
       reconnectionTimer: null, //Timer that tries to reconnect intervally
     }
@@ -244,6 +247,8 @@ class Client {
    * @param {number} level 0 = none, 1 = extended stack traces, 2 = basic, 3 = detailed, 4 = detailed + raw data
    */
   setDebugging(level) {
+    debug(`setDebugging(): Debug level set to ${level}`)
+
     debug.enabled = false
     debugD.enabled = false
     debugIO.enabled = false
@@ -279,7 +284,7 @@ class Client {
    * - If resolved, client is connected successfully and connection info is returned (object)
    * - If rejected, something went wrong and error info is returned (object)
    */
-  connect(allowHalfOpen = this.settings.allowHalfOpen) {
+  connect() {
     
     return new Promise(async (resolve, reject) => {
 
@@ -408,7 +413,7 @@ class Client {
           await _reInitializeInternals.call(this)
 
         } catch (err) { 
-          if (allowHalfOpen !== true) {
+          if (this.settings.allowHalfOpen !== true) {
             try {
               await this.disconnect()
             } catch (err) {
@@ -428,8 +433,10 @@ class Client {
         this._internals.socketConnectionLostHandler = _onConnectionLost.bind(this, true)
         socket.on('close', this._internals.socketConnectionLostHandler)
         socket.on('end', this._internals.socketConnectionLostHandler)
-        socket.on('error', (err) => console.log('WARNING: socket error: ', err)) //TODO
 
+        //TODO: If socket error happens, should something to be done? Now probably close/end is called afterwards.
+        this._internals.socketErrorHandler = err => _console.call(this, `WARNING: Socket connection error: ${JSON.stringify(err)}`)
+        socket.on('error', this._internals.socketErrorHandler)
 
         //We are connected to the target
         resolve(this.connection)
@@ -470,22 +477,28 @@ class Client {
    * Unsubscribes all notifications, unregisters ADS port from router (if it was registered) 
    * and disconnects target system and ADS router 
    * 
+   * @param {boolean} [forceDisconnect] - If true, the connection is dropped immediately (default = false)  
+   * 
    * @returns {Promise} Returns a promise (async function)
    * - If resolved, disconnect was successful 
    * - If rejected, connection is still closed but something went wrong during disconnecting and error info is returned
    */
   disconnect(forceDisconnect = false) {
     return new Promise(async (resolve, reject) => {
-      debug(`disconnect(): Starting to close connection`)
+      debug(`disconnect(): Starting to close connection (force: ${forceDisconnect})`)
 
       if (this._internals.socketConnectionLostHandler) {
         this._internals.socket.off('close', this._internals.socketConnectionLostHandler)
         this._internals.socket.off('end', this._internals.socketConnectionLostHandler)
       }
+      if (this._internals.socketErrorHandler) {
+        this._internals.socket.off('error', this._internals.socketErrorHandler)
+      }
 
       //Clear system manager state poller
       clearTimeout(this._internals.systemManagerStatePoller)
 
+      //If forced, then just destroy the socket
       if (forceDisconnect) {
         this._internals.socket.removeAllListeners()
         this._internals.socket.destroy()
@@ -497,15 +510,13 @@ class Client {
         return resolve()
       }
 
-      let error = null
 
+      let error = null
       try {
         await this.unsubscribeAll()
       } catch (err) {
         error = new ClientException(this, 'disconnect()', err)
       }
-
-
       try {
         await _unsubscribeAllInternals.call(this)
       } catch (err) {
@@ -518,8 +529,12 @@ class Client {
         //Done
         this.connection.connected = false
         this.connection.localAdsPort = null
-        this._internals.socket.removeAllListeners()
-        this._internals.socket = null
+
+        if (this._internals.socket != null) {
+          this._internals.socket.removeAllListeners()
+          this._internals.socket.destroy() //Just incase
+          this._internals.socket = null
+        }
 
         debug(`disconnect(): Connection closed successfully`)
 
@@ -552,9 +567,9 @@ class Client {
 
 
   /**
-   * Disconnects and reconnects again
+   * Disconnects and reconnects again. At the moment does NOT reinitialize subscriptions, everything is lost
    * 
-   * NOTE: Does NOT reinitialize subscriptions, everything is lost
+   * @param {boolean} [forceDisconnect] - If true, the connection is dropped immediately (default = false)  
    * 
    * @returns {Promise} Returns a promise (async function)
    * - If resolved, connection to PLC runtime is successful
@@ -563,7 +578,7 @@ class Client {
   reconnect(forceDisconnect = false) {
     return new Promise(async (resolve, reject) => {
 
-      if (this.connection.connected && this._internals.socket != null) {
+      if (this._internals.socket != null) {
         try {
           debug(`reconnect(): Trying to disconnect`)
 
@@ -576,7 +591,7 @@ class Client {
 
       debug(`reconnect(): Trying to connect`)
 
-      return this.connect(false)
+      return this.connect()
         .then(res => {
           debug(`reconnect(): Connected!`)
           resolve(res)
@@ -2148,14 +2163,15 @@ function _unregisterAdsPort() {
     })
 
     //When socket emits close event, the ads port is unregistered and connection closed
-    this._internals.socket.once('close', function (hadError) {
+    this._internals.socket.once('close', hadError => {
       debugD(`_unregisterAdsPort(): Ads port unregistered and socket connection closed.`)
       resolve()
     })
 
     //Sometimes close event is not received, so resolve already here
-    this._internals.socket.once('end', function () {
+    this._internals.socket.once('end', () => {
       debugD(`_unregisterAdsPort(): Socket connection ended. Connection closed.`)
+      this._internals.socket.destroy()
       resolve()
     })
 
@@ -2178,6 +2194,8 @@ function _unregisterAdsPort() {
 async function _onConnectionLost(socketFailure = false) {
   debug(`_onConnectionLost(): Connection was lost. Socket failure: ${socketFailure}`)
   _console.call(this, 'WARNING: Connection was lost. Trying to reconnect...')
+  
+  this.connection.connected = false
 
   //Clear timers
   clearTimeout(this._internals.systemManagerStatePoller)
@@ -2266,50 +2284,47 @@ async function _reInitializeInternals() {
 /**
  * Reinitializes user-made subscriptions (not internal ones)
  *  
- * @throws {Error} If failed, error is thrown
+ * @throws {Error} If failed, array of errors is thrown
  * 
  * @memberof _LibraryInternals
  */
-async function _reInitializeSubscriptions(previousSubscriptions) {
-  try {    
-    debug(`_reInitializeSubscriptions(): Reinitializing subscriptions`)
+async function _reInitializeSubscriptions(previousSubscriptions) { 
+  debug(`_reInitializeSubscriptions(): Reinitializing subscriptions`)
 
-    const errors = []    
-    
-    for (let sub in previousSubscriptions) {
-      if (previousSubscriptions[sub].internal === true) continue
+  const errors = []    
+  
+  for (let sub in previousSubscriptions) {
+    if (previousSubscriptions[sub].internal === true) continue
 
-      const oldSub = previousSubscriptions[sub]
-      debugD(`_reInitializeSubscriptions(): Reinitializing subscription: ${oldSub.target}`)
+    const oldSub = previousSubscriptions[sub]
+    debugD(`_reInitializeSubscriptions(): Reinitializing subscription: ${oldSub.target}`)
 
-      //Subscribe again
-      try {
-        const newSub = await _subscribe.call(this, oldSub.target, oldSub.callback, oldSub.settings)
+    //Subscribe again
+    try {
+      const newSub = await _subscribe.call(this, oldSub.target, oldSub.callback, oldSub.settings)
 
-        debugD(`_reInitializeSubscriptions(): Reinitializing successful: ${oldSub.target} - Old handle was ${oldSub.notificationHandle} - Handle is now ${newSub.notificationHandle}`)
-        //Success. Change old object values before deleting as there might still be some references
-        //NOTE: Sometimes the handle will be the same, so do not delete the new one
-        if (oldSub.notificationHandle !== newSub.notificationHandle) {
-          Object.assign(previousSubscriptions[sub], newSub)
-          //delete this._internals.activeSubscriptions[sub]
-        }
-        
-      } catch (err) {
-        debug(`_reInitializeSubscriptions(): Reinitializing subscription failed: ${oldSub.target}`)
-        errors.push(err)
+      debugD(`_reInitializeSubscriptions(): Reinitializing successful: ${oldSub.target} - Old handle was ${oldSub.notificationHandle} - Handle is now ${newSub.notificationHandle}`)
+      //Success. Change old object values before deleting as there might still be some references
+      //NOTE: Sometimes the handle will be the same, so do not delete the new one
+      if (oldSub.notificationHandle !== newSub.notificationHandle) {
+        Object.assign(previousSubscriptions[sub], newSub)
       }
+      
+    } catch (err) {
+      debug(`_reInitializeSubscriptions(): Reinitializing subscription failed: ${oldSub.target}`)
+      errors.push(err)
     }
-
-    if (errors.length > 0) {
-      debug(`_reInitializeSubscriptions(): Some subscriptions were not reinitialized`)
-      throw errors
-    } else {
-      debug(`_reInitializeSubscriptions(): All subscriptions successfully reinitialized`)
-    }
-
-  } catch (err) {
-    throw err
   }
+  
+  //We should clear the temporary data now
+  this._internals.oldSubscriptions = null
+  
+  if (errors.length > 0) {
+    debug(`_reInitializeSubscriptions(): Some subscriptions were not reinitialized`)
+    throw errors
+  }
+
+  debug(`_reInitializeSubscriptions(): All subscriptions successfully reinitialized`)
 }
  
 
