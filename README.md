@@ -794,9 +794,9 @@ client.setDebugging(2)
 Different debug levels explained:
 - 0: No debugging (default)
 - 1: Errors have full stack traces, no debug printing
-- 2: Basic debug printing (same as `DEBUG=ads-client`) 
-- 3: Detailed debug printing (same as `DEBUG=ads-client,ads-client:details`)
-- 4: Detailed debug printing and raw I/O data (same as `DEBUG=ads-client*`)
+- 2: Basic debug printing (same as `DEBUG='ads-client'`) 
+- 3: Detailed debug printing (same as `DEBUG='ads-client,ads-client:details'`)
+- 4: Detailed debug printing and raw I/O data (same as `DEBUG='ads-client*'`)
 
 ## Enabling debugging from terminal
 See [debug package](https://www.npmjs.com/package/debug) for instructions.
