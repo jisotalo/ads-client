@@ -80,13 +80,14 @@ const ads = require('ads-client')
 - PLC symbol and data type handling and caching
 - Reading PLC runtime and system manager states
 - Automatic 32/64 bit variable support (PVOID, XINT, etc.)
-- Automatic cache and subscription refreshing when PLC program changes or system starts (*See [#3](), [#4]()*)
+- Automatic cache and subscription refreshing when PLC program changes or system starts
 
 
 
 # Supported platforms and setups
 
 The ads-client package is tested so far with the following setups:
+  - **At the moment, TwinCAT 4022 or newer is required** (see issue #21)
   - TwinCAT 3 4022.27 running on 64bit Windows 10
   - TwinCAT 3 4024.4 running on 64bit Windows 10
   - TwinCAT 3 4022.27 running on 64bit Windows 7 Embedded @ Beckhoff PLC
