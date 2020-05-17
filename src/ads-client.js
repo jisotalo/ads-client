@@ -1566,6 +1566,8 @@ class Client {
    * @returns {Promise<Buffer>} Returns a promise (async function)
    * - If resolved, reading was successful and data is returned (Buffer)
    * - If rejected, reading failed and error info is returned (object)
+   * 
+  
    */
   readRaw(indexGroup, indexOffset, size) {
     return new Promise(async (resolve, reject) => {
@@ -1604,6 +1606,128 @@ class Client {
         })
     })
   }
+
+  
+
+
+
+
+
+  /**
+   * @typedef MultiTarget
+   * 
+   * @property {number} indexGroup - Variable index group in the PLC
+   * @property {number} indexOffset - Variable index offset in the PLC
+   * @property {number} size - Variable size in the PLC (bytes)
+   * 
+   */
+
+  
+  /**
+   * Reads (raw byte) data from PLC by given index group, index offset and size
+   * 
+   * All required parameters can be read for example with getSymbolInfo() method, **see also readRawBySymbol()**
+   * 
+   * @param {MultiTarget[]} targetArray - Targets to read from
+   * 
+   * @returns {Promise<Buffer[]]>} Returns a promise (async function)
+   * - If resolved, reading was successful and data is returned (Buffer)
+   * - If rejected, reading failed and error info is returned (object)
+   */
+  readRawMulti(targetArray) {
+    return new Promise(async (resolve, reject) => {
+
+      if (Array.isArray(targetArray) !== true) {
+        return reject(new ClientException(this, 'readRawMulti()', `Given targetArray parameter is not an array`))
+      }
+
+      for (let i = 0; i < targetArray.length; i++) {
+        if (targetArray[i].indexGroup == null || targetArray[i].indexOffset == null || targetArray[i].size == null) {
+          return reject(new ClientException(this, 'readRawMulti()', `Given targetArray index ${i} is missing some of the required parameters (indexGroup, indexOffset, size)`))
+        }
+      }
+      
+      const totalSize = targetArray.reduce((total, target) => total + target.size, 0)
+
+      debug(`readRawMulti(): Reading ${targetArray.length} values (total length ${totalSize} bytes)`)
+      
+      //Allocating bytes for request
+      const data = Buffer.alloc(16 + targetArray.length * 12)
+      let pos = 0
+
+      //0..3 IndexGroup
+      data.writeUInt32LE(ADS.ADS_RESERVED_INDEX_GROUPS.SumCommandRead, pos)
+      pos += 4
+  
+      //4..7 IndexOffset - Number of read requests
+      data.writeUInt32LE(targetArray.length, pos)
+      pos += 4
+
+      //8..11 Read data length
+      data.writeUInt32LE(totalSize + 4 * targetArray.length, pos) 
+      pos += 4
+
+      //12..15 Write data length
+      data.writeUInt32LE(targetArray.length * 12, pos) 
+      pos += 4
+
+      //16..n All read targets
+      targetArray.forEach(target => {
+        //0..3 IndexGroup
+        data.writeUInt32LE(target.indexGroup, pos)
+        pos += 4
+        
+        //4..7 IndexOffset
+        data.writeUInt32LE(target.indexOffset, pos)
+        pos += 4
+        
+        //8..11 Data size
+        data.writeUInt32LE(target.size, pos)
+        pos += 4
+      })
+      
+      _sendAdsCommand.call(this, ADS.ADS_COMMAND.ReadWrite, data)
+        .then(res => {
+          debug(`readRawMulti(): Data read - ${res.ads.data.byteLength} bytes received`)
+          
+          let pos = 0, results = []
+
+          //First we have ADS error codes for each target
+          targetArray.forEach(target => {          
+
+            const errorCode = res.ads.data.readUInt32LE(pos)
+            pos += 4
+
+            const result = {
+              target: target,
+              status: {
+                error: errorCode > 0,
+                errorCode: errorCode,
+                errorStr: ADS.ADS_ERROR[errorCode]
+              },
+              data: null
+            }
+
+            results.push(result)
+          })
+
+          //And now the data for each target
+          for (let i = 0; i < targetArray.length; i++) {
+            results[i].data = res.ads.data.slice(pos, pos + targetArray[i].size)
+            pos += targetArray[i].size
+          }
+
+          resolve(results)
+        })
+
+
+        .catch(res => {
+          debug(`readRawMulti(): Reading ${targetArray.length} values (total length ${totalSize} bytes) failed: %o`, res)
+          reject(new ClientException(this, 'readRawMulti()', `Reading data failed`, res))
+        })
+    })
+  }
+
 
 
 
@@ -1870,6 +1994,48 @@ class Client {
         })
     })
   }
+
+
+  
+  /**
+   * Returns full datatype as object.
+   * 
+   * First searchs the local cache. If not found, reads it from PLC and caches it
+   * 
+   * @param {string} dataTypeName - Data type name in the PLC - Example: 'ST_SomeStruct', 'REAL',.. 
+   * 
+   * @returns {Promise<object>} Returns a promise (async function)
+   * - If resolved, full data type info is returned (object)
+   * - If rejected, reading or parsing failed and error info is returned (object)
+   */
+  convertFromRaw(rawData, dataTypeName) {
+    return new Promise(async (resolve, reject) => {
+      debug(`convertFromRaw(): Converting ${rawData.byteLength} bytes of data to ${dataTypeName}`)
+      
+      //1. Get data type
+      let dataType = {}
+      try {
+        debugD(`convertFromRaw(): Reading data type info for ${dataTypeName}`)
+
+        dataType = await this.getDataType(dataTypeName)
+      } catch (err) {
+        return reject(new ClientException(this, 'convertFromRaw()', `Reading symbol ${variableName} failed: Reading data type failed`, err))
+      }
+
+      //2. Parse the data to javascript object
+      let data = {}
+      try {
+        debugD(`convertFromRaw(): Parsing ${rawData.byteLength} bytes of data`)
+
+        data = _parsePlcDataToObject.call(this, rawData, dataType)
+
+        resolve(data)
+      } catch (err) {
+        return reject(new ClientException(this, 'convertFromRaw()', `Converting given data to Javascript type failed`, err))
+      }
+    })
+  }
+
 }
 
 
@@ -3559,6 +3725,7 @@ function _readDataTypeInfo(dataTypeName) {
 
       //Select default values. Edit this to add more to the end-user data type object
       let parsedDataType = {
+        DEBUG: dataType,
         name: dataType.name,
         type: dataType.type,
         size: dataType.size,
@@ -3591,7 +3758,7 @@ function _readDataTypeInfo(dataTypeName) {
 
       
       //If the data type has flag "DataType", it's not enum and it's not array
-      } else if ((dataType.type === '' || ADS.BASE_DATA_TYPES.isKnownType(dataType.name)) && dataType.flagsStr.includes('DataType') && !dataType.flagsStr.includes('EnumInfos') && dataType.arrayDimension === 0) {
+      } else if (((dataType.type === '' && !ADS.BASE_DATA_TYPES.isPseudoType(dataType.name)) || ADS.BASE_DATA_TYPES.isKnownType(dataType.name)) && dataType.flagsStr.includes('DataType') && !dataType.flagsStr.includes('EnumInfos') && dataType.arrayDimension === 0) {
         //Do nothing - this is the final form
         //TODO: Get rid of this
 

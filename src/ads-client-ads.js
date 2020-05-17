@@ -908,6 +908,12 @@ const BASE_DATA_TYPES = {
    */
   types: [
     {
+      name: ['BIT'],
+      size: 0,
+      toBuffer: (value, buffer) => 0,
+      fromBuffer: buffer => 0
+    },
+    {
       name: ['BOOL'],
       size: 1,
       toBuffer: (value, buffer) => buffer.writeUInt8(value === true || value === 1 ? 1 : 0),
@@ -950,7 +956,7 @@ const BASE_DATA_TYPES = {
       fromBuffer: buffer => buffer.readUInt32LE(0)
     },
     {
-      name: ['DATE_AND_TIME', 'DATE'],
+      name: ['DATE_AND_TIME', 'DT', 'DATE'],
       size: 4,
       toBuffer: (value, buffer, settings) => {
         if (settings.convertDatesToJavascript === true && value.getTime)
