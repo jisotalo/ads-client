@@ -1998,15 +1998,15 @@ class Client {
 
   
   /**
-   * Returns full datatype as object.
+   * Converts given raw data (byte Buffer) to Javascript object by given dataTypeName
    * 
-   * First searchs the local cache. If not found, reads it from PLC and caches it
    * 
+   * @param {Buffer} rawData - A Buffer containing valid data for given data type
    * @param {string} dataTypeName - Data type name in the PLC - Example: 'ST_SomeStruct', 'REAL',.. 
    * 
    * @returns {Promise<object>} Returns a promise (async function)
-   * - If resolved, full data type info is returned (object)
-   * - If rejected, reading or parsing failed and error info is returned (object)
+   * - If resolved, Javascript object / variable is returned
+   * - If rejected, parsing failed and error info is returned (object)
    */
   convertFromRaw(rawData, dataTypeName) {
     return new Promise(async (resolve, reject) => {
@@ -2019,7 +2019,12 @@ class Client {
 
         dataType = await this.getDataType(dataTypeName)
       } catch (err) {
-        return reject(new ClientException(this, 'convertFromRaw()', `Reading symbol ${variableName} failed: Reading data type failed`, err))
+        return reject(new ClientException(this, 'convertFromRaw()', `Reading data type info for "${dataTypeName} failed" - Is the data type correct?`, err))
+      }
+
+      //Make sure lengths are the same
+      if (dataType.size != rawData.byteLength) {
+        return reject(new ClientException(this, 'convertFromRaw()', `Given data buffer and data type sizes mismatch: Buffer is ${rawData.byteLength} bytes and data type is ${dataType.size} bytes`))
       }
 
       //2. Parse the data to javascript object
@@ -2033,6 +2038,120 @@ class Client {
       } catch (err) {
         return reject(new ClientException(this, 'convertFromRaw()', `Converting given data to Javascript type failed`, err))
       }
+    })
+  }
+
+  
+  /**
+   * Converts given Javascript object/variable to raw Buffer data by given dataTypeName
+   * 
+   * 
+   * @param {object} value - Javacript object or variable that represents dataTypeName
+   * @param {string} dataTypeName - Data type name in the PLC - Example: 'ST_SomeStruct', 'REAL',.. 
+   * @param {boolean} autoFill - If true and variable type is STRUCT, given value can be just a part of it and the rest is **SET TO ZEROS**. Otherwise they must match 1:1
+   * 
+   * @returns {Promise<object>} Returns a promise (async function)
+   * - If resolved, Javascript object / variable is returned
+   * - If rejected, parsing failed and error info is returned (object)
+   */
+  convertToRaw(value, dataTypeName, autoFill = false) {
+    return new Promise(async (resolve, reject) => {
+      debug(`convertToRaw(): Converting given object to ${dataTypeName}`)
+      
+      //1. Get data type
+      let dataType = {}
+      try {
+        debugD(`convertToRaw(): Reading data type info for ${dataTypeName}`)
+
+        dataType = await this.getDataType(dataTypeName)
+      } catch (err) {
+        return reject(new ClientException(this, 'convertToRaw()', `Reading data type info for "${dataTypeName} failed" - Is the data type correct?`, err))
+      }
+      
+      //2. Create data buffer packet (parse the value to a byte Buffer)
+      let dataBuffer = null
+      try {
+        debugD(`convertToRaw(): Parsing data buffer from Javascript object`)
+      
+        dataBuffer = _parseJsObjectToBuffer.call(this, value, dataType)
+
+        resolve(dataBuffer)
+      } catch (err) {
+        //Parsing the Javascript object failed. If error is TypeError with specific message, it means that the object is missing a required field (not 1:1 match to PLC data type)
+        if (err instanceof TypeError && err.isNotCompleteObject != null) {
+          if (!autoFill) {
+            debug(`convertToRaw(): Given Javascript object does not match the PLC variable - autoFill not given so quiting`)
+
+            return reject(new ClientException(this, 'convertToRaw()',`Converting Javascript object to byte Buffer failed: ${err.message} - Set 3rd parameter (autoFill) to true to allow uncomplete objects`))
+          }
+          debug(`convertToRaw(): Given Javascript object does not match the PLC variable - autoFill given so continuing`)
+
+          try {
+            debugD(`convertToRaw(): Creating empty object (autoFill parameter given)`)
+            let emptyObject = await this.getEmptyPlcType(dataTypeName)
+
+            //Deep merge objects - Object.assign() won't work for objects that contain objects
+            value = _deepMergeObjects(false, emptyObject, value)
+
+            debugD(`convertToRaw(): Parsing data buffer from Javascript object (after autoFill)`)
+            dataBuffer = _parseJsObjectToBuffer.call(this, value, dataType)
+
+            resolve(dataBuffer)
+
+          } catch (err) {
+            //Still failing
+            return reject(new ClientException(this, 'convertToRaw()', `Converting Javascript object to byte Buffer failed: Parsing the Javascript object to PLC failed`, err))
+          }
+
+        } else {
+          //Error is something else than TypeError -> quit
+          return reject(err)
+        }
+      }
+      
+      
+    })
+  }
+
+  
+  /**
+   * Returns empty Javascript object that represents given dataTypeName
+   * 
+   * 
+   * @param {string} dataTypeName - Data type name in the PLC - Example: 'ST_SomeStruct', 'REAL',.. 
+   * 
+   * @returns {Promise<object>} Returns a promise (async function)
+   * - If resolved, Javascript object / variable is returned
+   * - If rejected, parsing failed and error info is returned (object)
+   */
+  getEmptyPlcType(dataTypeName) {
+    return new Promise(async (resolve, reject) => {
+      debug(`getEmptyPlcType(): Converting given object to ${dataTypeName}`)
+      
+      //1. Get data type
+      let dataType = {}
+      try {
+        debugD(`getEmptyPlcType(): Reading data type info for ${dataTypeName}`)
+
+        dataType = await this.getDataType(dataTypeName)
+      } catch (err) {
+        return reject(new ClientException(this, 'getEmptyPlcType()', `Reading data type info for "${dataTypeName} failed" - Is the data type correct?`, err))
+      }
+
+      const rawData = Buffer.alloc(dataType.size)
+      
+      //2. Parse the data to javascript object
+      let data = {}
+      try {
+        debugD(`convertFromRaw(): Parsing ${rawData.byteLength} bytes of data`)
+
+        data = _parsePlcDataToObject.call(this, rawData, dataType)
+
+        resolve(data)
+      } catch (err) {
+        return reject(new ClientException(this, 'convertFromRaw()', `Converting given data to Javascript type failed`, err))
+      }
+      
     })
   }
 

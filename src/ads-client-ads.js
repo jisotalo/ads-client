@@ -908,12 +908,6 @@ const BASE_DATA_TYPES = {
    */
   types: [
     {
-      name: ['BIT'],
-      size: 0,
-      toBuffer: (value, buffer) => 0,
-      fromBuffer: buffer => 0
-    },
-    {
       name: ['BOOL'],
       size: 1,
       toBuffer: (value, buffer) => buffer.writeUInt8(value === true || value === 1 ? 1 : 0),
