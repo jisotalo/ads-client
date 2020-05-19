@@ -3400,11 +3400,59 @@ function _parsePlcDataToObject(dataBuffer, dataType, isArraySubItem = false) {
   //Array - Go through each array subitem
   } else if (dataType.arrayData.length > 0 && !isArraySubItem) {
     output = []
-    for (let i = 0; i < dataType.arrayData[0].length; i++) {
+
+    let size = 0
+
+    const parseArray = (arrayDimension) => {
+
+      let arr = []
+
+      for (let child = 0; child < dataType.arrayData[arrayDimension].length; child++) {
+
+        let logStr = ""
+        for (let i = 0; i < arrayDimension; i++) logStr += " "
+
+
+        if (dataType.arrayData[arrayDimension + 1]) {
+          arr.push(parseArray(arrayDimension + 1))
+
+        } else {
+          size += 2
+          //output.push(_parsePlcDataToObject.call(this, dataBuffer, dataType, true))
+          const val = _parsePlcDataToObject.call(this, dataBuffer, dataType, true)
+          dataBuffer = dataBuffer.slice(dataType.size)
+  
+          //console.log(logStr, val)
+          arr.push(val)
+        }
+      }
+
+      return arr
+    }
+
+    output = parseArray(0)
+    
+
+    console.log(output)
+    console.log(output[0][1])
+    process.exit(0)
+
+
+    for (let dimension = 0; dimension < dataType.arrayData.length; dimension++) {
+      console.log('dimension ', dimension, ': size:', dataType.arrayData[dimension].length)
+    }
+    process.exit(0)
+    for (const arrayDim of dataType.arrayData) {
+      console.log(arrayDim)  
+    }
+
+    console.log('end')
+    process.exit(0)
+    for (let i = 0; i < dataType.arrayData[0].length*2; i++) {
       output.push(_parsePlcDataToObject.call(this, dataBuffer, dataType, true))
       dataBuffer = dataBuffer.slice(dataType.size)
     }
-
+    
   //Enumeration (only if we want to convert enumerations to object)
   } else if (dataType.enumInfo && this.settings.objectifyEnumerations && this.settings.objectifyEnumerations === true) {
     output = _parsePlcVariableToJs.call(this, dataBuffer.slice(0, dataType.size), dataType)
