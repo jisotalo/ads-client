@@ -1611,10 +1611,26 @@ class Client {
 
 
 
+  /**
+   * @typedef IndexGroupAndOffset
+   * 
+   * @property {number} indexGroup - Index group in the PLC
+   * @property {number} indexOffset - Index offset in the PLC
+   * 
+   */
+
+  /**
+   * @typedef MultiResult
+   * 
+   * @property {boolean} error - If true, command failed
+   * @property {number} errorCode - If error, ADS error code
+   * @property {string} errorStr - If error, ADS error as string
+   * 
+   */
 
 
   /**
-   * @typedef MultiTarget
+   * @typedef ReadRawMultiParam
    * 
    * @property {number} indexGroup - Variable index group in the PLC
    * @property {number} indexOffset - Variable index offset in the PLC
@@ -1622,16 +1638,27 @@ class Client {
    * 
    */
 
+  /**
+   * @typedef ReadRawMultiResult
+   * 
+   * @property {boolean} success - True if read was successful
+   * @property {MultiErrorInfo} errorInfo - Error information (if any)
+   * @property {IndexGroupAndOffset} target - Original target info
+   * @property {Buffer} data - Read data as byte Buffer
+   * 
+   */
+  
+
   
   /**
-   * Reads (raw byte) data from PLC by given index group, index offset and size
+   * Reads multiple (raw byte) data from PLC by given index group, index offset and size
    * 
    * All required parameters can be read for example with getSymbolInfo() method, **see also readRawBySymbol()**
    * 
-   * @param {MultiTarget[]} targetArray - Targets to read from
+   * @param {ReadRawMultiParam[]} targetArray - Targets to read from
    * 
-   * @returns {Promise<Buffer[]]>} Returns a promise (async function)
-   * - If resolved, reading was successful and data is returned (Buffer)
+   * @returns {Promise<ReadRawMultiResult[]]>} Returns a promise (async function)
+   * - If resolved, reading was successful and data is returned (object)
    * - If rejected, reading failed and error info is returned (object)
    */
   readRawMulti(targetArray) {
@@ -1699,14 +1726,21 @@ class Client {
             pos += 4
 
             const result = {
-              target: target,
-              status: {
+              success: errorCode === 0,
+              errorInfo: {
                 error: errorCode > 0,
                 errorCode: errorCode,
                 errorStr: ADS.ADS_ERROR[errorCode]
               },
+              target: {
+                indexGroup: target.indexGroup,
+                indexOffset: target.indexOffset
+              },
               data: null
             }
+
+            if (target.name != null)
+              result.target.name = target.name
 
             results.push(result)
           })
@@ -1849,6 +1883,136 @@ class Client {
     })
   }
   
+
+
+
+  
+  /**
+   * @typedef WriteRawMultiParam
+   * 
+   * @property {number} indexGroup - Variable index group in the PLC
+   * @property {number} indexOffset - Variable index offset in the PLC
+   * @property {Buffer} dataBuffer - Buffer object that contains the data (and byteLength is acceptable)
+   * 
+   */
+  /**
+   * @typedef WriteRawMultiResult
+   * 
+   * @property {boolean} success - True if write was successful
+   * @property {MultiErrorInfo} errorInfo - Error information (if any)
+   * @property {IndexGroupAndOffset} target - Original target info
+   * 
+   */
+  
+
+  
+  /**
+   * Writes multiple (raw byte) data to PLC by given index group and index offset
+   * 
+   * All required parameters can be read for example with getSymbolInfo() method, **see also readRawBySymbol()**
+   * 
+   * @param {WriteRawMultiParam[]} targetArray - Targets to write to
+   * 
+   * @returns {Promise<WriteRawMultiResult[]]>} Returns a promise (async function)
+   * - If resolved, writing was successful and data is returned (Buffer)
+   * - If rejected, reading failed and error info is returned (object)
+   */
+  writeRawMulti(targetArray) {
+    return new Promise(async (resolve, reject) => {
+
+      if (Array.isArray(targetArray) !== true) {
+        return reject(new ClientException(this, 'writeRawMulti()', `Given targetArray parameter is not an array`))
+      }
+
+      for (let i = 0; i < targetArray.length; i++) {
+        if (targetArray[i].indexGroup == null || targetArray[i].indexOffset == null || targetArray[i].dataBuffer == null) {
+          return reject(new ClientException(this, 'writeRawMulti()', `Given targetArray index ${i} is missing some of the required parameters (indexGroup, indexOffset, dataBuffer)`))
+        }
+      }
+      
+      const totalSize = targetArray.reduce((total, target) => total + target.dataBuffer.byteLength, 0)
+
+      debug(`writeRawMulti(): Writing ${targetArray.length} values (total length ${totalSize} bytes)`)
+      
+      //Allocating bytes for request
+      const data = Buffer.alloc(16 + targetArray.length * 12 + totalSize)
+      let pos = 0
+
+      //0..3 IndexGroup
+      data.writeUInt32LE(ADS.ADS_RESERVED_INDEX_GROUPS.SumCommandWrite, pos)
+      pos += 4
+  
+      //4..7 IndexOffset - Number of write requests
+      data.writeUInt32LE(targetArray.length, pos)
+      pos += 4
+
+      //8..11 Read data length
+      data.writeUInt32LE(4 * targetArray.length, pos) 
+      pos += 4
+
+      //12..15 Write data length
+      data.writeUInt32LE(targetArray.length * 12 + totalSize, pos) 
+      pos += 4
+
+      //16..n All write targets
+      targetArray.forEach(target => {
+        //0..3 IndexGroup
+        data.writeUInt32LE(target.indexGroup, pos)
+        pos += 4
+        
+        //4..7 IndexOffset
+        data.writeUInt32LE(target.indexOffset, pos)
+        pos += 4
+        
+        //8..11 Data size
+        data.writeUInt32LE(target.dataBuffer.byteLength, pos)
+        pos += 4
+      }) 
+
+      //Then the actual data for each one
+      targetArray.forEach(target => {
+        target.dataBuffer.copy(data, pos)
+        pos += target.dataBuffer.byteLength
+      })
+
+      _sendAdsCommand.call(this, ADS.ADS_COMMAND.ReadWrite, data)
+        .then(res => {
+          debug(`writeRawMulti(): Data written - ${res.ads.data.byteLength} bytes received`)
+          
+          let pos = 0, results = []
+
+          //Result has ADS error codes for each target
+          targetArray.forEach(target => {          
+
+            const errorCode = res.ads.data.readUInt32LE(pos)
+            pos += 4
+
+            const result = {
+              success: errorCode === 0,
+              errorInfo: {
+                error: errorCode > 0,
+                errorCode: errorCode,
+                errorStr: ADS.ADS_ERROR[errorCode]
+              },
+              target: {
+                indexGroup: target.indexGroup,
+                indexOffset: target.indexOffset
+              }
+            }
+
+            results.push(result)
+          })
+          
+          resolve(results)
+        })
+
+
+        .catch(res => {
+          debug(`writeRawMulti(): Writing ${targetArray.length} values (total length ${totalSize} bytes) failed: %o`, res)
+          reject(new ClientException(this, 'writeRawMulti()', `Writing data failed`, res))
+        })
+    })
+  }
 
 
 
