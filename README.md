@@ -780,6 +780,87 @@ Mon Apr 13 2020 13:09:06 GMT+0300 (GMT+03:00): GVL_Test.IncrementingValue change
 ...
 ```
 
+## Reading and writing raw data
+
+It's also possible to read and write raw data. Reading will result in a `Buffer` object, that contains the read data as bytes. Writing accepts a `Buffer` object that is then written to the PLC.
+
+Handling raw data is usually the most fastest and efficient way, as there is usually much less network traffic required.
+
+### Reading a single raw value
+```js
+//Reading DINT from indexGroup 16448 and indexOffset 411836 (4 bytes)
+const result = await client.readRaw(16448, 411836, 4)
+console.log(result) //<Buffer 37 61 00 00>
+```
+
+### Reading multiple raw values
+
+Starting from version 1.3.0 you can use ADS sum commands to read multiple values in a single request. This is faster than reading one by one.
+
+Method returns an array of results. If result has `success` of true, the read was succesful and data is located in `data`. Otherwise error information can be read from `errorInfo`.
+
+```js
+const result = await client.readRawMulti([
+  {
+    indexGroup: 16448,
+    indexOffset: 411836,
+    size: 4
+  },{
+    indexGroup: 16448,
+    indexOffset: 436040,
+    size: 255
+  }
+])
+console.log(result)
+/*
+[ { success: true,
+    errorInfo: { error: false, errorCode: 0, errorStr: 'No error' },
+    target: { indexGroup: 16448, indexOffset: 411836 },
+    data: <Buffer 37 61 00 00> },
+  { success: true,
+    errorInfo: { error: false, errorCode: 0, errorStr: 'No error' },
+    target: { indexGroup: 16448, indexOffset: 436040 },
+    data:
+     <Buffer 74 65 72 76 65 70 ... > } ]
+*/
+```
+
+### Creating a variable handle and reading the raw value
+
+### Converting a raw value to PLC data type
+The ads-client has a method to convert raw data to data type. It works for all data types including structs etc.
+
+```js
+//result = <Buffer 37 61 00 00>
+const value = await client.convertFromRaw(result, 'DINT')
+console.log(value) //24887
+```
+
+### Getting symbol index group, offset and size
+
+If you don't know the data location, you can read variable symbol information with method `getSymbolInfo` to obtain indexGroup, indexOffset and size.
+
+```js
+const info = await client.getSymbolInfo('GVL_Test.TestINT')
+console.log(info)
+/*
+{ indexGroup: 16448,
+  indexOffset: 414816,
+  size: 2,
+  dataType: 2,
+  dataTypeStr: 'ADST_INT16',
+  flags: 8,
+  flagsStr: [ 'TypeGuid' ],
+  arrayDimension: 0,
+  nameLength: 16,
+  typeLength: 3,
+  commentLength: 0,
+  name: 'GVL_Test.TestINT',
+  type: 'INT',
+  comment: '' }
+*/
+```
+
 # Debugging
 If you have problems or you are interested, you can enabled debug output to console. The ads-client uses `debug` package for debugging.
 
