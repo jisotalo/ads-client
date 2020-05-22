@@ -872,9 +872,9 @@ console.log(result)
 
 ### Writing multiple raw values
 
-Starting from version 1.3.0 you can use ADS sum commands to write multiple values in a single request. This is faster than reading one by one.
+Starting from version 1.3.0 you can use ADS sum commands to write multiple values in a single request. This is faster than writing one by one.
 
-Method returns an array of results, one result object for each read operation. If result has `success` of true, the write was succesful. Otherwise error information can be read from `errorInfo`.
+Method returns an array of results, one result object for each write operation. If result has `success` of true, the write was succesful. Otherwise error information can be read from `errorInfo`.
 
 ```js
 //Create raw data for DINT with value 555
@@ -982,6 +982,17 @@ The 3rd parameter `autoFill` works as in `writeSymbol`.
 ```js
 const data = await client.convertToRaw(12345, 'INT')
 console.log(data) //<Buffer 39 30>
+```
+
+```js
+const data = await client.convertToRaw(
+  {
+    SomeText: 'Hello ads-client',
+    SomeReal: 3.1415927410125732,
+  }, 'ST_Example', true //NOTE: autoFill=true (as there is no SomeDate given)
+)
+console.log(data)
+//<Buffer 48 65 6c 6c 6f 20 ... >
 ```
 
 
