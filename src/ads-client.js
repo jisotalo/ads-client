@@ -1892,7 +1892,7 @@ class Client {
    * 
    * @property {number} indexGroup - Variable index group in the PLC
    * @property {number} indexOffset - Variable index offset in the PLC
-   * @property {Buffer} dataBuffer - Buffer object that contains the data (and byteLength is acceptable)
+   * @property {Buffer} data - Buffer object that contains the data (and byteLength is acceptable)
    * 
    */
   /**
@@ -1925,12 +1925,12 @@ class Client {
       }
 
       for (let i = 0; i < targetArray.length; i++) {
-        if (targetArray[i].indexGroup == null || targetArray[i].indexOffset == null || targetArray[i].dataBuffer == null) {
-          return reject(new ClientException(this, 'writeRawMulti()', `Given targetArray index ${i} is missing some of the required parameters (indexGroup, indexOffset, dataBuffer)`))
+        if (targetArray[i].indexGroup == null || targetArray[i].indexOffset == null || targetArray[i].data == null) {
+          return reject(new ClientException(this, 'writeRawMulti()', `Given targetArray index ${i} is missing some of the required parameters (indexGroup, indexOffset, data)`))
         }
       }
       
-      const totalSize = targetArray.reduce((total, target) => total + target.dataBuffer.byteLength, 0)
+      const totalSize = targetArray.reduce((total, target) => total + target.data.byteLength, 0)
 
       debug(`writeRawMulti(): Writing ${targetArray.length} values (total length ${totalSize} bytes)`)
       
@@ -1965,14 +1965,14 @@ class Client {
         pos += 4
         
         //8..11 Data size
-        data.writeUInt32LE(target.dataBuffer.byteLength, pos)
+        data.writeUInt32LE(target.data.byteLength, pos)
         pos += 4
       }) 
 
       //Then the actual data for each one
       targetArray.forEach(target => {
-        target.dataBuffer.copy(data, pos)
-        pos += target.dataBuffer.byteLength
+        target.data.copy(data, pos)
+        pos += target.data.byteLength
       })
 
       _sendAdsCommand.call(this, ADS.ADS_COMMAND.ReadWrite, data)
@@ -2121,6 +2121,10 @@ class Client {
     return new Promise(async (resolve, reject) => {
       if (handle == null) {
         return reject(new ClientException(this, 'deleteVariableHandle()', `Parameter handle is not assigned`))
+      } else if (typeof handle === 'object' && handle.handle) {
+        handle = handle.handle
+      } else if (typeof handle !== 'number') {
+        return reject(new ClientException(this, 'deleteVariableHandle()', `Parameter handle is not correct type`))
       }
     
       debug(`deleteVariableHandle(): Deleting variable handle ${handle}`)
@@ -2271,9 +2275,7 @@ class Client {
           //Error is something else than TypeError -> quit
           return reject(err)
         }
-      }
-      
-      
+      }      
     })
   }
 

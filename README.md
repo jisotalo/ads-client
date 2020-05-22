@@ -782,9 +782,9 @@ Mon Apr 13 2020 13:09:06 GMT+0300 (GMT+03:00): GVL_Test.IncrementingValue change
 
 ## Reading and writing raw data
 
-It's also possible to read and write raw data. Reading will result in a `Buffer` object, that contains the read data as bytes. Writing accepts a `Buffer` object that is then written to the PLC.
+It's possible to read and write raw data using ads-client. Reading will result in a `Buffer` object, that contains the read data as bytes. Writing accepts a `Buffer` object that is then written to the PLC.
 
-Handling raw data is usually the most fastest and efficient way, as there is usually much less network traffic required.
+Handling raw data is usually the most fastest and efficient way, as there is usually much less network traffic required. The methods require known `indexGroup` and `indexOffset` values.
 
 ### Reading a single raw value
 ```js
@@ -793,11 +793,20 @@ const result = await client.readRaw(16448, 411836, 4)
 console.log(result) //<Buffer 37 61 00 00>
 ```
 
+### Writing a single raw value
+```js
+//Writing value 123 to DINT from indexGroup 16448 and indexOffset 411836 (4 bytes)
+const data = Buffer.alloc(4)
+data.writeInt32LE(123)
+
+await client.writeRaw(16448, 411836, data)
+```
+
 ### Reading multiple raw values
 
 Starting from version 1.3.0 you can use ADS sum commands to read multiple values in a single request. This is faster than reading one by one.
 
-Method returns an array of results. If result has `success` of true, the read was succesful and data is located in `data`. Otherwise error information can be read from `errorInfo`.
+Method returns an array of results, one result object for each read operation. If result has `success` of true, the read was succesful and data is located in `data`. Otherwise error information can be read from `errorInfo`.
 
 ```js
 const result = await client.readRawMulti([
@@ -806,7 +815,7 @@ const result = await client.readRawMulti([
     indexOffset: 411836,
     size: 4
   },{
-    indexGroup: 16448,
+    indexGroup: 123, //Note: Incorrect on purpose
     indexOffset: 436040,
     size: 255
   }
@@ -816,19 +825,90 @@ console.log(result)
 [ { success: true,
     errorInfo: { error: false, errorCode: 0, errorStr: 'No error' },
     target: { indexGroup: 16448, indexOffset: 411836 },
-    data: <Buffer 37 61 00 00> },
-  { success: true,
-    errorInfo: { error: false, errorCode: 0, errorStr: 'No error' },
-    target: { indexGroup: 16448, indexOffset: 436040 },
+    data: <Buffer 00 43 3a d4> },
+  { success: false,
+    errorInfo:
+     { error: true, errorCode: 1794, errorStr: 'Invalid index group' },
+    target: { indexGroup: 123, indexOffset: 436040 },
     data:
-     <Buffer 74 65 72 76 65 70 ... > } ]
+     <Buffer 00 00 00 00 ... > } ]
 */
 ```
 
-### Creating a variable handle and reading the raw value
+### Writing multiple raw values
 
-### Converting a raw value to PLC data type
-The ads-client has a method to convert raw data to data type. It works for all data types including structs etc.
+Starting from version 1.3.0 you can use ADS sum commands to write multiple values in a single request. This is faster than reading one by one.
+
+Method returns an array of results, one result object for each read operation. If result has `success` of true, the write was succesful. Otherwise error information can be read from `errorInfo`.
+
+```js
+//Create raw data for DINT with value 555
+const data = Buffer.alloc(4)
+data.writeInt32LE(555)
+
+const result = await client.writeRawMulti([
+  {
+    indexGroup: 16448,
+    indexOffset: 411836,
+    data: data
+  },{
+    indexGroup: 123, //Note: Incorrect on purpose
+    indexOffset: 436040,
+    data: Buffer.alloc(255)
+  }
+])
+console.log(result)
+/*
+[ { success: true,
+    errorInfo: { error: false, errorCode: 0, errorStr: 'No error' },
+    target: { indexGroup: 16448, indexOffset: 411836 } },
+  { success: false,
+    errorInfo:
+     { error: true,
+       errorCode: 1793,
+       errorStr: 'Service is not supported by server' },
+    target: { indexGroup: 123, indexOffset: 436040 } } ]
+*/
+```
+
+### Creating a variable handle and reading a raw value
+
+Using handles is another alternative for reading and writing raw data. A handle is first made using variable name and then using the returned handle, read and write operations can be made. No need to know `indexGroup` and `indexOffset`.
+
+NOTE: Handles should always be deleted if no more used. This doesn't mean that it wouldn't be a good habit to use the same handle all the time (for example in application backend until app is terminated). The reason is that there are limited number of handles available.
+
+```js
+const handle = await client.createVariableHandle('GVL_Test.TestINT')
+console.log(handle)
+//{ handle: 905969897, size: 2, type: 'INT' }
+
+const result = await client.readRawByHandle(handle)
+console.log(result)
+//<Buffer d2 04>
+
+await client.deleteVariableHandle(handle)
+```
+
+
+### Creating a variable handle and writing a raw value
+
+See *Creating a variable handle and reading a raw value* for more info about handles.
+
+```js
+const handle = await client.createVariableHandle('GVL_Test.TestINT')
+console.log(handle)
+//{ handle: 905969897, size: 2, type: 'INT' }
+
+//Create raw data for INT with value 12345
+const data = Buffer.alloc(2)
+data.writeInt32LE(12345)
+
+await client.writeRawByHandle(handle, data)
+await client.deleteVariableHandle(handle)
+```
+
+### Converting a raw value to Javascript object
+Using `convertFromRaw` method, raw data can be converted to Javascript object. The conversion works internally like in `readSymbol`.
 
 ```js
 //result = <Buffer 37 61 00 00>
@@ -836,9 +916,44 @@ const value = await client.convertFromRaw(result, 'DINT')
 console.log(value) //24887
 ```
 
+Example with `readRawMulti` and custom struct:
+```js
+const result = await client.readRawMulti([
+  {
+    indexGroup: 16448,
+    indexOffset: 449659,
+    size: 59
+  },{
+    indexGroup: 16448,
+    indexOffset: 436040,
+    size: 255
+  }
+])
+
+const value = await client.convertFromRaw(result[0].data, 'ST_Example')
+console.log(value)
+/*
+{ SomeText: 'Hello ads-client',
+  SomeReal: 3.1415927410125732,
+  SomeDate: 2020-04-13T12:25:33.000Z }
+*/
+```
+
+### Converting a Javascript object to raw value
+Using `convertToRaw` method, Javascript object can be converted to raw data. The conversion works internally like in `writeSymbol`.
+
+The 3rd parameter `autoFill` works as in `writeSymbol`.
+
+```js
+const data = await client.convertToRaw(12345, 'INT')
+console.log(data) //<Buffer 39 30>
+```
+
+
+
 ### Getting symbol index group, offset and size
 
-If you don't know the data location, you can read variable symbol information with method `getSymbolInfo` to obtain indexGroup, indexOffset and size.
+Variable symbol information can be acquired with method `getSymbolInfo`. The symbol infoc contains required `indexGroup`, `indexOffset` and `size`.
 
 ```js
 const info = await client.getSymbolInfo('GVL_Test.TestINT')
