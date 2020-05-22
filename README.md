@@ -52,6 +52,16 @@ There is still some work to do for "production ready" version. See this [Github 
   - [Subscribing to PLC variables (device notifications)](#subscribing-to-plc-variables-device-notifications)
     - [Subcribe to variable value (on-change)](#subcribe-to-variable-value-on-change)
     - [Subcribe to variable value (cyclic)](#subcribe-to-variable-value-cyclic)
+  - [Reading and writing raw data](#reading-and-writing-raw-data)
+    - [Getting symbol index group, offset and size](#getting-symbol-index-group-offset-and-size)
+    - [Reading a single raw value](#reading-a-single-raw-value)
+    - [Writing a single raw value](#writing-a-single-raw-value)
+    - [Reading multiple raw values](#reading-multiple-raw-values)
+    - [Writing multiple raw values](#writing-multiple-raw-values)
+    - [Creating a variable handle and reading a raw value](#creating-a-variable-handle-and-reading-a-raw-value)
+    - [Creating a variable handle and writing a raw value](#creating-a-variable-handle-and-writing-a-raw-value)
+    - [Converting a raw value to Javascript object](#converting-a-raw-value-to-javascript-object)
+    - [Converting a Javascript object to raw value](#converting-a-javascript-object-to-raw-value)
 - [Debugging](#debugging)
 - [FAQ](#faq)
 - [Documentation](#documentation)
@@ -786,6 +796,31 @@ It's possible to read and write raw data using ads-client. Reading will result i
 
 Handling raw data is usually the most fastest and efficient way, as there is usually much less network traffic required. The methods require known `indexGroup` and `indexOffset` values.
 
+### Getting symbol index group, offset and size
+
+Variable symbol information can be acquired with method `getSymbolInfo`. The symbol infoc contains required `indexGroup`, `indexOffset` and `size`.
+
+```js
+const info = await client.getSymbolInfo('GVL_Test.TestINT')
+console.log(info)
+/*
+{ indexGroup: 16448,
+  indexOffset: 414816,
+  size: 2,
+  dataType: 2,
+  dataTypeStr: 'ADST_INT16',
+  flags: 8,
+  flagsStr: [ 'TypeGuid' ],
+  arrayDimension: 0,
+  nameLength: 16,
+  typeLength: 3,
+  commentLength: 0,
+  name: 'GVL_Test.TestINT',
+  type: 'INT',
+  comment: '' }
+*/
+```
+
 ### Reading a single raw value
 ```js
 //Reading DINT from indexGroup 16448 and indexOffset 411836 (4 bytes)
@@ -950,31 +985,6 @@ console.log(data) //<Buffer 39 30>
 ```
 
 
-
-### Getting symbol index group, offset and size
-
-Variable symbol information can be acquired with method `getSymbolInfo`. The symbol infoc contains required `indexGroup`, `indexOffset` and `size`.
-
-```js
-const info = await client.getSymbolInfo('GVL_Test.TestINT')
-console.log(info)
-/*
-{ indexGroup: 16448,
-  indexOffset: 414816,
-  size: 2,
-  dataType: 2,
-  dataTypeStr: 'ADST_INT16',
-  flags: 8,
-  flagsStr: [ 'TypeGuid' ],
-  arrayDimension: 0,
-  nameLength: 16,
-  typeLength: 3,
-  commentLength: 0,
-  name: 'GVL_Test.TestINT',
-  type: 'INT',
-  comment: '' }
-*/
-```
 
 # Debugging
 If you have problems or you are interested, you can enabled debug output to console. The ads-client uses `debug` package for debugging.
