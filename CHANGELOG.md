@@ -4,6 +4,28 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.0] - 24.05.2020
+### Added
+- Multi read and write methods
+  - `readRawMulti` and `writeRawMulti`
+- Method for converting raw byte data to Javascript object
+  - `convertFromRaw`
+- Method for converting Javascript object to raw byte data
+  - `convertToRaw`
+- Method for generating an empty Javascript object of a data type
+  - `getEmptyPlcType`
+
+## Changed
+- Fixed a problem that JSDoc documentation header links were not working
+- Added DT to base data types
+- `deleteVariableHandle` accepts handle object as parameter 
+- `_readDataTypeInfo` bug fix with pseudo types
+- README updated
+  - New raw read/write explained
+  - Updated guides for different setups
+
+
+
 
 ## [1.2.0] - 16.05.2020
 ### Added

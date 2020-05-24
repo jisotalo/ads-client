@@ -1657,7 +1657,7 @@ class Client {
    * 
    * @param {ReadRawMultiParam[]} targetArray - Targets to read from
    * 
-   * @returns {Promise<ReadRawMultiResult[]]>} Returns a promise (async function)
+   * @returns {Promise<Array.<ReadRawMultiResult>>} Returns a promise (async function)
    * - If resolved, reading was successful and data is returned (object)
    * - If rejected, reading failed and error info is returned (object)
    */
@@ -1913,7 +1913,7 @@ class Client {
    * 
    * @param {WriteRawMultiParam[]} targetArray - Targets to write to
    * 
-   * @returns {Promise<WriteRawMultiResult[]]>} Returns a promise (async function)
+   * @returns {Promise<Array.<WriteRawMultiResult>>} Returns a promise (async function)
    * - If resolved, writing was successful and data is returned (Buffer)
    * - If rejected, reading failed and error info is returned (object)
    */
@@ -4010,7 +4010,6 @@ function _readDataTypeInfo(dataTypeName) {
 
       //Select default values. Edit this to add more to the end-user data type object
       let parsedDataType = {
-        DEBUG: dataType,
         name: dataType.name,
         type: dataType.type,
         size: dataType.size,
