@@ -1566,6 +1566,8 @@ class Client {
    * @returns {Promise<Buffer>} Returns a promise (async function)
    * - If resolved, reading was successful and data is returned (Buffer)
    * - If rejected, reading failed and error info is returned (object)
+   * 
+  
    */
   readRaw(indexGroup, indexOffset, size) {
     return new Promise(async (resolve, reject) => {
@@ -1604,6 +1606,162 @@ class Client {
         })
     })
   }
+
+  
+
+
+
+  /**
+   * @typedef IndexGroupAndOffset
+   * 
+   * @property {number} indexGroup - Index group in the PLC
+   * @property {number} indexOffset - Index offset in the PLC
+   * 
+   */
+
+  /**
+   * @typedef MultiResult
+   * 
+   * @property {boolean} error - If true, command failed
+   * @property {number} errorCode - If error, ADS error code
+   * @property {string} errorStr - If error, ADS error as string
+   * 
+   */
+
+
+  /**
+   * @typedef ReadRawMultiParam
+   * 
+   * @property {number} indexGroup - Variable index group in the PLC
+   * @property {number} indexOffset - Variable index offset in the PLC
+   * @property {number} size - Variable size in the PLC (bytes)
+   * 
+   */
+
+  /**
+   * @typedef ReadRawMultiResult
+   * 
+   * @property {boolean} success - True if read was successful
+   * @property {MultiErrorInfo} errorInfo - Error information (if any)
+   * @property {IndexGroupAndOffset} target - Original target info
+   * @property {Buffer} data - Read data as byte Buffer
+   * 
+   */
+  
+
+  
+  /**
+   * Reads multiple (raw byte) data from PLC by given index group, index offset and size
+   * 
+   * All required parameters can be read for example with getSymbolInfo() method, **see also readRawBySymbol()**
+   * 
+   * @param {ReadRawMultiParam[]} targetArray - Targets to read from
+   * 
+   * @returns {Promise<Array.<ReadRawMultiResult>>} Returns a promise (async function)
+   * - If resolved, reading was successful and data is returned (object)
+   * - If rejected, reading failed and error info is returned (object)
+   */
+  readRawMulti(targetArray) {
+    return new Promise(async (resolve, reject) => {
+
+      if (Array.isArray(targetArray) !== true) {
+        return reject(new ClientException(this, 'readRawMulti()', `Given targetArray parameter is not an array`))
+      }
+
+      for (let i = 0; i < targetArray.length; i++) {
+        if (targetArray[i].indexGroup == null || targetArray[i].indexOffset == null || targetArray[i].size == null) {
+          return reject(new ClientException(this, 'readRawMulti()', `Given targetArray index ${i} is missing some of the required parameters (indexGroup, indexOffset, size)`))
+        }
+      }
+      
+      const totalSize = targetArray.reduce((total, target) => total + target.size, 0)
+
+      debug(`readRawMulti(): Reading ${targetArray.length} values (total length ${totalSize} bytes)`)
+      
+      //Allocating bytes for request
+      const data = Buffer.alloc(16 + targetArray.length * 12)
+      let pos = 0
+
+      //0..3 IndexGroup
+      data.writeUInt32LE(ADS.ADS_RESERVED_INDEX_GROUPS.SumCommandRead, pos)
+      pos += 4
+  
+      //4..7 IndexOffset - Number of read requests
+      data.writeUInt32LE(targetArray.length, pos)
+      pos += 4
+
+      //8..11 Read data length
+      data.writeUInt32LE(totalSize + 4 * targetArray.length, pos) 
+      pos += 4
+
+      //12..15 Write data length
+      data.writeUInt32LE(targetArray.length * 12, pos) 
+      pos += 4
+
+      //16..n All read targets
+      targetArray.forEach(target => {
+        //0..3 IndexGroup
+        data.writeUInt32LE(target.indexGroup, pos)
+        pos += 4
+        
+        //4..7 IndexOffset
+        data.writeUInt32LE(target.indexOffset, pos)
+        pos += 4
+        
+        //8..11 Data size
+        data.writeUInt32LE(target.size, pos)
+        pos += 4
+      })
+      
+      _sendAdsCommand.call(this, ADS.ADS_COMMAND.ReadWrite, data)
+        .then(res => {
+          debug(`readRawMulti(): Data read - ${res.ads.data.byteLength} bytes received`)
+          
+          let pos = 0, results = []
+
+          //First we have ADS error codes for each target
+          targetArray.forEach(target => {          
+
+            const errorCode = res.ads.data.readUInt32LE(pos)
+            pos += 4
+
+            const result = {
+              success: errorCode === 0,
+              errorInfo: {
+                error: errorCode > 0,
+                errorCode: errorCode,
+                errorStr: ADS.ADS_ERROR[errorCode]
+              },
+              target: {
+                indexGroup: target.indexGroup,
+                indexOffset: target.indexOffset
+              },
+              data: null
+            }
+
+            if (target.name != null)
+              result.target.name = target.name
+
+            results.push(result)
+          })
+
+          //And now the data for each target
+          for (let i = 0; i < targetArray.length; i++) {
+            results[i].data = res.ads.data.slice(pos, pos + targetArray[i].size)
+            pos += targetArray[i].size
+          }
+
+          resolve(results)
+        })
+
+
+        .catch(res => {
+          debug(`readRawMulti(): Reading ${targetArray.length} values (total length ${totalSize} bytes) failed: %o`, res)
+          reject(new ClientException(this, 'readRawMulti()', `Reading data failed`, res))
+        })
+    })
+  }
+
 
 
 
@@ -1729,6 +1887,136 @@ class Client {
 
 
   
+  /**
+   * @typedef WriteRawMultiParam
+   * 
+   * @property {number} indexGroup - Variable index group in the PLC
+   * @property {number} indexOffset - Variable index offset in the PLC
+   * @property {Buffer} data - Buffer object that contains the data (and byteLength is acceptable)
+   * 
+   */
+  /**
+   * @typedef WriteRawMultiResult
+   * 
+   * @property {boolean} success - True if write was successful
+   * @property {MultiErrorInfo} errorInfo - Error information (if any)
+   * @property {IndexGroupAndOffset} target - Original target info
+   * 
+   */
+  
+
+  
+  /**
+   * Writes multiple (raw byte) data to PLC by given index group and index offset
+   * 
+   * All required parameters can be read for example with getSymbolInfo() method, **see also readRawBySymbol()**
+   * 
+   * @param {WriteRawMultiParam[]} targetArray - Targets to write to
+   * 
+   * @returns {Promise<Array.<WriteRawMultiResult>>} Returns a promise (async function)
+   * - If resolved, writing was successful and data is returned (Buffer)
+   * - If rejected, reading failed and error info is returned (object)
+   */
+  writeRawMulti(targetArray) {
+    return new Promise(async (resolve, reject) => {
+
+      if (Array.isArray(targetArray) !== true) {
+        return reject(new ClientException(this, 'writeRawMulti()', `Given targetArray parameter is not an array`))
+      }
+
+      for (let i = 0; i < targetArray.length; i++) {
+        if (targetArray[i].indexGroup == null || targetArray[i].indexOffset == null || targetArray[i].data == null) {
+          return reject(new ClientException(this, 'writeRawMulti()', `Given targetArray index ${i} is missing some of the required parameters (indexGroup, indexOffset, data)`))
+        }
+      }
+      
+      const totalSize = targetArray.reduce((total, target) => total + target.data.byteLength, 0)
+
+      debug(`writeRawMulti(): Writing ${targetArray.length} values (total length ${totalSize} bytes)`)
+      
+      //Allocating bytes for request
+      const data = Buffer.alloc(16 + targetArray.length * 12 + totalSize)
+      let pos = 0
+
+      //0..3 IndexGroup
+      data.writeUInt32LE(ADS.ADS_RESERVED_INDEX_GROUPS.SumCommandWrite, pos)
+      pos += 4
+  
+      //4..7 IndexOffset - Number of write requests
+      data.writeUInt32LE(targetArray.length, pos)
+      pos += 4
+
+      //8..11 Read data length
+      data.writeUInt32LE(4 * targetArray.length, pos) 
+      pos += 4
+
+      //12..15 Write data length
+      data.writeUInt32LE(targetArray.length * 12 + totalSize, pos) 
+      pos += 4
+
+      //16..n All write targets
+      targetArray.forEach(target => {
+        //0..3 IndexGroup
+        data.writeUInt32LE(target.indexGroup, pos)
+        pos += 4
+        
+        //4..7 IndexOffset
+        data.writeUInt32LE(target.indexOffset, pos)
+        pos += 4
+        
+        //8..11 Data size
+        data.writeUInt32LE(target.data.byteLength, pos)
+        pos += 4
+      }) 
+
+      //Then the actual data for each one
+      targetArray.forEach(target => {
+        target.data.copy(data, pos)
+        pos += target.data.byteLength
+      })
+
+      _sendAdsCommand.call(this, ADS.ADS_COMMAND.ReadWrite, data)
+        .then(res => {
+          debug(`writeRawMulti(): Data written - ${res.ads.data.byteLength} bytes received`)
+          
+          let pos = 0, results = []
+
+          //Result has ADS error codes for each target
+          targetArray.forEach(target => {          
+
+            const errorCode = res.ads.data.readUInt32LE(pos)
+            pos += 4
+
+            const result = {
+              success: errorCode === 0,
+              errorInfo: {
+                error: errorCode > 0,
+                errorCode: errorCode,
+                errorStr: ADS.ADS_ERROR[errorCode]
+              },
+              target: {
+                indexGroup: target.indexGroup,
+                indexOffset: target.indexOffset
+              }
+            }
+
+            results.push(result)
+          })
+          
+          resolve(results)
+        })
+
+
+        .catch(res => {
+          debug(`writeRawMulti(): Writing ${targetArray.length} values (total length ${totalSize} bytes) failed: %o`, res)
+          reject(new ClientException(this, 'writeRawMulti()', `Writing data failed`, res))
+        })
+    })
+  }
+
+
+
+  
 
 
 
@@ -1833,6 +2121,10 @@ class Client {
     return new Promise(async (resolve, reject) => {
       if (handle == null) {
         return reject(new ClientException(this, 'deleteVariableHandle()', `Parameter handle is not assigned`))
+      } else if (typeof handle === 'object' && handle.handle) {
+        handle = handle.handle
+      } else if (typeof handle !== 'number') {
+        return reject(new ClientException(this, 'deleteVariableHandle()', `Parameter handle is not correct type`))
       }
     
       debug(`deleteVariableHandle(): Deleting variable handle ${handle}`)
@@ -1870,6 +2162,165 @@ class Client {
         })
     })
   }
+
+
+  
+  /**
+   * Converts given raw data (byte Buffer) to Javascript object by given dataTypeName
+   * 
+   * 
+   * @param {Buffer} rawData - A Buffer containing valid data for given data type
+   * @param {string} dataTypeName - Data type name in the PLC - Example: 'ST_SomeStruct', 'REAL',.. 
+   * 
+   * @returns {Promise<object>} Returns a promise (async function)
+   * - If resolved, Javascript object / variable is returned
+   * - If rejected, parsing failed and error info is returned (object)
+   */
+  convertFromRaw(rawData, dataTypeName) {
+    return new Promise(async (resolve, reject) => {
+      debug(`convertFromRaw(): Converting ${rawData.byteLength} bytes of data to ${dataTypeName}`)
+      
+      //1. Get data type
+      let dataType = {}
+      try {
+        debugD(`convertFromRaw(): Reading data type info for ${dataTypeName}`)
+
+        dataType = await this.getDataType(dataTypeName)
+      } catch (err) {
+        return reject(new ClientException(this, 'convertFromRaw()', `Reading data type info for "${dataTypeName} failed" - Is the data type correct?`, err))
+      }
+
+      //Make sure lengths are the same
+      if (dataType.size != rawData.byteLength) {
+        return reject(new ClientException(this, 'convertFromRaw()', `Given data buffer and data type sizes mismatch: Buffer is ${rawData.byteLength} bytes and data type is ${dataType.size} bytes`))
+      }
+
+      //2. Parse the data to javascript object
+      let data = {}
+      try {
+        debugD(`convertFromRaw(): Parsing ${rawData.byteLength} bytes of data`)
+
+        data = _parsePlcDataToObject.call(this, rawData, dataType)
+
+        resolve(data)
+      } catch (err) {
+        return reject(new ClientException(this, 'convertFromRaw()', `Converting given data to Javascript type failed`, err))
+      }
+    })
+  }
+
+  
+  /**
+   * Converts given Javascript object/variable to raw Buffer data by given dataTypeName
+   * 
+   * 
+   * @param {object} value - Javacript object or variable that represents dataTypeName
+   * @param {string} dataTypeName - Data type name in the PLC - Example: 'ST_SomeStruct', 'REAL',.. 
+   * @param {boolean} autoFill - If true and variable type is STRUCT, given value can be just a part of it and the rest is **SET TO ZEROS**. Otherwise they must match 1:1
+   * 
+   * @returns {Promise<object>} Returns a promise (async function)
+   * - If resolved, Javascript object / variable is returned
+   * - If rejected, parsing failed and error info is returned (object)
+   */
+  convertToRaw(value, dataTypeName, autoFill = false) {
+    return new Promise(async (resolve, reject) => {
+      debug(`convertToRaw(): Converting given object to ${dataTypeName}`)
+      
+      //1. Get data type
+      let dataType = {}
+      try {
+        debugD(`convertToRaw(): Reading data type info for ${dataTypeName}`)
+
+        dataType = await this.getDataType(dataTypeName)
+      } catch (err) {
+        return reject(new ClientException(this, 'convertToRaw()', `Reading data type info for "${dataTypeName} failed" - Is the data type correct?`, err))
+      }
+      
+      //2. Create data buffer packet (parse the value to a byte Buffer)
+      let dataBuffer = null
+      try {
+        debugD(`convertToRaw(): Parsing data buffer from Javascript object`)
+      
+        dataBuffer = _parseJsObjectToBuffer.call(this, value, dataType)
+
+        resolve(dataBuffer)
+      } catch (err) {
+        //Parsing the Javascript object failed. If error is TypeError with specific message, it means that the object is missing a required field (not 1:1 match to PLC data type)
+        if (err instanceof TypeError && err.isNotCompleteObject != null) {
+          if (!autoFill) {
+            debug(`convertToRaw(): Given Javascript object does not match the PLC variable - autoFill not given so quiting`)
+
+            return reject(new ClientException(this, 'convertToRaw()',`Converting Javascript object to byte Buffer failed: ${err.message} - Set 3rd parameter (autoFill) to true to allow uncomplete objects`))
+          }
+          debug(`convertToRaw(): Given Javascript object does not match the PLC variable - autoFill given so continuing`)
+
+          try {
+            debugD(`convertToRaw(): Creating empty object (autoFill parameter given)`)
+            let emptyObject = await this.getEmptyPlcType(dataTypeName)
+
+            //Deep merge objects - Object.assign() won't work for objects that contain objects
+            value = _deepMergeObjects(false, emptyObject, value)
+
+            debugD(`convertToRaw(): Parsing data buffer from Javascript object (after autoFill)`)
+            dataBuffer = _parseJsObjectToBuffer.call(this, value, dataType)
+
+            resolve(dataBuffer)
+
+          } catch (err) {
+            //Still failing
+            return reject(new ClientException(this, 'convertToRaw()', `Converting Javascript object to byte Buffer failed: Parsing the Javascript object to PLC failed`, err))
+          }
+
+        } else {
+          //Error is something else than TypeError -> quit
+          return reject(err)
+        }
+      }      
+    })
+  }
+
+  
+  /**
+   * Returns empty Javascript object that represents given dataTypeName
+   * 
+   * 
+   * @param {string} dataTypeName - Data type name in the PLC - Example: 'ST_SomeStruct', 'REAL',.. 
+   * 
+   * @returns {Promise<object>} Returns a promise (async function)
+   * - If resolved, Javascript object / variable is returned
+   * - If rejected, parsing failed and error info is returned (object)
+   */
+  getEmptyPlcType(dataTypeName) {
+    return new Promise(async (resolve, reject) => {
+      debug(`getEmptyPlcType(): Converting given object to ${dataTypeName}`)
+      
+      //1. Get data type
+      let dataType = {}
+      try {
+        debugD(`getEmptyPlcType(): Reading data type info for ${dataTypeName}`)
+
+        dataType = await this.getDataType(dataTypeName)
+      } catch (err) {
+        return reject(new ClientException(this, 'getEmptyPlcType()', `Reading data type info for "${dataTypeName} failed" - Is the data type correct?`, err))
+      }
+
+      const rawData = Buffer.alloc(dataType.size)
+      
+      //2. Parse the data to javascript object
+      let data = {}
+      try {
+        debugD(`convertFromRaw(): Parsing ${rawData.byteLength} bytes of data`)
+
+        data = _parsePlcDataToObject.call(this, rawData, dataType)
+
+        resolve(data)
+      } catch (err) {
+        return reject(new ClientException(this, 'convertFromRaw()', `Converting given data to Javascript type failed`, err))
+      }
+      
+    })
+  }
+
 }
 
 
@@ -3591,7 +4042,7 @@ function _readDataTypeInfo(dataTypeName) {
 
       
       //If the data type has flag "DataType", it's not enum and it's not array
-      } else if ((dataType.type === '' || ADS.BASE_DATA_TYPES.isKnownType(dataType.name)) && dataType.flagsStr.includes('DataType') && !dataType.flagsStr.includes('EnumInfos') && dataType.arrayDimension === 0) {
+      } else if (((dataType.type === '' && !ADS.BASE_DATA_TYPES.isPseudoType(dataType.name)) || ADS.BASE_DATA_TYPES.isKnownType(dataType.name)) && dataType.flagsStr.includes('DataType') && !dataType.flagsStr.includes('EnumInfos') && dataType.arrayDimension === 0) {
         //Do nothing - this is the final form
         //TODO: Get rid of this
 

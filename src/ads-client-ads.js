@@ -950,7 +950,7 @@ const BASE_DATA_TYPES = {
       fromBuffer: buffer => buffer.readUInt32LE(0)
     },
     {
-      name: ['DATE_AND_TIME', 'DATE'],
+      name: ['DATE_AND_TIME', 'DT', 'DATE'],
       size: 4,
       toBuffer: (value, buffer, settings) => {
         if (settings.convertDatesToJavascript === true && value.getTime)

@@ -26,7 +26,8 @@ There is still some work to do for "production ready" version. See this [Github 
 
 - [Installation](#installation)
 - [Features](#installation)
-- [Supported platforms and setups](#supported-platforms-and-setups)
+- [Supported and tested platforms](#supported-and-tested-platforms)
+- [Connection setups and possibilities](#connection-setups-and-possibilities)
 - [Enabling localhost support](#enabling-localhost-support)
 - [IMPORTANT: Note about STRUCT variables](#important-note-about-struct-variables)
 - [IMPORTANT: Writing STRUCT variables](#important-note-writing-sturct-variables)
@@ -52,6 +53,16 @@ There is still some work to do for "production ready" version. See this [Github 
   - [Subscribing to PLC variables (device notifications)](#subscribing-to-plc-variables-device-notifications)
     - [Subcribe to variable value (on-change)](#subcribe-to-variable-value-on-change)
     - [Subcribe to variable value (cyclic)](#subcribe-to-variable-value-cyclic)
+  - [Reading and writing raw data](#reading-and-writing-raw-data)
+    - [Getting symbol index group, offset and size](#getting-symbol-index-group-offset-and-size)
+    - [Reading a single raw value](#reading-a-single-raw-value)
+    - [Writing a single raw value](#writing-a-single-raw-value)
+    - [Reading multiple raw values](#reading-multiple-raw-values)
+    - [Writing multiple raw values](#writing-multiple-raw-values)
+    - [Creating a variable handle and reading a raw value](#creating-a-variable-handle-and-reading-a-raw-value)
+    - [Creating a variable handle and writing a raw value](#creating-a-variable-handle-and-writing-a-raw-value)
+    - [Converting a raw value to Javascript object](#converting-a-raw-value-to-javascript-object)
+    - [Converting a Javascript object to raw value](#converting-a-javascript-object-to-raw-value)
 - [Debugging](#debugging)
 - [FAQ](#faq)
 - [Documentation](#documentation)
@@ -84,26 +95,50 @@ const ads = require('ads-client')
 
 
 
-# Supported platforms and setups
+# Supported and tested platforms
 
 The ads-client package is tested so far with the following setups:
-  - **At the moment, TwinCAT 4022 or newer is required** (see issue #21)
+  - **At the moment, TwinCAT 4022 or newer is required** (see issue [#21](https://github.com/jisotalo/ads-client/issues/21))
   - TwinCAT 3 4022.27 running on 64bit Windows 10
   - TwinCAT 3 4024.4 running on 64bit Windows 10
   - TwinCAT 3 4022.27 running on 64bit Windows 7 Embedded @ Beckhoff PLC
   - Node.js v10.16.3 and newer
 
-The ads-client can be used in different system setups:
 
-![ads-client-setups](https://user-images.githubusercontent.com/13457157/79771661-c59c0d80-8337-11ea-809f-b7c41bcb099d.png)
+# Connection setups and possibilities
 
-## Setup 1
+The ads-client can be used in different system configurations. The following figure has different possible setups:
 
-*Connect from Windows PC to the PLC.*
+[![ads-client-setups](https://user-images.githubusercontent.com/13457157/82724547-8dde0800-9cdf-11ea-8dd1-0a1f06f8559f.PNG)](https://user-images.githubusercontent.com/13457157/82724547-8dde0800-9cdf-11ea-8dd1-0a1f06f8559f.PNG)
+
+## Setup 1 - Connect from Windows PC to the PLC
+
+Suggested use cases:
+- When using Windows operating system and TwinCAT runtime can be installed
+- When opening a TCP port from PLC is a no-go
 
 Requirements:
-- UI client has TwinCAT installed
-- ADS route is created between the UI and the PLC
+- Client has TwinCAT runtime or XAE installed 
+- ADS route is created between the client and the PLC
+
+
+Example connection to PLC with AmsNetId of `192.168.1.120.1.1`.
+```js
+const client = new ads.Client({
+  targetAmsNetId: '192.168.1.120.1.1',
+  targetAdsPort: 851,
+})
+```
+
+## Setup 2 - Connecting from Unix/Windows/etc. system to the PLC
+
+Suggested use cases:
+- On Windows when TwinCAT installation is not possible, but .NET Core is available
+- Unix based system and .NET Core available
+
+Requirements:
+- Client has [AdsRouterConsole](https://www.nuget.org/packages/Beckhoff.TwinCAT.Ads.AdsRouterConsole/5.0.0-preview4) running
+- ADS route is created between the client and the PLC (as in the nuget package instructions)
 
 Example connection when PLC has AmsNetId of `192.168.1.120.1.1`.
 ```js
@@ -113,47 +148,36 @@ const client = new ads.Client({
 })
 ```
 
-## Setup 2
-
-*Connect from Unix PC to the PLC.*
-
-Requirements:
-- UI client has [AdsRouterConsole](https://www.nuget.org/packages/Beckhoff.TwinCAT.Ads.AdsRouterConsole/5.0.0-preview4) or similar running
-- ADS route is created between the UI and the PLC
-
-Example connection when PLC has AmsNetId of `192.168.1.120.1.1`.
-```js
-const client = new ads.Client({
-  targetAmsNetId: '192.168.1.120.1.1',
-  targetAdsPort: 851,
-})
-```
-Example entry in the PLCs 
 
 
-## Setup 3
+## Setup 3 - Connecting from any Node.js supported system to the PLC
 
-*Connect from Windows PC, Unix PC or other device to the PLC.*
+Suggested use cases:
+- When opening TCP port from PLC is possible
+- When fast connection is required (1 router less -> faster response)
 
 Requirements:
-- PLC has TCP port 48898 open
-- Given `localAmsNetId` is not already in use
-- Given `localAdsPort` is not already in use
-- PLC has ADS route manually created to UI machines IP address and the given `localAmsNetId`
+- PLC has TCP port 48898 open (default router port)
+  - NOTE: Windows Firewall might block, make sure Ethernet connection is handled as "private"
+- Local AmsNetId and ADS port are given manually
+  - Given `localAmsNetId` is not already in use
+  - Given `localAdsPort` is not already in use
+- PLC has ADS route manually created to client IP address and client `localAmsNetId`
+  - See example after code sample
 
 Example connection when PLC has AmsNetId of `192.168.1.120.1.1` and IP of `192.168.1.120`.
 ```js
 const client = new ads.Client({
-  localAmsNetId: '192.168.1.10.1.1',
-  localAdsPort: 32750,
+  localAmsNetId: '192.168.1.10.1.1',  //Can be anything but needs to be in PLC StaticRoutes.xml file
+  localAdsPort: 32750,                //Can be anything that is not used
   targetAmsNetId: '192.168.1.120.1.1',
   targetAdsPort: 851,
-  routerAddress: '192.168.1.120',
-  routerTcpPort: 48898
+  routerAddress: '192.168.1.120',     //PLC ip address
+  routerTcpPort: 48898                //PLC needs to have this port opened. Test disabling all firewalls if problems
 })
 ```
 
-Example entry in the PLCs `TwinCAT\3.1\Target\StaticRoutes.xml` file when UI has AmsNetId of `192.168.1.10.1.1` and IP of `192.168.1.10`.
+Adding a route to the PLC can be done editing `TwinCAT\3.1\Target\StaticRoutes.xml` file from PLC. Add the following inside `<RemoteConnections>` tag. In this example, client should use meanual AmsNetId `192.168.1.10.1.1` and client has IP address `192.168.1.10`.
 ```xml
 <Route>
   <Name>UI</Name>
@@ -163,17 +187,24 @@ Example entry in the PLCs `TwinCAT\3.1\Target\StaticRoutes.xml` file when UI has
   <Flags>64</Flags>
 </Route>
 ```
-## Setup 4
 
-*Connect from the PLC to the localhost (PLC and UI on the same machine).*
+
+## Setup 4 - Connect to the localhost (PLC and client on the same machine)
+
+Suggested use cases:
+- When testing PLC systems on the local computer
+- When using panel PC/PLC combination
+- When PLC has monitor and it's used as user interface
+
 
 Requirements:
-- No special requirements
-- AMS router TCP loopback enabled (see "Enabling localhost support")
+- AMS router TCP loopback enabled (see [Enabling localhost support](#enabling-localhost-support))
+
+Example connection to local PLC runtime
 
 ```js
 const client = new ads.Client({
-  targetAmsNetId: '127.0.0.1.1.1',
+  targetAmsNetId: '127.0.0.1.1.1', //or 'localhost'
   targetAdsPort: 851,
 })
 
@@ -181,30 +212,32 @@ const client = new ads.Client({
 
 
 # Enabling localhost support 
-*NOTE: Only required for TwinCAT versions older than 4024.5. Newer versions have this already enabled.*
+*NOTE: Only required for TwinCAT versions older than 4024.5. Newer versions should have this already enabled.*
 
-If you want to connect to the local TwinCAT runtime (Node.js and the TwinCAT on the same computer - **as in these examples**), the ADS router TCP loopback feature has to be enabled. Tested with TwinCAT 4022.27 and 4024.4.
+If you want to connect to the local TwinCAT runtime (Node.js and the TwinCAT on the same computer - **as example setup 4**), the ADS router TCP loopback feature has to be enabled. Tested with TwinCAT 4022.27 and 4024.4.
 
 The following method is from [Beckhoff.TwinCAT.Ads nuget package](https://www.nuget.org/packages/Beckhoff.TwinCAT.Ads/5.0.0-preview6) installation guide.
 
 1. Stop TwinCAT System Service
 
-2. Enable TCP Loopback for TwinCAT via registery (regedit):
+2. Open registery editor (`regedit`)
 
-    - 32-Bit Windows Operating System:
+3. Depending on the operating system, navigate to 
+```
+32 bit operating system:
+HKEY_LOCAL_MACHINE\SOFTWARE\Beckhoff\TwinCAT3\System\
 
-      ```
-      Create following DWORD and set value to 1:
-      HKEY_LOCAL_MACHINE\SOFTWARE\Beckhoff\TwinCAT3\System\EnableAmsTcpLoopback
-      ```
-    - 64-Bit Windows Operating System:
-      ```
-      Create following DWORD and set value to 1:
-      HKEY_LOCAL_MACHINE\SOFTWARE\WOW6432Node\Beckhoff\TwinCAT3\System\EnableAmsTcpLoopback
-      ```
-3. Restart TwinCAT System Service 
+64 bit it operating system:
+HKEY_LOCAL_MACHINE\SOFTWARE\WOW6432Node\Beckhoff\TwinCAT3\System\
+```
 
-Now you can connect to the localhost using `localAmsNetId` address of `127.0.0.1.1.1` or `localhost`.
+4. Create new DWORD registery named `EnableAmsTcpLoopback` and set value to 1 (example figure below from 64 bit system)
+
+![ads-client-tcp-loopback](https://user-images.githubusercontent.com/13457157/82748398-2640bf00-9daa-11ea-98e5-0032b3537969.png)
+
+5. Restart TwinCAT system
+
+Now you can connect to the localhost using `targetAmsNetId` address of `127.0.0.1.1.1` or `localhost`.
 
 # IMPORTANT: Note about STRUCT variables
 
@@ -779,6 +812,213 @@ Mon Apr 13 2020 13:09:05 GMT+0300 (GMT+03:00): GVL_Test.IncrementingValue change
 Mon Apr 13 2020 13:09:06 GMT+0300 (GMT+03:00): GVL_Test.IncrementingValue changed to 277
 ...
 ```
+
+## Reading and writing raw data
+
+It's possible to read and write raw data using ads-client. Reading will result in a `Buffer` object, that contains the read data as bytes. Writing accepts a `Buffer` object that is then written to the PLC.
+
+Handling raw data is usually the most fastest and efficient way, as there is usually much less network traffic required. The methods require known `indexGroup` and `indexOffset` values.
+
+### Getting symbol index group, offset and size
+
+Variable symbol information can be acquired with method `getSymbolInfo`. The symbol infoc contains required `indexGroup`, `indexOffset` and `size`.
+
+```js
+const info = await client.getSymbolInfo('GVL_Test.TestINT')
+console.log(info)
+/*
+{ indexGroup: 16448,
+  indexOffset: 414816,
+  size: 2,
+  dataType: 2,
+  dataTypeStr: 'ADST_INT16',
+  flags: 8,
+  flagsStr: [ 'TypeGuid' ],
+  arrayDimension: 0,
+  nameLength: 16,
+  typeLength: 3,
+  commentLength: 0,
+  name: 'GVL_Test.TestINT',
+  type: 'INT',
+  comment: '' }
+*/
+```
+
+### Reading a single raw value
+```js
+//Reading DINT from indexGroup 16448 and indexOffset 411836 (4 bytes)
+const result = await client.readRaw(16448, 411836, 4)
+console.log(result) //<Buffer 37 61 00 00>
+```
+
+### Writing a single raw value
+```js
+//Writing value 123 to DINT from indexGroup 16448 and indexOffset 411836 (4 bytes)
+const data = Buffer.alloc(4)
+data.writeInt32LE(123)
+
+await client.writeRaw(16448, 411836, data)
+```
+
+### Reading multiple raw values
+
+Starting from version 1.3.0 you can use ADS sum commands to read multiple values in a single request. This is faster than reading one by one.
+
+Method returns an array of results, one result object for each read operation. If result has `success` of true, the read was succesful and data is located in `data`. Otherwise error information can be read from `errorInfo`.
+
+```js
+const result = await client.readRawMulti([
+  {
+    indexGroup: 16448,
+    indexOffset: 411836,
+    size: 4
+  },{
+    indexGroup: 123, //Note: Incorrect on purpose
+    indexOffset: 436040,
+    size: 255
+  }
+])
+console.log(result)
+/*
+[ { success: true,
+    errorInfo: { error: false, errorCode: 0, errorStr: 'No error' },
+    target: { indexGroup: 16448, indexOffset: 411836 },
+    data: <Buffer 00 43 3a d4> },
+  { success: false,
+    errorInfo:
+     { error: true, errorCode: 1794, errorStr: 'Invalid index group' },
+    target: { indexGroup: 123, indexOffset: 436040 },
+    data:
+     <Buffer 00 00 00 00 ... > } ]
+*/
+```
+
+### Writing multiple raw values
+
+Starting from version 1.3.0 you can use ADS sum commands to write multiple values in a single request. This is faster than writing one by one.
+
+Method returns an array of results, one result object for each write operation. If result has `success` of true, the write was succesful. Otherwise error information can be read from `errorInfo`.
+
+```js
+//Create raw data for DINT with value 555
+const data = Buffer.alloc(4)
+data.writeInt32LE(555)
+
+const result = await client.writeRawMulti([
+  {
+    indexGroup: 16448,
+    indexOffset: 411836,
+    data: data
+  },{
+    indexGroup: 123, //Note: Incorrect on purpose
+    indexOffset: 436040,
+    data: Buffer.alloc(255)
+  }
+])
+console.log(result)
+/*
+[ { success: true,
+    errorInfo: { error: false, errorCode: 0, errorStr: 'No error' },
+    target: { indexGroup: 16448, indexOffset: 411836 } },
+  { success: false,
+    errorInfo:
+     { error: true,
+       errorCode: 1793,
+       errorStr: 'Service is not supported by server' },
+    target: { indexGroup: 123, indexOffset: 436040 } } ]
+*/
+```
+
+### Creating a variable handle and reading a raw value
+
+Using handles is another alternative for reading and writing raw data. A handle is first made using variable name and then using the returned handle, read and write operations can be made. No need to know `indexGroup` and `indexOffset`.
+
+NOTE: Handles should always be deleted if no more used. This doesn't mean that it wouldn't be a good habit to use the same handle all the time (for example in application backend until app is terminated). The reason is that there are limited number of handles available.
+
+```js
+const handle = await client.createVariableHandle('GVL_Test.TestINT')
+console.log(handle)
+//{ handle: 905969897, size: 2, type: 'INT' }
+
+const result = await client.readRawByHandle(handle)
+console.log(result)
+//<Buffer d2 04>
+
+await client.deleteVariableHandle(handle)
+```
+
+
+### Creating a variable handle and writing a raw value
+
+See *Creating a variable handle and reading a raw value* for more info about handles.
+
+```js
+const handle = await client.createVariableHandle('GVL_Test.TestINT')
+console.log(handle)
+//{ handle: 905969897, size: 2, type: 'INT' }
+
+//Create raw data for INT with value 12345
+const data = Buffer.alloc(2)
+data.writeInt32LE(12345)
+
+await client.writeRawByHandle(handle, data)
+await client.deleteVariableHandle(handle)
+```
+
+### Converting a raw value to Javascript object
+Using `convertFromRaw` method, raw data can be converted to Javascript object. The conversion works internally like in `readSymbol`.
+
+```js
+//result = <Buffer 37 61 00 00>
+const value = await client.convertFromRaw(result, 'DINT')
+console.log(value) //24887
+```
+
+Example with `readRawMulti` and custom struct:
+```js
+const result = await client.readRawMulti([
+  {
+    indexGroup: 16448,
+    indexOffset: 449659,
+    size: 59
+  },{
+    indexGroup: 16448,
+    indexOffset: 436040,
+    size: 255
+  }
+])
+
+const value = await client.convertFromRaw(result[0].data, 'ST_Example')
+console.log(value)
+/*
+{ SomeText: 'Hello ads-client',
+  SomeReal: 3.1415927410125732,
+  SomeDate: 2020-04-13T12:25:33.000Z }
+*/
+```
+
+### Converting a Javascript object to raw value
+Using `convertToRaw` method, Javascript object can be converted to raw data. The conversion works internally like in `writeSymbol`.
+
+
+```js
+const data = await client.convertToRaw(12345, 'INT')
+console.log(data) //<Buffer 39 30>
+```
+
+The 3rd parameter `autoFill` works as in `writeSymbol`.
+```js
+const data = await client.convertToRaw(
+  {
+    SomeText: 'Hello ads-client',
+    SomeReal: 3.1415927410125732,
+  }, 'ST_Example', true //NOTE: autoFill=true (as there is no SomeDate given)
+)
+console.log(data)
+//<Buffer 48 65 6c 6c 6f 20 ... >
+```
+
+
 
 # Debugging
 If you have problems or you are interested, you can enabled debug output to console. The ads-client uses `debug` package for debugging.
