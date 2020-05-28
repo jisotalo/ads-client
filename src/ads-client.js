@@ -2321,6 +2321,96 @@ class Client {
     })
   }
 
+
+  /**
+   * Sends a WriteControl ADS command to the given ADS port
+   * 
+   * WriteControl can be used to start/stop PLC, set TwinCAT system to run/config and so on
+   * 
+   * @param {number} adsPort - Target ADS port
+   * @param {number} adsState - ADS state to be set (see ADS.ADS_STATE)
+   * @param {number} [deviceState] - device state to be set (usually 0) - Default: 0
+   * @param {Buffer} [data] - Additional data to be send (Buffer object) - Default: none
+   * 
+   * @returns {Promise<object>} Returns a promise (async function)
+   * - If resolved, command was successful
+   * - If rejected, error info is returned (object)
+   */
+  writeControl(adsPort, adsState, deviceState = 0, data = Buffer.alloc(0)) {
+    return new Promise(async (resolve, reject) => {
+      debug(`writeControl(): Sending writeControl command to port ${adsPort} - adsState: ${adsState}, deviceState: ${deviceState} and ${data.byteLength} bytes data`)
+      
+      //Allocating bytes for request
+      const dataBuffer = Buffer.alloc(8 + data.byteLength)
+      let pos = 0
+
+      //0..1 ADS state
+      dataBuffer.writeUInt32LE(adsState, pos)
+      pos += 2
+    
+      //2..3 Device state
+      dataBuffer.writeUInt32LE(deviceState, pos)
+      pos += 2
+    
+      //4..7 Data length
+      dataBuffer.writeUInt32LE(data.byteLength, pos)
+      pos += 4
+
+      //7..n Data
+      data.copy(dataBuffer, pos)
+    
+      _sendAdsCommand.call(this, ADS.ADS_COMMAND.WriteControl, dataBuffer, adsPort)
+        .then((res) => {
+          debug(`writeControl(): Sending command was successful`)
+
+          resolve()
+        })
+        .catch((err) => {
+          debug(`writeControl(): failed to send command:  %o`, err)
+          reject(new ClientException(this, 'writeControl()', `Failed to send command:`, err))
+        })
+      
+    })
+  }
+
+
+  
+  startPlc(adsPort = this.settings.targetAdsPort) {
+    return this.writeControl(adsPort, ADS.ADS_STATE.Run)
+  }
+
+  stopPlc(adsPort = this.settings.targetAdsPort) {
+    return this.writeControl(adsPort, ADS.ADS_STATE.Stop)
+  }
+
+  restartPlc(adsPort = this.settings.targetAdsPort) {
+    return new Promise(async (resolve, reject) => {
+      try {
+        await this.writeControl(adsPort, ADS.ADS_STATE.Reset)
+
+        await this.startPlc()
+
+      } catch (err) {
+        reject (err)
+      }
+    })
+  }
+
+  
+  setSystemRun(adsPort = ADS.ADS_RESERVED_PORTS.SystemService) {
+    return this.writeControl(adsPort, ADS.ADS_STATE.Reset)
+  }
+
+  setSystemConfig(adsPort = ADS.ADS_RESERVED_PORTS.SystemService) {
+    return this.writeControl(adsPort, ADS.ADS_STATE.Reconfig)
+  }
+
+  restartSystem(adsPort = ADS.ADS_RESERVED_PORTS.SystemService) {
+    return this.writeControl(adsPort, ADS.ADS_STATE.Reset)
+  }
+
+
+
 }
 
 
@@ -4551,6 +4641,15 @@ function _parseAdsData(packet, data) {
       break
     
     
+    
+    //-------------- WriteControl ---------------
+    case ADS.ADS_COMMAND.WriteControl:
+      
+      //0..3 Ads error number
+      ads.errorCode = data.readUInt32LE(pos)
+      pos += 4
+
+      break
     
     
     default:
