@@ -3719,12 +3719,29 @@ function _parseJsObjectToBuffer(value, dataType, objectPathStr = '', isArraySubI
 
   //Array - Go through each array subitem
   } else if (dataType.arrayData.length > 0 && !isArraySubItem) {
-    for (let i = 0; i < dataType.arrayData[0].length; i++) {      
-      //Recursively parse array subitems
-      const bufferedData = _parseJsObjectToBuffer.call(this, value[i], dataType, `${objectPathStr}.${dataType.name}[${dataType.arrayData[0].startIndex + i}]`, true)
 
-      buffer = Buffer.concat([buffer, bufferedData]) //TODO: optimize, concat is not a good way
+    //Recursive parsing of array dimensions
+    const parseArray = (value, arrayDimension, arrayPathStr = '') => {
+
+      for (let child = 0; child < dataType.arrayData[arrayDimension].length; child++) {
+        if (dataType.arrayData[arrayDimension + 1]) {
+          //More dimensions available -> go deeper
+          parseArray(value[child], arrayDimension + 1, `${arrayPathStr}[${child}]`)
+
+        } else {
+          //This is the final dimension
+          if (value[child] === undefined) {
+            throw new Error(`Given Javascript object is missing array index for ${objectPathStr}${arrayPathStr}[${child}]`)
+          }
+
+          const bufferedData = _parseJsObjectToBuffer.call(this, value[child], dataType, `${objectPathStr}${arrayPathStr}[${child}]`, true)
+          buffer = Buffer.concat([buffer, bufferedData]) //TODO: optimize, concat is not a good way
+        }
       }
+    }
+    parseArray(value, 0)
+    
+
 
   //Enumeration
   } else if (dataType.enumInfo) {
@@ -3851,11 +3868,28 @@ function _parsePlcDataToObject(dataBuffer, dataType, isArraySubItem = false) {
   //Array - Go through each array subitem
   } else if (dataType.arrayData.length > 0 && !isArraySubItem) {
     output = []
-    for (let i = 0; i < dataType.arrayData[0].length; i++) {
-      output.push(_parsePlcDataToObject.call(this, dataBuffer, dataType, true))
-      dataBuffer = dataBuffer.slice(dataType.size)
+
+    //Recursive parsing of array dimensions
+    const parseArray = (arrayDimension) => {
+      let result = []
+
+      for (let child = 0; child < dataType.arrayData[arrayDimension].length; child++) {
+        if (dataType.arrayData[arrayDimension + 1]) {
+          //More dimensions available -> go deeper
+          result.push(parseArray(arrayDimension + 1))
+
+        } else {
+          //This is the final dimension -> we have actual data
+          result.push(_parsePlcDataToObject.call(this, dataBuffer, dataType, true))
+          dataBuffer = dataBuffer.slice(dataType.size)
+        }
+      }
+      return result
     }
 
+    output = parseArray(0)
+    
+    
   //Enumeration (only if we want to convert enumerations to object)
   } else if (dataType.enumInfo && this.settings.objectifyEnumerations && this.settings.objectifyEnumerations === true) {
     output = _parsePlcVariableToJs.call(this, dataBuffer.slice(0, dataType.size), dataType)

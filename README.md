@@ -1,27 +1,18 @@
 # ads-client
 
 
-[![npm version](https://img.shields.io/npm/v/ads-client)](https://www.npmjs.org/package/ads-client)
-[![GitHub](https://img.shields.io/badge/View%20on-GitHub!-brightgreen)](https://img.shields.io/github/license/jisotalo/ads-client)
+[![npm version](https://img.shields.io/npm/v/ads-client)](https://www.npmjs.org/package/ads-client) 
+[![GitHub milestone](https://img.shields.io/github/milestones/progress-percent/jisotalo/ads-client/1)](https://github.com/jisotalo/ads-client/milestone/1)
+[![GitHub](https://img.shields.io/badge/View%20on-GitHub-brightgreen)](https://github.com/jisotalo/ads-client)
 [![License](https://img.shields.io/github/license/jisotalo/ads-client)](https://choosealicense.com/licenses/mit/)
 
 Unofficial node.js ADS library for connecting to Beckhoff TwinCAT automation systems using ADS protocol.
 
 Coded from scratch using [TwinCAT ADS specification](https://infosys.beckhoff.com/content/1033/tc3_ads_intro/116157835.html?id=124964102706356243) and [Beckhoff.TwinCAT.Ads nuget package](https://www.nuget.org/packages/Beckhoff.TwinCAT.Ads/5.0.0-preview6). Inspiration from similar projects like [node-ads](https://www.npmjs.com/package/node-ads), [beckhoff-js](https://www.npmjs.com/package/beckhoff-js) and [iecstruct](https://www.npmjs.com/package/iecstruct).
 
----
-## ***NOTE:** Readme is still under construction!*
-
-
-**Important note**:
-
-[![GitHub milestone](https://img.shields.io/github/milestones/progress-percent/jisotalo/ads-client/1)](https://github.com/jisotalo/ads-client/milestone/1)
-
-There is still some work to do for "production ready" version. See this [Github milestone for details](https://github.com/jisotalo/ads-client/milestone/1)
 
 
 
----
 # Table of contents
 
 - [Installation](#installation)
@@ -490,7 +481,6 @@ Value read: { SomeText: 'Hello ads-client',
 
 ### Reading `ARRAY OF INT` type variable
 
-**NOTE:** Handling multi-dimensional arrays is not supported at the moment. See [this GitHub issue](https://github.com/jisotalo/ads-client/issues/10) for the development of the multi-dimensional array support.
 
 ```js
 try {
@@ -511,8 +501,6 @@ Value read: [ 0, 10, 200, 3000, 4000 ]
 ---
 
 ### Reading `ARRAY OF STRUCT` type variable
-
-**NOTE:** Handling multi-dimensional arrays is not supported at the moment. See [this GitHub issue](https://github.com/jisotalo/ads-client/issues/10) for the development of the multi-dimensional array support.
 
 ```javascript
 try {
