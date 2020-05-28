@@ -6,7 +6,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [1.4.0] - 28.05.2020
 ### Added
-- Support for multi-dimensional arrays of any type
+- Support for multi-dimensional arrays of any type (issue #10)
 - **Ready for production milestone reached!**
 
 ### Changed
