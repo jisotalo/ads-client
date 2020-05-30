@@ -1037,7 +1037,8 @@ await client.restartPlc(852) //Restart the PLC from ADS port 852
 
 The PLC runtime state can always be read using `readPlcRuntimeState()` and the latest known state of PLC runtime at `settings.targetAdsPort` is located in `metaData.plcRuntimeState`.
 ```js
-await client.readPlcRuntimeState() //{ adsState: 5, adsStateStr: 'Run', deviceState: 0 }
+await client.readPlcRuntimeState() //Read PLC runtime status from settings.targetAdsPort 
+//Example result: { adsState: 5, adsStateStr: 'Run', deviceState: 0 }
 await client.readPlcRuntimeState(852) //Read PLC runtime status from ADS port 852
 ```
 
