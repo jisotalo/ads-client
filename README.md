@@ -21,7 +21,7 @@ Coded from scratch using [TwinCAT ADS specification](https://infosys.beckhoff.co
 - [Connection setups and possibilities](#connection-setups-and-possibilities)
 - [Enabling localhost support](#enabling-localhost-support)
 - [IMPORTANT: Note about STRUCT variables](#important-note-about-struct-variables)
-- [IMPORTANT: Writing STRUCT variables](#important-note-writing-sturct-variables)
+- [IMPORTANT: Writing STRUCT variables](#important-writing-struct-variables)
 - [Getting started](#getting-started)
   - [Data types used in getting started](data-types-used-in-getting-started)
   - [Creating a new Client instance](#creating-a-new-client-instance)
