@@ -7,6 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [1.5.0] - 30.05.2020
 ### Added
 - `WriteControl()` method for connecting device states using ADS WriteControl command
+- Support for WriteControl ADS command response
 - Methods for controlling PLC runtime
   - `startPlc`
   - `stopPlc`
@@ -15,10 +16,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `setSystemManagerToRun`
   - `setSystemManagerToConfig`
   -  `restartSystemManager`
-- 
-
 ### Changed
-- `readPlcRuntimeState` now accepts target ADS port as parameter
+- `readPlcRuntimeState` now accepts target ADS port as optional parameter
 ## [1.4.0] - 28.05.2020
 ### Added
 - Support for multi-dimensional arrays of any type (issue #10)
