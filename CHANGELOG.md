@@ -4,6 +4,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.0] - 30.05.2020
+### Added
+- `WriteControl()` method for connecting device states using ADS WriteControl command
+- Support for WriteControl ADS command response
+- Methods for controlling PLC runtime
+  - `startPlc`
+  - `stopPlc`
+  - `restartPlc`
+- Methods for controlling TwinCAT system
+  - `setSystemManagerToRun`
+  - `setSystemManagerToConfig`
+  -  `restartSystemManager`
+### Changed
+- `readPlcRuntimeState` now accepts target ADS port as optional parameter
 ## [1.4.0] - 28.05.2020
 ### Added
 - Support for multi-dimensional arrays of any type (issue #10)
@@ -22,7 +36,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Method for generating an empty Javascript object of a data type
   - `getEmptyPlcType`
 
-## Changed
+### Changed
 - Fixed a problem that JSDoc documentation header links were not working
 - Added DT to base data types
 - `deleteVariableHandle` accepts handle object as parameter 
