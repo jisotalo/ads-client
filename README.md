@@ -54,6 +54,8 @@ Coded from scratch using [TwinCAT ADS specification](https://infosys.beckhoff.co
     - [Creating a variable handle and writing a raw value](#creating-a-variable-handle-and-writing-a-raw-value)
     - [Converting a raw value to Javascript object](#converting-a-raw-value-to-javascript-object)
     - [Converting a Javascript object to raw value](#converting-a-javascript-object-to-raw-value)
+  - [Starting and stopping the PLC](#starting-and-stopping-the-plc)
+  - [Starting and stopping the TwinCAT system](#starting-and-stopping-the-twincat-system)
 - [Debugging](#debugging)
 - [FAQ](#faq)
 - [Documentation](#documentation)
@@ -1007,6 +1009,65 @@ console.log(data)
 ```
 
 
+## Starting and stopping the PLC
+
+The PLC runtime(s) can be started and stopped using following methods. Internally `WriteControl()` is used.
+
+Note that all following methods will fail, if the PLC is already in the target state.
+
+**Starting the PLC**
+```js
+await client.startPlc() //Start the PLC from settings.targetAdsPort
+await client.startPlc(852) //Start the PLC from ADS port 852
+```
+
+**Stopping the PLC**
+```js
+await client.stopPlc() //Stop the PLC from settings.targetAdsPort
+await client.stopPlc(852) //Stop the PLC from ADS port 852
+```
+
+**Restarting the PLC**
+```js
+await client.restartPlc() //Restart the PLC from settings.targetAdsPort
+await client.restartPlc(852) //Restart the PLC from ADS port 852
+```
+
+**Reading the PLC state**
+
+The PLC runtime state can always be read using `readPlcRuntimeState()` and the latest known state of PLC runtime at `settings.targetAdsPort` is located in `metaData.plcRuntimeState`.
+```js
+await client.readPlcRuntimeState() //{ adsState: 5, adsStateStr: 'Run', deviceState: 0 }
+await client.readPlcRuntimeState(852) //Read PLC runtime status from ADS port 852
+```
+
+## Starting and stopping the TwinCAT system
+
+The TwinCAT system can be started and set to config mode using following methods. This can be useful for example when updating the PLC software. Internally `WriteControl()` is used.
+
+Note that all following methods will fail, if the system is already in the target state/mode.
+
+**Setting the TwinCAT system to run mode**
+```js
+await client.setSystemManagerToRun()
+```
+**Setting the TwinCAT system to config mode**
+```js
+await client.setSystemManagerToConfig()
+```
+**Restart TwinCAT system**
+```js
+//Same as calling setSystemManagerToRun()
+await client.restartSystemManager()
+```
+
+**Reading the TwinCAT system state**
+
+The TwinCAT system state can always be read using `readSystemManagerState()` and the latest known state is located in `metaData.systemManagerState`.
+```js
+await client.readSystemManagerState() //{ adsState: 5, adsStateStr: 'Run', deviceState: 1 }
+```
+
 
 # Debugging
 If you have problems or you are interested, you can enabled debug output to console. The ads-client uses `debug` package for debugging.
@@ -1027,7 +1088,7 @@ Different debug levels explained:
 - 4: Detailed debug printing and raw I/O data (same as `DEBUG='ads-client*'`)
 
 ## Enabling debugging from terminal
-See [debug package](https://www.npmjs.com/package/debug) for instructions.
+See the [debug package](https://www.npmjs.com/package/debug) for instructions.
 
 Example for Visual Studio Code (PowerShell):
 ```bash

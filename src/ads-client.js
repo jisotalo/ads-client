@@ -172,7 +172,7 @@ class Client {
      * @typedef Metadata
      * @property {object} deviceInfo - Target device info (read after connecting)
      * @property {object} systemManagerState - Target device system manager state (run, config, etc.)
-     * @property {object} plcRuntimeState - Target PLC runtime state (run, stop, etc.) (if target port is 851 -> this is TwinCAT 3 runtime 1 status and so on)
+     * @property {object} plcRuntimeState - Target PLC runtime state (run, stop, etc.) (the runtime state of settings.targetAdsPort PLC runtime)
      * @property {object} uploadInfo - Contains information of target data types, symbols and so on
      * @property {number} symbolVersion - Active symbol version at target system. Changes when PLC software is updated
      * @property {boolean} allSymbolsCached - True if all symbols are cached (so we know to re-cache all during symbol version change)
@@ -649,11 +649,11 @@ class Client {
     */
   readSystemManagerState() {
     return new Promise(async (resolve, reject) => {
-      debug(`readSystemManagerState(): Reading device system manager state`)
+      debugD(`readSystemManagerState(): Reading device system manager state`)
 
       _sendAdsCommand.call(this, ADS.ADS_COMMAND.ReadState, Buffer.alloc(0), ADS.ADS_RESERVED_PORTS.SystemService)
         .then((res) => {
-          debug(`readSystemManagerState(): Device system state read successfully`)
+          debugD(`readSystemManagerState(): Device system state read successfully`)
           this.metaData.systemManagerState = res.ads.data
 
           resolve(this.metaData.systemManagerState)
@@ -677,20 +677,24 @@ class Client {
     * - If resolved, device status is returned (object)
     * - If rejected, reading failed and error info is returned (object)
     */
-  readPlcRuntimeState() {
+  readPlcRuntimeState(adsPort = this.settings.targetAdsPort) {
     return new Promise(async (resolve, reject) => {
-      debug(`readPlcRuntimeState(): Reading PLC runtime (${this.connection.targetAdsPort}) state`)
+      debug(`readPlcRuntimeState(): Reading PLC runtime (port ${adsPort}) state`)
 
-      _sendAdsCommand.call(this, ADS.ADS_COMMAND.ReadState, Buffer.alloc(0))
+      _sendAdsCommand.call(this, ADS.ADS_COMMAND.ReadState, Buffer.alloc(0), adsPort)
         .then((res) => {
-          debug(`readPlcRuntimeState(): Device state read successfully`)
-          this.metaData.plcRuntimeState = res.ads.data
+          debug(`readPlcRuntimeState(): Device state read successfully for port ${adsPort}`)
+
+          //Save to metaData but only if target ADS port
+          if (adsPort === this.settings.targetAdsPort) {
+            this.metaData.plcRuntimeState = res.ads.data
+          }
           
-          resolve(this.metaData.plcRuntimeState)
+          resolve(res.ads.data)
         })
         .catch((res) => {
-          debug(`readPlcRuntimeState(): Reading PLC runtime (${this.connection.targetAdsPort}) state failed`)
-          reject(new ClientException(this, 'readPlcRuntimeState()', `Reading PLC runtime (${this.connection.targetAdsPort}) state failed`, res))
+          debug(`readPlcRuntimeState(): Reading PLC runtime (port ${adsPort}) state failed`)
+          reject(new ClientException(this, 'readPlcRuntimeState()', `Reading PLC runtime (port ${adsPort}) state failed`, res))
         })
     })
   }
@@ -2322,19 +2326,23 @@ class Client {
   }
 
 
+
+
+
   /**
-   * Sends a WriteControl ADS command to the given ADS port
-   * 
+   * Sends a WriteControl ADS command to the given ADS port. 
    * WriteControl can be used to start/stop PLC, set TwinCAT system to run/config and so on
    * 
-   * @param {number} adsPort - Target ADS port
-   * @param {number} adsState - ADS state to be set (see ADS.ADS_STATE)
+   * **NOTE: Commands will fail if already in requested state**
+   * 
+   * @param {number} adsPort - Target ADS port (TC3 runtime 1: 851, system manager: 10000 and so on)
+   * @param {number} adsState - ADS state to be set (see ADS.ADS_STATE for different values)
    * @param {number} [deviceState] - device state to be set (usually 0) - Default: 0
-   * @param {Buffer} [data] - Additional data to be send (Buffer object) - Default: none
+   * @param {Buffer} [data] - Additional data to be send (Buffer object - usually empty) - Default: none
    * 
    * @returns {Promise<object>} Returns a promise (async function)
    * - If resolved, command was successful
-   * - If rejected, error info is returned (object)
+   * - If rejected, command failed error info is returned (object)
    */
   writeControl(adsPort, adsState, deviceState = 0, data = Buffer.alloc(0)) {
     return new Promise(async (resolve, reject) => {
@@ -2359,15 +2367,16 @@ class Client {
       //7..n Data
       data.copy(dataBuffer, pos)
     
+      //Sending the command to given port
       _sendAdsCommand.call(this, ADS.ADS_COMMAND.WriteControl, dataBuffer, adsPort)
-        .then((res) => {
-          debug(`writeControl(): Sending command was successful`)
+        .then(res => {
+          debug(`writeControl(): Sending command to port ${adsPort} was successful`)
 
           resolve()
         })
-        .catch((err) => {
-          debug(`writeControl(): failed to send command:  %o`, err)
-          reject(new ClientException(this, 'writeControl()', `Failed to send command:`, err))
+        .catch(err => {
+          debug(`writeControl(): Sending writeControl command failed (port: ${adsPort}, adsState: ${adsState}, deviceState: ${deviceState}, ${data.byteLength} bytes data): %o`, err)
+          reject(new ClientException(this, 'writeControl()', `Failed to send command. Is the target system already in given state?`, err))
         })
       
     })
@@ -2375,38 +2384,198 @@ class Client {
 
 
   
+
+
+  
+
+  /**
+   * Starts the PLC runtime from settings.targetAdsPort or given ads port
+   * 
+   * **WARNING:** Make sure the system is ready to start
+   * 
+   * @param {number} adsPort - Target ADS port, for example 851 for TwinCAT 3 PLC runtime 1 (default: this.settings.targetAdsPort)
+   * 
+   * @returns {Promise<object>} Returns a promise (async function)
+   * - If resolved, command was successful
+   * - If rejected, command failed error info is returned (object)
+   */
   startPlc(adsPort = this.settings.targetAdsPort) {
-    return this.writeControl(adsPort, ADS.ADS_STATE.Run)
-  }
-
-  stopPlc(adsPort = this.settings.targetAdsPort) {
-    return this.writeControl(adsPort, ADS.ADS_STATE.Stop)
-  }
-
-  restartPlc(adsPort = this.settings.targetAdsPort) {
     return new Promise(async (resolve, reject) => {
+      
+      debug(`startPlc(): Starting PLC at ADS port ${adsPort}`)
+      
       try {
-        await this.writeControl(adsPort, ADS.ADS_STATE.Reset)
+        //Read deviceState (we don't want to change it, as we have no idea what it does)
+        const state = await this.readPlcRuntimeState(adsPort)
 
-        await this.startPlc()
+        await this.writeControl(adsPort, ADS.ADS_STATE.Run, state.deviceState)
 
+        debugD(`startPlc(): PLC started at ADS port ${adsPort}`)
+        resolve()
       } catch (err) {
+        debug(`startPlc(): Starting PLC at ADS port ${adsPort} failed: %o`, err)
         reject (err)
       }
     })
   }
 
+
+
   
-  setSystemRun(adsPort = ADS.ADS_RESERVED_PORTS.SystemService) {
-    return this.writeControl(adsPort, ADS.ADS_STATE.Reset)
+
+  
+
+  /**
+   * Stops the PLC runtime from settings.targetAdsPort or given ads port
+   * 
+   * **WARNING:** Make sure the system is ready to stop
+   * 
+   * @param {number} adsPort - Target ADS port, for example 851 for TwinCAT 3 PLC runtime 1 (default: this.settings.targetAdsPort)
+   * 
+   * @returns {Promise<object>} Returns a promise (async function)
+   * - If resolved, command was successful
+   * - If rejected, command failed error info is returned (object)
+   */
+  stopPlc(adsPort = this.settings.targetAdsPort) {
+    return new Promise(async (resolve, reject) => {
+      debug(`stopPlc(): Stopping PLC at ADS port ${adsPort}`)
+
+      try {
+        //Read deviceState (we don't want to change it, as we have no idea what it does)
+        const state = await this.readPlcRuntimeState(adsPort)
+
+        await this.writeControl(adsPort, ADS.ADS_STATE.Stop, state.deviceState)
+
+        debugD(`stopPlc(): PLC stopped at ADS port ${adsPort}`)
+        resolve()
+      } catch (err) {
+        debug(`stopPlc(): Stopping PLC at ADS port ${adsPort} failed: %o`, err)
+        reject (err)
+      }
+    })
   }
 
-  setSystemConfig(adsPort = ADS.ADS_RESERVED_PORTS.SystemService) {
-    return this.writeControl(adsPort, ADS.ADS_STATE.Reconfig)
+
+
+
+
+  
+  
+
+  /**
+   * Restarts the PLC runtime from settings.targetAdsPort or given ads port
+   * 
+   * **WARNING:** Make sure the system is ready to stop and start
+   * 
+   * @param {number} adsPort - Target ADS port, for example 851 for TwinCAT 3 PLC runtime 1 (default: this.settings.targetAdsPort)
+   * 
+   * @returns {Promise<object>} Returns a promise (async function)
+   * - If resolved, command was successful
+   * - If rejected, command failed error info is returned (object)
+   */
+  restartPlc(adsPort = this.settings.targetAdsPort) {
+    return new Promise(async (resolve, reject) => {
+      try {
+        debug(`restartPlc(): Restarting PLC at ADS port ${adsPort}`)
+
+        //Read deviceState (we don't want to change it, as we have no idea what it does)
+        const state = await this.readPlcRuntimeState(adsPort)
+
+        await this.writeControl(adsPort, ADS.ADS_STATE.Reset, state.deviceState)
+
+        await this.startPlc(adsPort)
+
+        debugD(`restartPlc(): PLC restarted at ADS port ${adsPort}`)
+        resolve()
+      } catch (err) {
+        debug(`restartPlc(): Restarting PLC at ADS port ${adsPort} failed: %o`, err)
+        reject (err)
+      }
+    })
   }
 
-  restartSystem(adsPort = ADS.ADS_RESERVED_PORTS.SystemService) {
-    return this.writeControl(adsPort, ADS.ADS_STATE.Reset)
+
+
+
+
+
+  /**
+   * Sets the TwinCAT system (system manager) to start/run mode (green TwinCAT icon)
+   * 
+   * **WARNING:** Make sure the system is ready to stop and start
+   * 
+   * @returns {Promise<object>} Returns a promise (async function)
+   * - If resolved, command was successful
+   * - If rejected, command failed error info is returned (object)
+   */
+  setSystemManagerToRun() {
+    return new Promise(async (resolve, reject) => {
+      try {
+        debug(`setSystemManagerToRun(): Starting TwinCAT system to run mode`)
+        //Read deviceState (we don't want to change it, as we have no idea what it does)
+        const state = await this.readSystemManagerState()
+
+        await this.writeControl(ADS.ADS_RESERVED_PORTS.SystemService, ADS.ADS_STATE.Reset, state.deviceState)
+
+        debugD(`setSystemManagerToRun(): TwinCAT system started to run mode`)
+        resolve()
+      } catch (err) {
+        debug(`setSystemManagerToRun(): Starting TwinCAT system to run mode failed: %o`, err)
+        reject (err)
+      }
+    })
+  }
+
+
+
+  
+
+  /**
+   * Sets the TwinCAT system (system manager) to config mode (blue TwinCAT icon)
+   * 
+   * **WARNING:** Make sure the system is ready to stop
+   * 
+   * @returns {Promise<object>} Returns a promise (async function)
+   * - If resolved, command was successful
+   * - If rejected, command failed error info is returned (object)
+   */
+  setSystemManagerToConfig() {
+    return new Promise(async (resolve, reject) => {
+      try {
+        debug(`setSystemManagerToConfig(): Setting TwinCAT system to config mode`)
+
+        //Read deviceState (we don't want to change it, as we have no idea what it does)
+        const state = await this.readSystemManagerState()
+
+        await this.writeControl(ADS.ADS_RESERVED_PORTS.SystemService, ADS.ADS_STATE.Reconfig, state.deviceState)
+
+        debugD(`setSystemManagerToConfig(): TwinCAT system set to config mode`)
+        resolve()
+      } catch (err) {
+        debug(`setSystemManagerToConfig(): Setting TwinCAT system to config mode failed: %o`, err)
+        reject (err)
+      }
+    })
+  }
+
+
+
+
+
+
+  /**
+   * Restarts TwinCAT system (system manager) for software update etc. 
+   * Internally same as setSystemManagerToRun()
+   * 
+   * **WARNING:** Make sure the system is ready to stop and start
+   * 
+   * @returns {Promise<object>} Returns a promise (async function)
+   * - If resolved, command was successful
+   * - If rejected, command failed error info is returned (object)
+   */
+  restartSystemManager() {
+    debug(`restartSystemManager(): Restarting TwinCAT system`)
+    return this.setSystemManagerToRun()
   }
 
 
