@@ -4103,9 +4103,8 @@ function _parseJsVariableToPlc(value, dataType, dataBuffer) {
  * 
  * @memberof _LibraryInternals
  */
-function _parsePlcDataToObject(dataBuffer, dataType, isArraySubItem = false) {
+function _parsePlcDataToObject(dataBuffer, dataType, isArraySubItem = false, addr = { addr: 0 }, packMode = 1) {
   let output = null
-
   //Struct or array subitem - Go through each subitem
   if ((dataType.arrayData.length === 0 || isArraySubItem) && dataType.subItems.length > 0) {
     output = {}
@@ -4115,12 +4114,12 @@ function _parsePlcDataToObject(dataBuffer, dataType, isArraySubItem = false) {
     }
 
     for (const subItem of dataType.subItems) {
-      output[subItem.name] = _parsePlcDataToObject.call(this, dataBuffer, subItem)
+      output[subItem.name] = _parsePlcDataToObject.call(this, dataBuffer, subItem, false, addr, dataType.isStructWithoutPackMode1 ? 8 : 1)
 
       if (subItem.arrayData.length > 0) {
         dataBuffer = dataBuffer.slice(subItem.size * subItem.arrayData[0].length)
       } else {
-        dataBuffer = dataBuffer.slice(subItem.size)
+        dataBuffer = dataBuffer.slice(addr.padding + subItem.size)
       }
     }
 
@@ -4139,7 +4138,7 @@ function _parsePlcDataToObject(dataBuffer, dataType, isArraySubItem = false) {
 
         } else {
           //This is the final dimension -> we have actual data
-          result.push(_parsePlcDataToObject.call(this, dataBuffer, dataType, true))
+          result.push(_parsePlcDataToObject.call(this, dataBuffer, dataType, true, addr, packMode))
           dataBuffer = dataBuffer.slice(dataType.size)
         }
       }
@@ -4167,8 +4166,52 @@ function _parsePlcDataToObject(dataBuffer, dataType, isArraySubItem = false) {
 
     //Basic datatype
   } else {
-    output = _parsePlcVariableToJs.call(this, dataBuffer.slice(0, dataType.size), dataType)
-    dataBuffer = dataBuffer.slice(dataType.size)
+    //pack mode padding
+    let padding = 0
+
+
+    if (packMode == 8) {
+      switch (dataType.size) {
+        case 1:
+          padding = 0
+          break;
+      
+          case 2:
+            if(addr.addr % 2 == 0 || addr.addr == 0)
+              padding = 0
+            else {
+              padding += 1
+            }
+            break;
+          
+      
+        case 4:
+          if (addr.addr % 4 == 0 || addr.addr == 0)
+            padding = 0
+          else {
+            while (!((addr.addr + padding)% 4 == 0 || (padding + addr.addr) == 0)) {
+              padding += 1
+              console.log('inc', padding)
+            }
+            
+            console.log('final', padding)
+          }
+          break;
+            
+      }
+    } else {
+      //addr.addr += dataType.size
+    }
+
+    console.log('padding:', padding)
+    addr.addr += padding + dataType.size
+    console.log(dataBuffer.byteLength)
+
+    addr.padding = padding
+    output = _parsePlcVariableToJs.call(this, dataBuffer.slice(padding, padding + dataType.size), dataType)
+
+    console.log('pack-mode:', packMode, '|', addr, dataType.name, dataType.size)
+    dataBuffer = dataBuffer.slice(padding + dataType.size)
   }
 
   return output
