@@ -4103,8 +4103,20 @@ function _parseJsVariableToPlc(value, dataType, dataBuffer) {
  * 
  * @memberof _LibraryInternals
  */
-function _parsePlcDataToObject(dataBuffer, dataType, isArraySubItem = false, addr = { addr: 0 }, packMode = 1) {
+function _parsePlcDataToObject(dataBuffer, dataType, isArraySubItem = false, state = null, packMode = null) {
   let output = null
+
+  if (packMode == null) {
+    packMode = dataType.isStructWithoutPackMode1 ? 8 : 1
+  }
+
+  if (state == null) {
+    state = {
+      currentAddress: 0,
+      previousPadding: 0
+    }
+  }
+
   //Struct or array subitem - Go through each subitem
   if ((dataType.arrayData.length === 0 || isArraySubItem) && dataType.subItems.length > 0) {
     output = {}
@@ -4113,15 +4125,28 @@ function _parsePlcDataToObject(dataBuffer, dataType, isArraySubItem = false, add
       _console.call(this, `WARNING: PLC data type ${dataType.type} is a STRUCT and has no attribute {attribute 'pack_mode' := '1'} above it's definition -> Read data may be corrupted depending on the struct layout. Disable this warning with setting 'disableStructPackModeWarning: true'`)
     }
 
+    let largestDataType = null
     for (const subItem of dataType.subItems) {
-      output[subItem.name] = _parsePlcDataToObject.call(this, dataBuffer, subItem, false, addr, dataType.isStructWithoutPackMode1 ? 8 : 1)
+      output[subItem.name] = _parsePlcDataToObject.call(this, dataBuffer, subItem, false, state, dataType.isStructWithoutPackMode1 ? 8 : 1)
 
       if (subItem.arrayData.length > 0) {
         dataBuffer = dataBuffer.slice(subItem.size * subItem.arrayData[0].length)
       } else {
-        dataBuffer = dataBuffer.slice(addr.padding + subItem.size)
+        //dataBuffer = dataBuffer.slice(subItem.size)
+        dataBuffer = dataBuffer.slice(state.previousPadding + subItem.size)
+      }
+
+      if (largestDataType == null || subItem.size > largestDataType.size) {
+        largestDataType = subItem
       }
     }
+
+    //Add padding to end if required
+    let paddingToAdd = _calculateStructPadding(dataType.isStructWithoutPackMode1 ? 8 : 1, largestDataType, dataType.size)
+
+    state.currentAddress += paddingToAdd
+
+    dataBuffer = dataBuffer.slice(state.currentAddress)
 
   //Array - Go through each array subitem
   } else if (dataType.arrayData.length > 0 && !isArraySubItem) {
@@ -4138,7 +4163,9 @@ function _parsePlcDataToObject(dataBuffer, dataType, isArraySubItem = false, add
 
         } else {
           //This is the final dimension -> we have actual data
-          result.push(_parsePlcDataToObject.call(this, dataBuffer, dataType, true, addr, packMode))
+
+
+          result.push(_parsePlcDataToObject.call(this, dataBuffer, dataType, true, state, packMode))
           dataBuffer = dataBuffer.slice(dataType.size)
         }
       }
@@ -4150,7 +4177,15 @@ function _parsePlcDataToObject(dataBuffer, dataType, isArraySubItem = false, add
     
   //Enumeration (only if we want to convert enumerations to object)
   } else if (dataType.enumInfo && this.settings.objectifyEnumerations && this.settings.objectifyEnumerations === true) {
-    output = _parsePlcVariableToJs.call(this, dataBuffer.slice(0, dataType.size), dataType)
+    
+    
+    //Get padding before data type starts
+    let paddingBefore = _calculateVariablePacking(packMode, dataType, state.currentAddress)
+
+    output = _parsePlcVariableToJs.call(this, dataBuffer.slice(paddingBefore, paddingBefore + dataType.size), dataType)
+
+    
+    //output = _parsePlcVariableToJs.call(this, dataBuffer.slice(0, dataType.size), dataType)
 
     let enumVal = dataType.enumInfo.find(entry => entry.value === output)
     if (enumVal) {
@@ -4162,56 +4197,23 @@ function _parsePlcDataToObject(dataBuffer, dataType, isArraySubItem = false, add
         value: output
       }
     }
-    dataBuffer = dataBuffer.slice(dataType.size)
+
+    dataBuffer = dataBuffer.slice(paddingBefore + dataType.size)
+    state.currentAddress += (paddingBefore + dataType.size)
+    state.previousPadding = paddingBefore
+    //dataBuffer = dataBuffer.slice(dataType.size)
 
     //Basic datatype
   } else {
-    //pack mode padding
-    let padding = 0
 
+    //Get padding before data type starts
+    let paddingBefore = _calculateVariablePacking(packMode, dataType, state.currentAddress)
 
-    if (packMode == 8) {
-      switch (dataType.size) {
-        case 1:
-          padding = 0
-          break;
-      
-          case 2:
-            if(addr.addr % 2 == 0 || addr.addr == 0)
-              padding = 0
-            else {
-              padding += 1
-            }
-            break;
-          
-      
-        case 4:
-          if (addr.addr % 4 == 0 || addr.addr == 0)
-            padding = 0
-          else {
-            while (!((addr.addr + padding)% 4 == 0 || (padding + addr.addr) == 0)) {
-              padding += 1
-              console.log('inc', padding)
-            }
-            
-            console.log('final', padding)
-          }
-          break;
-            
-      }
-    } else {
-      //addr.addr += dataType.size
-    }
+    output = _parsePlcVariableToJs.call(this, dataBuffer.slice(paddingBefore, paddingBefore + dataType.size), dataType)
 
-    console.log('padding:', padding)
-    addr.addr += padding + dataType.size
-    console.log(dataBuffer.byteLength)
-
-    addr.padding = padding
-    output = _parsePlcVariableToJs.call(this, dataBuffer.slice(padding, padding + dataType.size), dataType)
-
-    console.log('pack-mode:', packMode, '|', addr, dataType.name, dataType.size)
-    dataBuffer = dataBuffer.slice(padding + dataType.size)
+    dataBuffer = dataBuffer.slice(paddingBefore + dataType.size)
+    state.currentAddress += (paddingBefore + dataType.size)
+    state.previousPadding = paddingBefore
   }
 
   return output
@@ -4221,6 +4223,60 @@ function _parsePlcDataToObject(dataBuffer, dataType, isArraySubItem = false, add
 
 
 
+function _calculateVariablePacking(packModeAlignment, dataType, startAddress) {
+  let paddingBefore = 0
+
+  if (dataType.size == 0)
+    return 0
+
+  if (dataType.adsDataType === ADS.ADS_DATA_TYPES['ADST_STRING'] || dataType.adsDataType === ADS.ADS_DATA_TYPES['ADST_WSTRING']) {
+    paddingBefore = 0
+
+  } else if (dataType.size <= packModeAlignment) {
+    //If the data type size <= alignment, address is divisible by data type size
+    while ((startAddress + paddingBefore) !== 0 && (startAddress + paddingBefore) % dataType.size !== 0) {
+      paddingBefore++
+    }
+    
+  } else {
+    //If the data type size > alignment, address is divisible by alignment
+    while ((startAddress + paddingBefore) !== 0 && (startAddress + paddingBefore) % packModeAlignment !== 0) {
+      paddingBefore++
+    }
+
+  }
+
+  return paddingBefore
+/*
+  return ({
+    size:dataType.size,
+    paddingBefore,
+    startAddress: startAddress,
+    endAddress: startAddress + paddingBefore + dataType.size
+  })*/
+}
+
+
+
+function _calculateStructPadding(packModeAlignment, largestStructDataType, structSize) {
+  let paddingAfter = 0
+  
+  if (largestStructDataType.size <= packModeAlignment) {
+    //If the largest data type size <= alignment, size is divisible by data type size
+    while ((structSize + paddingAfter) !== 0 && (structSize + paddingAfter) % largestStructDataType.size !== 0) {
+      paddingAfter++
+    }
+    
+  } else {
+    //If the largest data type size > alignment, size is divisible by alignment
+    while ((structSize + paddingAfter) !== 0 && (structSize + paddingAfter) % packModeAlignment !== 0) {
+      paddingAfter++
+    }
+
+  }
+
+  return paddingAfter
+}
 
 
 
@@ -5568,3 +5624,5 @@ function _amsNedIdStrToByteArray(str) {
 
 exports.ADS = ADS
 exports.Client = Client
+exports._calculateVariablePacking = _calculateVariablePacking
+exports._calculateStructPadding = _calculateStructPadding
