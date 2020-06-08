@@ -4118,7 +4118,8 @@ function _parsePlcDataToObject(dataBuffer, dataType, isArraySubItem = false) {
       output[subItem.name] = _parsePlcDataToObject.call(this, dataBuffer, subItem)
 
       if (subItem.arrayData.length > 0) {
-        dataBuffer = dataBuffer.slice(subItem.size * subItem.arrayData[0].length)
+        //Calculate total array size in bytes
+        dataBuffer = dataBuffer.slice(subItem.size * subItem.arrayData.reduce((total, value) => total * value.length, 1))
       } else {
         dataBuffer = dataBuffer.slice(subItem.size)
       }
@@ -4127,11 +4128,11 @@ function _parsePlcDataToObject(dataBuffer, dataType, isArraySubItem = false) {
   //Array - Go through each array subitem
   } else if (dataType.arrayData.length > 0 && !isArraySubItem) {
     output = []
-
+    
     //Recursive parsing of array dimensions
     const parseArray = (arrayDimension) => {
       let result = []
-
+      
       for (let child = 0; child < dataType.arrayData[arrayDimension].length; child++) {
         if (dataType.arrayData[arrayDimension + 1]) {
           //More dimensions available -> go deeper
