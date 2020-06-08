@@ -4107,7 +4107,7 @@ function _parsePlcDataToObject(dataBuffer, dataType, isArraySubItem = false, sta
   let output = null
 
   if (packMode == null) {
-    packMode = dataType.isStructWithoutPackMode1 ? 8 : 1
+    packMode = 8//dataType.isStructWithoutPackMode1 ? 8 : 1
   }
 
   if (state == null) {
@@ -4127,22 +4127,22 @@ function _parsePlcDataToObject(dataBuffer, dataType, isArraySubItem = false, sta
 
     let largestDataType = null
     for (const subItem of dataType.subItems) {
-      output[subItem.name] = _parsePlcDataToObject.call(this, dataBuffer, subItem, false, state, dataType.isStructWithoutPackMode1 ? 8 : 1)
+      output[subItem.name] = _parsePlcDataToObject.call(this, dataBuffer, subItem, false, state, 8)
 
       if (subItem.arrayData.length > 0) {
-        dataBuffer = dataBuffer.slice(subItem.size * subItem.arrayData[0].length)
+        dataBuffer = dataBuffer.slice(state.previousPadding + subItem.size * subItem.arrayData[0].length)
       } else {
         //dataBuffer = dataBuffer.slice(subItem.size)
         dataBuffer = dataBuffer.slice(state.previousPadding + subItem.size)
       }
 
-      if (largestDataType == null || subItem.size > largestDataType.size) {
+      if ((largestDataType == null || subItem.size > largestDataType.size) && subItem.adsDataType !== ADS.ADS_DATA_TYPES['ADST_BIGTYPE'] && subItem.adsDataType !== ADS.ADS_DATA_TYPES['ADST_STRING'] & subItem.adsDataType !== ADS.ADS_DATA_TYPES['ADST_WSTRING']) {
         largestDataType = subItem
       }
     }
 
     //Add padding to end if required
-    let paddingToAdd = _calculateStructPadding(dataType.isStructWithoutPackMode1 ? 8 : 1, largestDataType, dataType.size)
+    let paddingToAdd = _calculateStructPadding(8, largestDataType, state.currentAddress)//dataType.size)
 
     state.currentAddress += paddingToAdd
 
@@ -4166,7 +4166,9 @@ function _parsePlcDataToObject(dataBuffer, dataType, isArraySubItem = false, sta
 
 
           result.push(_parsePlcDataToObject.call(this, dataBuffer, dataType, true, state, packMode))
-          dataBuffer = dataBuffer.slice(dataType.size)
+          //dataBuffer = dataBuffer.slice(dataType.size)
+          dataBuffer = dataBuffer.slice(state.previousPadding + dataType.size)
+           
         }
       }
       return result
