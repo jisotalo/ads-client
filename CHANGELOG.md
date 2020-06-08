@@ -4,7 +4,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.5.1] - 0.05.2020
+## [1.5.1] - 08.05.2020
 ### Changed
 - Fixed a bug that caused reading multi-dimensional arrays to fail if they are part of a struct and not the last struct element ([See issue #10 comment](https://github.com/jisotalo/ads-client/issues/10#issuecomment-640470603))
 
