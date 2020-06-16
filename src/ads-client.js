@@ -59,7 +59,6 @@ class Client {
    * @property {boolean} [readAndCacheSymbols=false] - If true, all PLC symbols are cached during connecting. Otherwise they are read and cached only when needed - Optional (**default**: false)
    * @property {boolean} [readAndCacheDataTypes=false] - If true, all PLC data types are cached during connecting. Otherwise they are read and cached only when needed - Optional (**default**: false)
    * @property {boolean} [disableSymbolVersionMonitoring=false] - If true, PLC symbol version changes aren't monitored and cached symbols and datatypes won't be updated after PLC program download - Optional - Optional (**default**: false)
-   * @property {boolean} [disableStructPackModeWarning=false] - If true, no warnings are shown even if STRUCTs without pack-mode 1 are read/written - Optional (**default**: false)
    * @property {number} [routerTcpPort=48898] - Target ADS router TCP port - Optional (**default**: 48898)
    * @property {string} [routerAddress=localhost] - Target ADS router IP address/hostname - Optional (**default**: localhost)
    * @property {string} [localAddress='(system default)'] - Local IP address to use, use this to change used network interface if required - Optional (**default**: System default)
@@ -88,7 +87,6 @@ class Client {
       readAndCacheSymbols: false,
       readAndCacheDataTypes: false,
       disableSymbolVersionMonitoring: false,
-      disableStructPackModeWarning: false,
       routerTcpPort: 48898,
       routerAddress: 'localhost',
       localAddress: null,
@@ -3939,11 +3937,8 @@ function _parseJsObjectToBuffer(value, dataType, objectPathStr = '', isArraySubI
 
   //Struct or array subitem - Go through each subitem 
   if ((dataType.arrayData.length === 0 || isArraySubItem) && dataType.subItems.length > 0) {
+    buffer = Buffer.alloc(dataType.offset + dataType.size)
 
-    if (dataType.isStructWithoutPackMode1 && !this.settings.disableStructPackModeWarning && !isArraySubItem) {
-      _console.call(this, `WARNING: PLC data type ${dataType.type} is a STRUCT and has no attribute {attribute 'pack_mode' := '1'} above it's definition -> Written data may be corrupted depending on the struct layout. Disable this warning with setting 'disableStructPackModeWarning: true'`)
-    }
-      
     for (const subItem of dataType.subItems) {
       //Try the find the subitem from javascript object
       let key = null
@@ -3973,7 +3968,8 @@ function _parseJsObjectToBuffer(value, dataType, objectPathStr = '', isArraySubI
       const bufferedData = _parseJsObjectToBuffer.call(this, value[key], subItem, `${objectPathStr}.${subItem.name}`)
 
       //Add the subitem data to the buffer
-      buffer = Buffer.concat([buffer, bufferedData]) //TODO: optimize, concat is not a good way
+      bufferedData.copy(buffer, subItem.offset)
+      //buffer = Buffer.concat([buffer, bufferedData]) //TODO: optimize, concat is not a good way
     }
 
   //Array - Go through each array subitem
@@ -4110,20 +4106,13 @@ function _parsePlcDataToObject(dataBuffer, dataType, isArraySubItem = false) {
   if ((dataType.arrayData.length === 0 || isArraySubItem) && dataType.subItems.length > 0) {
     output = {}
 
-    if (dataType.isStructWithoutPackMode1 && !this.settings.disableStructPackModeWarning) {
-      _console.call(this, `WARNING: PLC data type ${dataType.type} is a STRUCT and has no attribute {attribute 'pack_mode' := '1'} above it's definition -> Read data may be corrupted depending on the struct layout. Disable this warning with setting 'disableStructPackModeWarning: true'`)
-    }
+    //First skip the offset 
+    dataBuffer = dataBuffer.slice(dataType.offset)
 
-    for (const subItem of dataType.subItems) {
+    for (const subItem of dataType.subItems) { 
       output[subItem.name] = _parsePlcDataToObject.call(this, dataBuffer, subItem)
-
-      if (subItem.arrayData.length > 0) {
-        //Calculate total array size in bytes
-        dataBuffer = dataBuffer.slice(subItem.size * subItem.arrayData.reduce((total, value) => total * value.length, 1))
-      } else {
-        dataBuffer = dataBuffer.slice(subItem.size)
-      }
     }
+
 
   //Array - Go through each array subitem
   } else if (dataType.arrayData.length > 0 && !isArraySubItem) {
@@ -4152,7 +4141,7 @@ function _parsePlcDataToObject(dataBuffer, dataType, isArraySubItem = false) {
     
   //Enumeration (only if we want to convert enumerations to object)
   } else if (dataType.enumInfo && this.settings.objectifyEnumerations && this.settings.objectifyEnumerations === true) {
-    output = _parsePlcVariableToJs.call(this, dataBuffer.slice(0, dataType.size), dataType)
+    output = _parsePlcVariableToJs.call(this, dataBuffer.slice(dataType.offset, dataType.offset + dataType.size), dataType)
 
     let enumVal = dataType.enumInfo.find(entry => entry.value === output)
     if (enumVal) {
@@ -4164,12 +4153,11 @@ function _parsePlcDataToObject(dataBuffer, dataType, isArraySubItem = false) {
         value: output
       }
     }
-    dataBuffer = dataBuffer.slice(dataType.size)
+    
 
     //Basic datatype
   } else {
-    output = _parsePlcVariableToJs.call(this, dataBuffer.slice(0, dataType.size), dataType)
-    dataBuffer = dataBuffer.slice(dataType.size)
+    output = _parsePlcVariableToJs.call(this, dataBuffer.slice(dataType.offset, dataType.offset + dataType.size), dataType)
   }
 
   return output
@@ -4209,6 +4197,10 @@ function _parsePlcVariableToJs(dataBuffer, dataType) {
     
     //All others ads data types:
     default:
+      if (dataType.type === 'BIT') {
+        let stop = 1
+        return 0
+      }
       return ADS.BASE_DATA_TYPES.fromBuffer(this.settings, dataType.type, dataBuffer)
   }
 }
@@ -4318,18 +4310,16 @@ function _readDataTypeInfo(dataTypeName) {
 
       //If data type has subItems, loop them through
       if (dataType.subItemCount > 0) {
-        //If struct and no pack mode 1, set a flag
-        if (!dataType.attributeCount || dataType.attributeCount === 0 || (dataType.attributes.length > 0 && dataType.attributes.some(attr => attr.name === 'pack_mode' && attr.value === '1') === false)) {
-          parsedDataType.isStructWithoutPackMode1 = true
-        }
       
         for (let i = 0; i < dataType.subItemCount; i++) {
           //Get the actual data type for subItem
           const subItemType = await _getDataTypeRecursive.call(this, dataType.subItems[i].type, false)
-
-          //Take subItems type from it's name (as the name is data type in this case)
+ 
+          //Let's keep some data from the parent
           subItemType.type = subItemType.name
           subItemType.name = dataType.subItems[i].name
+          subItemType.offset = dataType.subItems[i].offset
+          subItemType.comment = dataType.subItems[i].comment
 
           parsedDataType.subItems.push(subItemType)
         }
