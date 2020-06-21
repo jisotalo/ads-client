@@ -3613,9 +3613,9 @@ async function _parseDataType(data) {
   dataType.offset = data.readUInt32LE(pos)
   pos += 4
 
-  //24..27 Data type (AdsDataType)
-  dataType.dataType = data.readUInt32LE(pos)
-  dataType.dataTypeStr = ADS.ADS_DATA_TYPES.toString(dataType.dataType)
+  //24..27 ADS data type (AdsDataType)
+  dataType.adsDataType = data.readUInt32LE(pos)
+  dataType.adsDataTypeStr = ADS.ADS_DATA_TYPES.toString(dataType.adsDataType)
   pos += 4
 
   //27..30 Flags (AdsDataTypeFlags)
@@ -3811,8 +3811,8 @@ function _parseSymbolInfo(data) {
   pos += 4
 
   //16..19 Symbol datatype
-  symbol.dataType = data.readUInt32LE(pos)
-  symbol.dataTypeStr = ADS.ADS_DATA_TYPES.toString(symbol.dataType)
+  symbol.adsDataType = data.readUInt32LE(pos)
+  symbol.adsDataTypeStr = ADS.ADS_DATA_TYPES.toString(symbol.adsDataType)
   pos += 4
 
   //20..21 Flags
@@ -4300,8 +4300,8 @@ function _readDataTypeInfo(dataTypeName) {
         type: dataType.type,
         size: dataType.size,
         offset: dataType.offset,
-        adsDataType: dataType.dataType,
-        adsDataTypeStr: dataType.dataTypeStr,
+        adsDataType: dataType.adsDataType,
+        adsDataTypeStr: dataType.adsDataTypeStr,
         comment: dataType.comment,
         attributes: (dataType.attributes ? dataType.attributes : []),
         arrayData: [],
