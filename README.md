@@ -34,11 +34,11 @@ Coded from scratch using [TwinCAT ADS specification](https://infosys.beckhoff.co
     - [Example: Reading ARRAY OF STRUCT type variable](#example-reading-array-of-struct-type-variable)
     - [Example: Reading FUNCTION BLOCK type variable](#example-reading-function-block-type-variable)
   - [Writing any type PLC variable](#writing-any-type-plc-variable)
-    - [Example: Writing INT type PLC variable](#example-writing-int-type-plc-variable)
-    - [Example: Writing STRING type PLC variable](#example-writing-string-type-plc-variable)
+    - [Example: Writing INT type variable](#example-writing-int-type-variable)
+    - [Example: Writing STRING type variable](#example-writing-string-type-variable)
     - [Example: Writing ENUM type variable](#example-writing-enum-type-variable)
-    - [Example: Writing STRUCT type PLC variable](#example-writing-struct-type-plc-variable)
-    - [Example: Writing STRUCT type PLC variable (with autoFill parameter)](#example-writing-struct-type-plc-variable-with-autofill-parameter)
+    - [Example: Writing STRUCT type variable](#example-writing-struct-type-variable)
+    - [Example: Writing STRUCT type variable (with autoFill parameter)](#example-writing-struct-type-variable-with-autofill-parameter)
     - [Example: Writing ARRAY OF INT type variable](#example-writing-array-of-int-type-variable)
     - [Example: Writing ARRAY of STRUCT type variable](#example-writing-array-of-struct-type-variable)
     - [Example: Writing FUNCTION BLOCK type variable](#example-writing-function-block-type-variable)
@@ -549,7 +549,7 @@ See full `writeSymbol` documentation [from the docs](https://jisotalo.github.io/
 
 ---
 
-### Example: Writing `INT` type PLC variable
+### Example: Writing `INT` type variable
 
 
 ```js
@@ -564,7 +564,7 @@ try {
 
 ---
 
-### Example: Writing `STRING` type PLC variable
+### Example: Writing `STRING` type variable
 
 ```js
 
@@ -598,7 +598,7 @@ try {
 ```
 
 ---
-### Example: Writing `STRUCT` type PLC variable
+### Example: Writing `STRUCT` type variable
 
 ```js
 try {
@@ -615,7 +615,7 @@ try {
 ```
 
 
-### Example: Writing `STRUCT` type PLC variable (with autoFill parameter)
+### Example: Writing `STRUCT` type variable (with autoFill parameter)
 
 ---
 
@@ -716,7 +716,7 @@ try {
 ```
 
 ---
-### Example: Writing `FUNCTION BLOCK` type PLC variable
+### Example: Writing `FUNCTION BLOCK` type variable
 
 Starting a timer from Node.js and setting time to 60 seconds.
 
