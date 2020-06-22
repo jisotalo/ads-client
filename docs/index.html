@@ -71,32 +71,33 @@
 <li><a href="#supported-and-tested-platforms">Supported and tested platforms</a></li>
 <li><a href="#connection-setups-and-possibilities">Connection setups and possibilities</a></li>
 <li><a href="#enabling-localhost-support">Enabling localhost support</a></li>
-<li><a href="#important-note-about-struct-variables">IMPORTANT: Note about STRUCT variables</a></li>
-<li><a href="#important-note-writing-sturct-variables">IMPORTANT: Writing STRUCT variables</a></li>
+<li><a href="#important-writing-struct-variables">IMPORTANT: Writing STRUCT variables</a></li>
 <li><a href="#getting-started">Getting started</a>
 <ul>
 <li><a href="data-types-used-in-getting-started">Data types used in getting started</a></li>
 <li><a href="#creating-a-new-client-instance">Creating a new Client instance</a></li>
 <li><a href="#connecting-and-disconnecting">Connecting and disconnecting</a></li>
-<li><a href="#reading-any-plc-variable">Reading any PLC variable</a>
+<li><a href="#reading-any-type-plc-variable">Reading any type PLC variable</a>
 <ul>
-<li><a href="#reading-int-type-variable">Reading INT type variable</a></li>
-<li><a href="#reading-string-type-variable">Reading STRING type variable</a></li>
-<li><a href="#reading-enum-type-variable">Reading ENUM type variable</a></li>
-<li><a href="#reading-struct-type-variable">Reading STRUCT type variable</a></li>
-<li><a href="#reading-array-of-int-type-variable">Reading ARRAY OF INT type variable</a></li>
-<li><a href="#reading-array-of-struct-type-variable">Reading ARRAY OF STRUCT type variable</a></li>
+<li><a href="#example-reading-int-type-variable">Example: Reading INT type variable</a></li>
+<li><a href="#example-reading-string-type-variable">Example: Reading STRING type variable</a></li>
+<li><a href="#example-reading-enum-type-variable">Example: Reading ENUM type variable</a></li>
+<li><a href="#example-reading-struct-type-variable">Example: Reading STRUCT type variable</a></li>
+<li><a href="#example-reading-array-of-int-type-variable">Example: Reading ARRAY OF INT type variable</a></li>
+<li><a href="#example-reading-array-of-struct-type-variable">Example: Reading ARRAY OF STRUCT type variable</a></li>
+<li><a href="#example-reading-function-block-type-variable">Example: Reading FUNCTION BLOCK type variable</a></li>
 </ul>
 </li>
-<li><a href="#writing-any-plc-variable">Writing any PLC variable</a>
+<li><a href="#writing-any-type-plc-variable">Writing any type PLC variable</a>
 <ul>
-<li><a href="#writing-int-type-plc-variable">Writing INT type PLC variable</a></li>
-<li><a href="#writing-string-type-plc-variable">Writing STRING type PLC variable</a></li>
-<li><a href="#writing-enum-type-variable">Writing ENUM type variable</a></li>
-<li><a href="#writing-struct-type-plc-variable">Writing STRUCT type PLC variable</a></li>
-<li><a href="#writing-struct-type-plc-variable-with-autofill-parameter">Writing STRUCT type PLC variable (with autoFill parameter)</a></li>
-<li><a href="#writing-array-of-int-type-variable">Writing ARRAY OF INT type variable</a></li>
-<li><a href="#writing-array-of-struct-type-variable">Writing ARRAY of STRUCT type variable</a></li>
+<li><a href="#example-writing-int-type-plc-variable">Example: Writing INT type PLC variable</a></li>
+<li><a href="#example-writing-string-type-plc-variable">Example: Writing STRING type PLC variable</a></li>
+<li><a href="#example-writing-enum-type-variable">Example: Writing ENUM type variable</a></li>
+<li><a href="#example-writing-struct-type-plc-variable">Example: Writing STRUCT type PLC variable</a></li>
+<li><a href="#example-writing-struct-type-plc-variable-with-autofill-parameter">Example: Writing STRUCT type PLC variable (with autoFill parameter)</a></li>
+<li><a href="#example-writing-array-of-int-type-variable">Example: Writing ARRAY OF INT type variable</a></li>
+<li><a href="#example-writing-array-of-struct-type-variable">Example: Writing ARRAY of STRUCT type variable</a></li>
+<li><a href="#example-writing-function-block-type-variable">Example: Writing FUNCTION BLOCK type variable</a></li>
 </ul>
 </li>
 <li><a href="#subscribing-to-plc-variables-device-notifications">Subscribing to PLC variables (device notifications)</a>
@@ -146,6 +147,12 @@
 <li>Reading PLC runtime and system manager states</li>
 <li>Automatic 32/64 bit variable support (PVOID, XINT, etc.)</li>
 <li>Automatic cache and subscription refreshing when PLC program changes or system starts</li>
+<li>Automatic byte alignment support (all pack-modes automatically supported)
+<ul>
+<li><strong>From version 1.6.0 upwards</strong></li>
+<li>Older versions: <code>{attribute 'pack_mode' := '1'}</code> is required above STRUCT definition</li>
+</ul>
+</li>
 </ul>
 <h1 id="supported-and-tested-platforms">Supported and tested platforms</h1>
 <p>The ads-client package is tested so far with the following setups:</p>
@@ -154,7 +161,11 @@
 <li>TwinCAT 3 4022.27 running on 64bit Windows 10</li>
 <li>TwinCAT 3 4024.4 running on 64bit Windows 10</li>
 <li>TwinCAT 3 4022.27 running on 64bit Windows 7 Embedded @ Beckhoff PLC</li>
-<li>Node.js v10.16.3 and newer</li>
+<li>Node.js v10.16.3 and newer
+<ul>
+<li>NOTE: 64 bit integer values are supported only with Node.js v.12+</li>
+</ul>
+</li>
 </ul>
 <h1 id="connection-setups-and-possibilities">Connection setups and possibilities</h1>
 <p>The ads-client can be used in different system configurations. The following figure has different possible setups:</p>
@@ -284,25 +295,9 @@ HKEY_LOCAL_MACHINE\SOFTWARE\WOW6432Node\Beckhoff\TwinCAT3\System\
 <li>Restart TwinCAT system</li>
 </ol>
 <p>Now you can connect to the localhost using <code>targetAmsNetId</code> address of <code>127.0.0.1.1.1</code> or <code>localhost</code>.</p>
-<h1 id="important%3A-note-about-struct-variables">IMPORTANT: Note about STRUCT variables</h1>
-<p>At the moment all structs need to have attribute <code>{attribute 'pack_mode' := '1'}</code> above the definition. This forces the TwinCAT to use 1-byte variable alignment.</p>
-<pre class="prettyprint source"><code>{attribute 'pack_mode' := '1'}
-TYPE ST_Example :
-STRUCT
-	SomeText : STRING(50) := 'Hello ads-client';
-	SomeReal : REAL := 3.14159265359;
-END_STRUCT
-END_TYPE
-</code></pre>
-<p>If the attribute is not found, the library will print a warning to the console:</p>
-<pre class="prettyprint source"><code>ads-client: WARNING: PLC data type ST_Example is a STRUCT and has no attribute {attribute 'pack_mode' := '1'} above it's definition -> Read data may be corrupted depending on the struct layout. Disable this warning with setting 'disableStructPackModeWarning: true'
-</code></pre>
-<p>The warning can be hidden using setting <code>'disableStructPackModeWarning: true'</code>. If the pack-mode is not defined, reading or writing data will cause corrupted data in some cases.</p>
-<p>See <a href="https://github.com/jisotalo/ads-client/issues/13">this GitHub issue</a> for developing support for TwinCAT 3 default byte alignment.</p>
-<hr>
 <h1 id="important%3A-writing-struct-variables">IMPORTANT: Writing STRUCT variables</h1>
-<p>When writing a struct using <code>writeSymbol</code>, the given Javascript object keys are handled as case-insensitive because the TwinCAT 3 system is <strong>case-insensitive</strong>.</p>
-<p>Basically this means that the following Javascript objects are used as-equals if passing to the <code>writeSymbol</code> method:</p>
+<p>When writing a struct using <code>writeSymbol</code>, the given Javascript object keys are handled as case-insensitive because the TwinCAT 3 system is case-insensitive.</p>
+<p>In practise this means that the following Javascript objects are used as-equals if passing to the <code>writeSymbol</code> method:</p>
 <pre class="prettyprint source lang-js"><code>{
   sometext: 'hello',
   somereal: 3.14
@@ -326,18 +321,18 @@ END_TYPE
 <p>These examples assume that the PLC has the following Global Variable List (GVL):</p>
 <pre class="prettyprint source"><code>//GVL_Test
 VAR_GLOBAL
-	TestINT         	: INT := 1234;
-	TestSTRING 	    	: STRING := 'Hello this is a test string';
-	ExampleSTRUCT   	: ST_Example;
-	TestARRAY  			: ARRAY[0..4] OF INT := [0, 10, 200, 3000, 4000];
-	TestARRAY2			: ARRAY[0..4] OF ST_Example := [(SomeText := 'Just for demo purposes')];
-	TestENUM  			: E_TestEnum := E_TestEnum.Running;
-	IncrementingValue 	: INT; //This should change every 500 ms or so
+  TestINT           : INT := 1234;
+  TestSTRING        : STRING := 'Hello this is a test string';
+  ExampleSTRUCT     : ST_Example;
+  TestARRAY         : ARRAY[0..4] OF INT := [0, 10, 200, 3000, 4000];
+  TestARRAY2        : ARRAY[0..4] OF ST_Example := [(SomeText := 'Just for demo purposes')];
+  TestENUM          : E_TestEnum := E_TestEnum.Running;
+  IncrementingValue : INT; //This should change every 500 ms or so
+  TestTimer         : TON := (PT := T#2S500MS);
 END_VAR
 </code></pre>
 <p>The <code>ST_Example</code> should be defined as below:</p>
-<pre class="prettyprint source"><code>{attribute 'pack_mode' := '1'}
-TYPE ST_Example :
+<pre class="prettyprint source"><code>TYPE ST_Example :
 STRUCT
 	SomeText : STRING(50) := 'Hello ads-client';
 	SomeReal : REAL := 3.14159265359;
@@ -397,10 +392,10 @@ Router assigned us AmsNetId 192.168.1.1.1.1 and port 36837
 Disconnected
 */
 </code></pre>
-<h2 id="reading-any-plc-variable">Reading any PLC variable</h2>
-<p>By using <code>readSymbol</code> method we can read all kind of types from the PLC, including base type variables, structs, arrays and so on. These examples cover just a few cases.</p>
+<h2 id="reading-any-type-plc-variable">Reading any type PLC variable</h2>
+<p>Using <code>readSymbol</code> method it is possible to read variables of <strong>any type</strong> from the PLC. These include base scalar type variables, structs, function blocks, arrays and so on. These examples cover just a few cases.</p>
 <p>See full <code>readSymbol</code> documentation <a href="https://jisotalo.github.io/ads-client/Client.html#readSymbol">from the docs</a>.</p>
-<h3 id="reading-int-type-variable">Reading <code>INT</code> type variable</h3>
+<h3 id="example%3A-reading-int-type-variable">Example: Reading <code>INT</code> type variable</h3>
 <pre class="prettyprint source lang-js"><code>//Using Promises
 client.readSymbol('GVL_Test.TestSTRING')
   .then(res => {
@@ -417,7 +412,7 @@ Value read: 1234
 */
 </code></pre>
 <hr>
-<h3 id="reading-string-type-variable">Reading <code>STRING</code> type variable</h3>
+<h3 id="example%3A-reading-string-type-variable">Example: Reading <code>STRING</code> type variable</h3>
 <pre class="prettyprint source lang-js"><code>client.readSymbol('GVL_Test.TestSTRING')
   .then(res => {
     console.log(`Value read: ${res.value}`)
@@ -432,8 +427,8 @@ Value read: Hello this is a test string
 */
 </code></pre>
 <hr>
-<h3 id="reading-enum-type-variable">Reading <code>ENUM</code> type variable</h3>
-<p>If <code>objectifyEnumerations</code> is set to false, only ENUM value (number) is returned.</p>
+<h3 id="example%3A-reading-enum-type-variable">Example: Reading <code>ENUM</code> type variable</h3>
+<p>If setting <code>objectifyEnumerations</code> is set to false, only ENUM value (number) is returned. As default, both string representation and integer value are returned.</p>
 <pre class="prettyprint source lang-js"><code>//objectifyEnumerations: true
 client.readSymbol('GVL_Test.TestENUM')
   .then(res => {
@@ -450,8 +445,7 @@ Value read: { name: 'Running', value: 100 }
 */
 </code></pre>
 <hr>
-<h3 id="reading-struct-type-variable">Reading <code>STRUCT</code> type variable</h3>
-<p><strong>IMPORTANT NOTE:</strong> See chapter <a href="#IMPORTANT-Note-about-STRUCT-variables">IMPORTANT: Note about STRUCT variables</a></p>
+<h3 id="example%3A-reading-struct-type-variable">Example: Reading <code>STRUCT</code> type variable</h3>
 <pre class="prettyprint source lang-js"><code>//Using await for example purposes
 try {
   const res = await client.readSymbol('GVL_Test.ExampleSTRUCT')
@@ -470,7 +464,7 @@ Value read: { SomeText: 'Hello ads-client',
 */
 </code></pre>
 <hr>
-<h3 id="reading-array-of-int-type-variable">Reading <code>ARRAY OF INT</code> type variable</h3>
+<h3 id="example%3A-reading-array-of-int-type-variable">Example: Reading <code>ARRAY OF INT</code> type variable</h3>
 <pre class="prettyprint source lang-js"><code>try {
   const res = await client.readSymbol('GVL_Test.TestARRAY')
 
@@ -486,7 +480,7 @@ Value read: [ 0, 10, 200, 3000, 4000 ]
 */
 </code></pre>
 <hr>
-<h3 id="reading-array-of-struct-type-variable">Reading <code>ARRAY OF STRUCT</code> type variable</h3>
+<h3 id="example%3A-reading-array-of-struct-type-variable">Example: Reading <code>ARRAY OF STRUCT</code> type variable</h3>
 <pre class="prettyprint source lang-javascript"><code>try {
   const res = await client.readSymbol('GVL_Test.TestARRAY2')
 
@@ -516,11 +510,28 @@ Value read: [ { SomeText: 'Just for demo purposes',
 */
 </code></pre>
 <hr>
-<h2 id="writing-any-plc-variable">Writing any PLC variable</h2>
-<p>By using <code>writeSymbol</code> method we can write all kind of types to the PLC, including base type variables, structs, arrays and so on. These examples cover just a few cases.</p>
+<h3 id="example%3A-reading-function-block-type-variable">Example: Reading <code>FUNCTION BLOCK</code> type variable</h3>
+<p>Example of reading <code>TON</code> timer function block.</p>
+<pre class="prettyprint source lang-javascript"><code>try {
+  const res = await client.readSymbol('GVL_Test.TestTimer')
+
+  console.log('Value read:', res.value)
+} catch (err) {
+  console.log('Reading failed:', err)
+}
+
+/*
+Example console output:
+
+Value read: { IN: false, PT: 2500, Q: false, ET: 0, M: false, StartTime: 0 }
+*/
+</code></pre>
+<hr>
+<h2 id="writing-any-type-plc-variable">Writing any type PLC variable</h2>
+<p>Using <code>writeSymbol</code> method it is possible to write variables of <strong>any type</strong> to the PLC. These include base scalar type variables, structs, function blocks, arrays and so on. These examples cover just a few cases.</p>
 <p>See full <code>writeSymbol</code> documentation <a href="https://jisotalo.github.io/ads-client/Client.html#writeSymbol">from the docs</a>.</p>
 <hr>
-<h3 id="writing-int-type-plc-variable">Writing <code>INT</code> type PLC variable</h3>
+<h3 id="example%3A-writing-int-type-plc-variable">Example: Writing <code>INT</code> type PLC variable</h3>
 <pre class="prettyprint source lang-js"><code>try {
   const res = await client.writeSymbol('GVL_Test.TestINT', 5)
 
@@ -530,7 +541,7 @@ Value read: [ { SomeText: 'Just for demo purposes',
 }
 </code></pre>
 <hr>
-<h3 id="writing-string-type-plc-variable">Writing <code>STRING</code> type PLC variable</h3>
+<h3 id="example%3A-writing-string-type-plc-variable">Example: Writing <code>STRING</code> type PLC variable</h3>
 <pre class="prettyprint source lang-js"><code>
 try {
   const res = await client.writeSymbol('GVL_Test.TestSTRING', 'Changing the string value to this')
@@ -541,7 +552,7 @@ try {
 }
 </code></pre>
 <hr>
-<h3 id="writing-enum-type-variable">Writing <code>ENUM</code> type variable</h3>
+<h3 id="example%3A-writing-enum-type-variable">Example: Writing <code>ENUM</code> type variable</h3>
 <p>When writing <code>ENUM</code> value, it can always be given as number or string.</p>
 <pre class="prettyprint source lang-js"><code>try {
   const res = await client.writeSymbol('GVL_Test.TestENUM', 'Starting')
@@ -554,8 +565,7 @@ try {
 }
 </code></pre>
 <hr>
-<h3 id="writing-struct-type-plc-variable">Writing <code>STRUCT</code> type PLC variable</h3>
-<p><strong>IMPORTANT NOTE:</strong> See chapter <a href="#IMPORTANT-Note-about-STRUCT-variables">IMPORTANT: Note about STRUCT variables</a></p>
+<h3 id="example%3A-writing-struct-type-plc-variable">Example: Writing <code>STRUCT</code> type PLC variable</h3>
 <pre class="prettyprint source lang-js"><code>try {
   const res = await client.writeSymbol('GVL_Test.ExampleSTRUCT', {
     SomeText: 'Hello to you too, Mr. PLC!',
@@ -568,9 +578,8 @@ try {
   console.log('Something failed:', err)
 }
 </code></pre>
-<h3 id="writing-struct-type-plc-variable-(with-autofill-parameter)">Writing <code>STRUCT</code> type PLC variable (with autoFill parameter)</h3>
+<h3 id="example%3A-writing-struct-type-plc-variable-(with-autofill-parameter)">Example: Writing <code>STRUCT</code> type PLC variable (with autoFill parameter)</h3>
 <hr>
-<p><strong>IMPORTANT NOTE:</strong> See chapter <a href="#IMPORTANT-Note-about-STRUCT-variables">IMPORTANT: Note about STRUCT variables</a></p>
 <p>The following code will not work. The PLC struct has three members but we provide only two, which causes an exception.</p>
 <pre class="prettyprint source lang-js"><code>//NOTE: This won't work
 try {
@@ -590,7 +599,7 @@ Something failed: { ClientException: Writing symbol GVL_Test.ExampleSTRUCT faile
     at Promise ...
 */
 </code></pre>
-<p>We need to tell the <code>WriteSymbol</code> that we <em>indeed</em> want to write just some members and the rest will stay the same. This happens by setting the 3rd parameter <code>autoFill</code> to true.</p>
+<p>We need to tell the <code>WriteSymbol</code> that we <strong>indeed</strong> want to write just some members and the rest will stay the same. This happens by setting the 3rd parameter <code>autoFill</code> to true.</p>
 <p>If <code>autoFill</code> is true, the method first reads the latest value and then writes it with only the new given changes.</p>
 <pre class="prettyprint source lang-js"><code>try {
   const res = await client.writeSymbol('GVL_Test.ExampleSTRUCT', {
@@ -609,7 +618,7 @@ Something failed: { ClientException: Writing symbol GVL_Test.ExampleSTRUCT faile
 res = await client.writeSymbol('GVL_Test.ExampleSTRUCT.SomeText', 'This is also possible')
 </code></pre>
 <hr>
-<h3 id="writing-array-of-int-type-variable">Writing <code>ARRAY OF INT</code> type variable</h3>
+<h3 id="example%3A-writing-array-of-int-type-variable">Example: Writing <code>ARRAY OF INT</code> type variable</h3>
 <pre class="prettyprint source lang-js"><code>try {
   const res = await client.writeSymbol('GVL_Test.TestArray', [9999, 8888, 6666, 5555, 4444])
 
@@ -621,7 +630,7 @@ res = await client.writeSymbol('GVL_Test.ExampleSTRUCT.SomeText', 'This is also 
 }
 </code></pre>
 <hr>
-<h3 id="writing-array-of-struct-type-variable">Writing <code>ARRAY of STRUCT</code> type variable</h3>
+<h3 id="example%3A-writing-array-of-struct-type-variable">Example: Writing <code>ARRAY of STRUCT</code> type variable</h3>
 <pre class="prettyprint source lang-js"><code>try {
   const res = await client.writeSymbol('GVL_Test.TestArray', 
     [ { SomeText: 'First value',
@@ -647,6 +656,27 @@ res = await client.writeSymbol('GVL_Test.ExampleSTRUCT.SomeText', 'This is also 
   console.log('Something failed:', err)
   return
 }
+</code></pre>
+<hr>
+<h3 id="example%3A-writing-function-block-type-plc-variable">Example: Writing <code>FUNCTION BLOCK</code> type PLC variable</h3>
+<p>Starting a timer from Node.js and setting time to 60 seconds.</p>
+<p><strong>NOTE:</strong> Using autoFill parameter to keep the rest as-is.</p>
+<pre class="prettyprint source lang-js"><code>try {
+  const res = await client.writeSymbol('GVL_Test.TestTimer', {
+    IN: true, 
+    PT: 60000,
+  }, true)
+
+  console.log('Value written:', res.value)
+} catch (err) {
+  console.log('Something failed:', err)
+}
+
+/*
+Example console output
+
+Value written: { IN: true, PT: 60000, Q: false, ET: 0, M: false, StartTime: 0 }
+*/
 </code></pre>
 <h2 id="subscribing-to-plc-variables-(device-notifications)">Subscribing to PLC variables (device notifications)</h2>
 <p>By using <code>subscribe</code> method, we can receive variable values automatically from the PLC if they change or periodically.</p>
@@ -898,7 +928,8 @@ await client.restartPlc(852) //Restart the PLC from ADS port 852
 </code></pre>
 <p><strong>Reading the PLC state</strong></p>
 <p>The PLC runtime state can always be read using <code>readPlcRuntimeState()</code> and the latest known state of PLC runtime at <code>settings.targetAdsPort</code> is located in <code>metaData.plcRuntimeState</code>.</p>
-<pre class="prettyprint source lang-js"><code>await client.readPlcRuntimeState() //{ adsState: 5, adsStateStr: 'Run', deviceState: 0 }
+<pre class="prettyprint source lang-js"><code>await client.readPlcRuntimeState() //Read PLC runtime status from settings.targetAdsPort 
+//Example result: { adsState: 5, adsStateStr: 'Run', deviceState: 0 }
 await client.readPlcRuntimeState(852) //Read PLC runtime status from ADS port 852
 </code></pre>
 <h2 id="starting-and-stopping-the-twincat-system">Starting and stopping the TwinCAT system</h2>
@@ -992,7 +1023,7 @@ SOFTWARE.</p></article>
 <br class="clear">
 
 <footer>
-    Documentation generated by <a href="https://github.com/jsdoc3/jsdoc">JSDoc 3.6.4</a> on Sat May 30 2020 10:24:24 GMT+0300 (GMT+03:00) using the <a href="https://github.com/clenemt/docdash">docdash</a> theme.
+    Documentation generated by <a href="https://github.com/jsdoc3/jsdoc">JSDoc 3.6.4</a> on Mon Jun 22 2020 19:24:18 GMT+0300 (GMT+03:00) using the <a href="https://github.com/clenemt/docdash">docdash</a> theme.
 </footer>
 
 <script>prettyPrint();</script>

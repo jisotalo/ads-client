@@ -989,7 +989,7 @@ const BASE_DATA_TYPES = {
       },
       fromBuffer: buffer => {
         if (buffer.readBigInt64LE)
-          return buffer.readBigInt64LE(0)
+          return buffer.readBigUInt64LE(0)
         else
           return buffer
       }

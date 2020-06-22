@@ -4,6 +4,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.6.0] - 22.06.2020
+### Added
+- Automatic support for all kinds of byte alignments ([See issue #13](https://github.com/jisotalo/ads-client/issues/13))
+  - Pragma `{attribute 'pack_mode' := '1'}` above STRUCT is no more needed 
+  - Reading any TwinCAT variable without changes is now possible
+
+### Changed
+- `readAndCacheDataTypes()`: Changed ADS data type variables (`dataType`, `dataTypeStr`) to `adsDataType` and `adsDataTypeStr` ([See issue #36](https://github.com/jisotalo/ads-client/issues/36))
+  - Now all PLC data type objects have the same object layout
+- Bug fix: Fixed bug that caused reading a `ULINT` to fail
+- Changed default `subscribe()` cycle time from 250 ms to 10 ms 
+    - Usually a notification is wanted always when the value chages
+    - The default TwinCAT 3 cycle time is 10 ms
+    - User can always provide different cycle time if required, but usually it just tries the default value -> less "bug" reports about variable notifications missing
+    
 ## [1.5.1] - 08.06.2020
 ### Changed
 - Fixed a bug that caused reading multi-dimensional arrays to fail if they are part of a struct and not the last struct element ([See issue #10 comment](https://github.com/jisotalo/ads-client/issues/10#issuecomment-640470603))
