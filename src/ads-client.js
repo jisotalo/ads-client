@@ -3969,7 +3969,6 @@ function _parseJsObjectToBuffer(value, dataType, objectPathStr = '', isArraySubI
 
       //Add the subitem data to the buffer
       bufferedData.copy(buffer, subItem.offset)
-      //buffer = Buffer.concat([buffer, bufferedData]) //TODO: optimize, concat is not a good way
     }
 
   //Array - Go through each array subitem
@@ -4197,10 +4196,6 @@ function _parsePlcVariableToJs(dataBuffer, dataType) {
     
     //All others ads data types:
     default:
-      if (dataType.type === 'BIT') {
-        let stop = 1
-        return 0
-      }
       return ADS.BASE_DATA_TYPES.fromBuffer(this.settings, dataType.type, dataBuffer)
   }
 }
