@@ -1260,7 +1260,7 @@ class Client {
    * 
    * @param {string} variableName Variable name in the PLC (full path) - Example: 'MAIN.SomeStruct.SomeValue' 
    * @param {subscriptionCallback} callback - Callback function that is called when notification is received
-   * @param {number} cycleTime - How often the PLC checks for value changes (milliseconds) - Default 250 ms
+   * @param {number} cycleTime - How often the PLC checks for value changes (milliseconds) - Default 10 ms
    * @param {boolean} onChange - If true (default), PLC sends the notification only when value has changed. If false, the value is sent every cycleTime milliseconds
    * @param {number} initialDelay - How long the PLC waits for sending the value - default 0 ms (immediately)
    * 
@@ -1268,7 +1268,7 @@ class Client {
    * - If resolved, subscribing is successful and notification data is returned (object)
    * - If rejected, subscribing failed and error info is returned (object)
    */
-  subscribe(variableName, callback, cycleTime = 250, onChange = true, initialDelay = 0) {
+  subscribe(variableName, callback, cycleTime = 10, onChange = true, initialDelay = 0) {
     return new Promise(async (resolve, reject) => {
       debug(`subscribe(): Subscribing to ${variableName}`)
 
@@ -1297,7 +1297,7 @@ class Client {
    * @param {number} indexOffset - Variable index offset in the PLC
    * @param {number} size - Variable size in the PLC (enter 0xFFFFFFFF if not known)
    * @param {subscriptionCallback} callback - Callback function that is called when notification is received
-   * @param {number} cycleTime - How often the PLC checks for value changes (milliseconds) - Default 250 ms
+   * @param {number} cycleTime - How often the PLC checks for value changes (milliseconds) - Default 10 ms
    * @param {boolean} onChange - If true (default), PLC sends the notification only when value has changed. If false, the value is sent every cycleTime milliseconds
    * @param {number} initialDelay - How long the PLC waits for sending the value - default 0 ms (immediately)
    * 
@@ -1305,7 +1305,7 @@ class Client {
    * - If resolved, subscribing is successful and notification data is returned (object)
    * - If rejected, subscribing failed and error info is returned (object)
    */
-  subscribeRaw(indexGroup, indexOffset, size, callback, cycleTime = 250, onChange = true, initialDelay = 0) {
+  subscribeRaw(indexGroup, indexOffset, size, callback, cycleTime = 10, onChange = true, initialDelay = 0) {
     return new Promise(async (resolve, reject) => {
       const target = {
         indexGroup,

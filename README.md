@@ -20,27 +20,28 @@ Coded from scratch using [TwinCAT ADS specification](https://infosys.beckhoff.co
 - [Supported and tested platforms](#supported-and-tested-platforms)
 - [Connection setups and possibilities](#connection-setups-and-possibilities)
 - [Enabling localhost support](#enabling-localhost-support)
-- [IMPORTANT: Note about STRUCT variables](#important-note-about-struct-variables)
 - [IMPORTANT: Writing STRUCT variables](#important-writing-struct-variables)
 - [Getting started](#getting-started)
   - [Data types used in getting started](data-types-used-in-getting-started)
   - [Creating a new Client instance](#creating-a-new-client-instance)
   - [Connecting and disconnecting](#connecting-and-disconnecting)
-  - [Reading any PLC variable](#reading-any-plc-variable)
-    - [Reading INT type variable](#reading-int-type-variable)
-    - [Reading STRING type variable](#reading-string-type-variable)
-    - [Reading ENUM type variable](#reading-enum-type-variable)
-    - [Reading STRUCT type variable](#reading-struct-type-variable)
-    - [Reading ARRAY OF INT type variable](#reading-array-of-int-type-variable)
-    - [Reading ARRAY OF STRUCT type variable](#reading-array-of-struct-type-variable)
-  - [Writing any PLC variable](#writing-any-plc-variable)
-    - [Writing INT type PLC variable](#writing-int-type-plc-variable)
-    - [Writing STRING type PLC variable](#writing-string-type-plc-variable)
-    - [Writing ENUM type variable](#writing-enum-type-variable)
-    - [Writing STRUCT type PLC variable](#writing-struct-type-plc-variable)
-    - [Writing STRUCT type PLC variable (with autoFill parameter)](#writing-struct-type-plc-variable-with-autofill-parameter)
-    - [Writing ARRAY OF INT type variable](#writing-array-of-int-type-variable)
-    - [Writing ARRAY of STRUCT type variable](#writing-array-of-struct-type-variable)
+  - [Reading any type PLC variable](#reading-any-type-plc-variable)
+    - [Example: Reading INT type variable](#example-reading-int-type-variable)
+    - [Example: Reading STRING type variable](#example-reading-string-type-variable)
+    - [Example: Reading ENUM type variable](#example-reading-enum-type-variable)
+    - [Example: Reading STRUCT type variable](#example-reading-struct-type-variable)
+    - [Example: Reading ARRAY OF INT type variable](#example-reading-array-of-int-type-variable)
+    - [Example: Reading ARRAY OF STRUCT type variable](#example-reading-array-of-struct-type-variable)
+    - [Example: Reading FUNCTION BLOCK type variable](#example-reading-function-block-type-variable)
+  - [Writing any type PLC variable](#writing-any-type-plc-variable)
+    - [Example: Writing INT type PLC variable](#example-writing-int-type-plc-variable)
+    - [Example: Writing STRING type PLC variable](#example-writing-string-type-plc-variable)
+    - [Example: Writing ENUM type variable](#example-writing-enum-type-variable)
+    - [Example: Writing STRUCT type PLC variable](#example-writing-struct-type-plc-variable)
+    - [Example: Writing STRUCT type PLC variable (with autoFill parameter)](#example-writing-struct-type-plc-variable-with-autofill-parameter)
+    - [Example: Writing ARRAY OF INT type variable](#example-writing-array-of-int-type-variable)
+    - [Example: Writing ARRAY of STRUCT type variable](#example-writing-array-of-struct-type-variable)
+    - [Example: Writing FUNCTION BLOCK type variable](#example-writing-function-block-type-variable)
   - [Subscribing to PLC variables (device notifications)](#subscribing-to-plc-variables-device-notifications)
     - [Subcribe to variable value (on-change)](#subcribe-to-variable-value-on-change)
     - [Subcribe to variable value (cyclic)](#subcribe-to-variable-value-cyclic)
@@ -85,6 +86,9 @@ const ads = require('ads-client')
 - Reading PLC runtime and system manager states
 - Automatic 32/64 bit variable support (PVOID, XINT, etc.)
 - Automatic cache and subscription refreshing when PLC program changes or system starts
+- Automatic byte alignment support (all pack-modes automatically supported) 
+  - **From version 1.6.0 upwards**
+  - Older versions: `{attribute 'pack_mode' := '1'}` is required above STRUCT definition
 
 
 
@@ -96,6 +100,7 @@ The ads-client package is tested so far with the following setups:
   - TwinCAT 3 4024.4 running on 64bit Windows 10
   - TwinCAT 3 4022.27 running on 64bit Windows 7 Embedded @ Beckhoff PLC
   - Node.js v10.16.3 and newer
+    - NOTE: 64 bit integer values are supported only with Node.js v.12+
 
 
 # Connection setups and possibilities
@@ -232,33 +237,11 @@ HKEY_LOCAL_MACHINE\SOFTWARE\WOW6432Node\Beckhoff\TwinCAT3\System\
 
 Now you can connect to the localhost using `targetAmsNetId` address of `127.0.0.1.1.1` or `localhost`.
 
-# IMPORTANT: Note about STRUCT variables
-
-At the moment all structs need to have attribute `{attribute 'pack_mode' := '1'}` above the definition. This forces the TwinCAT to use 1-byte variable alignment.
-```
-{attribute 'pack_mode' := '1'}
-TYPE ST_Example :
-STRUCT
-	SomeText : STRING(50) := 'Hello ads-client';
-	SomeReal : REAL := 3.14159265359;
-END_STRUCT
-END_TYPE
-```
-
-If the attribute is not found, the library will print a warning to the console:
-```
-ads-client: WARNING: PLC data type ST_Example is a STRUCT and has no attribute {attribute 'pack_mode' := '1'} above it's definition -> Read data may be corrupted depending on the struct layout. Disable this warning with setting 'disableStructPackModeWarning: true'
-```
-The warning can be hidden using setting `'disableStructPackModeWarning: true'`. If the pack-mode is not defined, reading or writing data will cause corrupted data in some cases.
-
-See [this GitHub issue](https://github.com/jisotalo/ads-client/issues/13) for developing support for TwinCAT 3 default byte alignment.
-
----
 # IMPORTANT: Writing STRUCT variables
 
-When writing a struct using `writeSymbol`, the given Javascript object keys are handled as case-insensitive because the TwinCAT 3 system is **case-insensitive**.
+When writing a struct using `writeSymbol`, the given Javascript object keys are handled as case-insensitive because the TwinCAT 3 system is case-insensitive.
 
-Basically this means that the following Javascript objects are used as-equals if passing to the `writeSymbol` method:
+In practise this means that the following Javascript objects are used as-equals if passing to the `writeSymbol` method:
 
 ```js
 {
@@ -295,19 +278,19 @@ These examples assume that the PLC has the following Global Variable List (GVL):
 ```
 //GVL_Test
 VAR_GLOBAL
-	TestINT         	: INT := 1234;
-	TestSTRING 	    	: STRING := 'Hello this is a test string';
-	ExampleSTRUCT   	: ST_Example;
-	TestARRAY  			: ARRAY[0..4] OF INT := [0, 10, 200, 3000, 4000];
-	TestARRAY2			: ARRAY[0..4] OF ST_Example := [(SomeText := 'Just for demo purposes')];
-	TestENUM  			: E_TestEnum := E_TestEnum.Running;
-	IncrementingValue 	: INT; //This should change every 500 ms or so
+  TestINT           : INT := 1234;
+  TestSTRING        : STRING := 'Hello this is a test string';
+  ExampleSTRUCT     : ST_Example;
+  TestARRAY         : ARRAY[0..4] OF INT := [0, 10, 200, 3000, 4000];
+  TestARRAY2        : ARRAY[0..4] OF ST_Example := [(SomeText := 'Just for demo purposes')];
+  TestENUM          : E_TestEnum := E_TestEnum.Running;
+  IncrementingValue : INT; //This should change every 500 ms or so
+  TestTimer         : TON := (PT := T#2S500MS);
 END_VAR
 ```
 
 The `ST_Example` should be defined as below:
 ```
-{attribute 'pack_mode' := '1'}
 TYPE ST_Example :
 STRUCT
 	SomeText : STRING(50) := 'Hello ads-client';
@@ -382,13 +365,13 @@ Disconnected
 ```
 
 
-## Reading any PLC variable
+## Reading any type PLC variable
 
-By using `readSymbol` method we can read all kind of types from the PLC, including base type variables, structs, arrays and so on. These examples cover just a few cases.
+Using `readSymbol` method it is possible to read variables of **any type** from the PLC. These include base scalar type variables, structs, function blocks, arrays and so on. These examples cover just a few cases.
 
 See full `readSymbol` documentation [from the docs](https://jisotalo.github.io/ads-client/Client.html#readSymbol).
 
-### Reading `INT` type variable
+### Example: Reading `INT` type variable
 ```js
 //Using Promises
 client.readSymbol('GVL_Test.TestSTRING')
@@ -408,7 +391,7 @@ Value read: 1234
 
 ---
 
-### Reading `STRING` type variable
+### Example: Reading `STRING` type variable
 ```js
 client.readSymbol('GVL_Test.TestSTRING')
   .then(res => {
@@ -428,9 +411,9 @@ Value read: Hello this is a test string
 
 
 
-### Reading `ENUM` type variable
+### Example: Reading `ENUM` type variable
 
-If `objectifyEnumerations` is set to false, only ENUM value (number) is returned.
+If setting `objectifyEnumerations` is set to false, only ENUM value (number) is returned. As default, both string representation and integer value are returned.
 
 ```js 
 //objectifyEnumerations: true
@@ -452,10 +435,7 @@ Value read: { name: 'Running', value: 100 }
 ---
 
 
-### Reading `STRUCT` type variable
-
-**IMPORTANT NOTE:** See chapter [IMPORTANT: Note about STRUCT variables](#IMPORTANT-Note-about-STRUCT-variables)
-
+### Example: Reading `STRUCT` type variable
 
 
 ```js
@@ -481,7 +461,7 @@ Value read: { SomeText: 'Hello ads-client',
 
 
 
-### Reading `ARRAY OF INT` type variable
+### Example: Reading `ARRAY OF INT` type variable
 
 
 ```js
@@ -502,7 +482,7 @@ Value read: [ 0, 10, 200, 3000, 4000 ]
 
 ---
 
-### Reading `ARRAY OF STRUCT` type variable
+### Example: Reading `ARRAY OF STRUCT` type variable
 
 ```javascript
 try {
@@ -537,16 +517,39 @@ Value read: [ { SomeText: 'Just for demo purposes',
 
 ----
 
+### Example: Reading `FUNCTION BLOCK` type variable
 
-## Writing any PLC variable
+Example of reading `TON` timer function block.
 
-By using `writeSymbol` method we can write all kind of types to the PLC, including base type variables, structs, arrays and so on. These examples cover just a few cases.
+```javascript
+try {
+  const res = await client.readSymbol('GVL_Test.TestTimer')
+
+  console.log('Value read:', res.value)
+} catch (err) {
+  console.log('Reading failed:', err)
+}
+
+/*
+Example console output:
+
+Value read: { IN: false, PT: 2500, Q: false, ET: 0, M: false, StartTime: 0 }
+*/
+```
+
+
+----
+
+
+## Writing any type PLC variable
+
+Using `writeSymbol` method it is possible to write variables of **any type** to the PLC. These include base scalar type variables, structs, function blocks, arrays and so on. These examples cover just a few cases.
 
 See full `writeSymbol` documentation [from the docs](https://jisotalo.github.io/ads-client/Client.html#writeSymbol).
 
 ---
 
-### Writing `INT` type PLC variable
+### Example: Writing `INT` type PLC variable
 
 
 ```js
@@ -561,7 +564,7 @@ try {
 
 ---
 
-### Writing `STRING` type PLC variable
+### Example: Writing `STRING` type PLC variable
 
 ```js
 
@@ -577,7 +580,7 @@ try {
 
 ---
 
-### Writing `ENUM` type variable
+### Example: Writing `ENUM` type variable
 
 When writing `ENUM` value, it can always be given as number or string.
 
@@ -595,9 +598,7 @@ try {
 ```
 
 ---
-### Writing `STRUCT` type PLC variable
-
-**IMPORTANT NOTE:** See chapter [IMPORTANT: Note about STRUCT variables](#IMPORTANT-Note-about-STRUCT-variables)
+### Example: Writing `STRUCT` type PLC variable
 
 ```js
 try {
@@ -614,12 +615,9 @@ try {
 ```
 
 
-### Writing `STRUCT` type PLC variable (with autoFill parameter)
+### Example: Writing `STRUCT` type PLC variable (with autoFill parameter)
 
 ---
-
-**IMPORTANT NOTE:** See chapter [IMPORTANT: Note about STRUCT variables](#IMPORTANT-Note-about-STRUCT-variables)
-
 
 The following code will not work. The PLC struct has three members but we provide only two, which causes an exception.
 
@@ -644,7 +642,7 @@ Something failed: { ClientException: Writing symbol GVL_Test.ExampleSTRUCT faile
 */
 ```
 
-We need to tell the `WriteSymbol` that we *indeed* want to write just some members and the rest will stay the same. This happens by setting the 3rd parameter `autoFill` to true.
+We need to tell the `WriteSymbol` that we **indeed** want to write just some members and the rest will stay the same. This happens by setting the 3rd parameter `autoFill` to true.
 
 If `autoFill` is true, the method first reads the latest value and then writes it with only the new given changes.
 
@@ -671,7 +669,7 @@ res = await client.writeSymbol('GVL_Test.ExampleSTRUCT.SomeText', 'This is also 
 
 ---
 
-### Writing `ARRAY OF INT` type variable
+### Example: Writing `ARRAY OF INT` type variable
 
 ```js
 try {
@@ -687,7 +685,7 @@ try {
 
 ---
 
-### Writing `ARRAY of STRUCT` type variable
+### Example: Writing `ARRAY of STRUCT` type variable
 
 ```js
 try {
@@ -717,6 +715,30 @@ try {
 }
 ```
 
+---
+### Example: Writing `FUNCTION BLOCK` type PLC variable
+
+Starting a timer from Node.js and setting time to 60 seconds.
+
+**NOTE:** Using autoFill parameter to keep the rest as-is.
+```js
+try {
+  const res = await client.writeSymbol('GVL_Test.TestTimer', {
+    IN: true, 
+    PT: 60000,
+  }, true)
+
+  console.log('Value written:', res.value)
+} catch (err) {
+  console.log('Something failed:', err)
+}
+
+/*
+Example console output
+
+Value written: { IN: true, PT: 60000, Q: false, ET: 0, M: false, StartTime: 0 }
+*/
+```
 
 ## Subscribing to PLC variables (device notifications)
 
