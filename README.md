@@ -1129,7 +1129,12 @@ Different debug levels explained:
 Possible fixes: 
 - Remove all routes and create them again
 - Increase timeout delay setting (`timeoutDelay`)
+- If you have very fast subscriptions, try to cache all data types before subscribing using `readAndCacheDataTypes()` 
 
+### When using JSON.stringify or similar I'm getting a `TypeError: Do not know how to serialize a BigInt`
+- JSON.stringify doesn't understand BigInt (64 bit integer) values as default
+- Use setting `disableBigInt: true` to receive Buffer objects instead of BigInts
+- Another solution is to use something like [this](https://github.com/GoogleChromeLabs/jsbi/issues/30#issuecomment-521460510)
 
 ### Can I connect from Raspberry Pi to TwinCAT?
 

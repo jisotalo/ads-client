@@ -3,7 +3,7 @@
 <head>
     
     <meta charset="utf-8">
-    <title>ads-client.js - Documentation</title>
+    <title>ads-client.js - Unofficial Node.js ADS library for connecting to Beckhoff TwinCAT automation systems </title>
     
     
     <script src="scripts/prettify/prettify.js"></script>
@@ -27,7 +27,7 @@
 
 <nav >
     
-    <h2><a href="index.html">Home</a></h2><h3>Classes</h3><ul><li><a href="Client.html">Client</a><ul class='methods'><li data-type='method'><a href="Client.html#.defaultSettings">defaultSettings</a></li><li data-type='method'><a href="Client.html#connect">connect</a></li><li data-type='method'><a href="Client.html#convertFromRaw">convertFromRaw</a></li><li data-type='method'><a href="Client.html#convertToRaw">convertToRaw</a></li><li data-type='method'><a href="Client.html#createVariableHandle">createVariableHandle</a></li><li data-type='method'><a href="Client.html#deleteVariableHandle">deleteVariableHandle</a></li><li data-type='method'><a href="Client.html#disconnect">disconnect</a></li><li data-type='method'><a href="Client.html#getDataType">getDataType</a></li><li data-type='method'><a href="Client.html#getEmptyPlcType">getEmptyPlcType</a></li><li data-type='method'><a href="Client.html#getSymbolInfo">getSymbolInfo</a></li><li data-type='method'><a href="Client.html#readAndCacheDataTypes">readAndCacheDataTypes</a></li><li data-type='method'><a href="Client.html#readAndCacheSymbols">readAndCacheSymbols</a></li><li data-type='method'><a href="Client.html#readDeviceInfo">readDeviceInfo</a></li><li data-type='method'><a href="Client.html#readPlcRuntimeState">readPlcRuntimeState</a></li><li data-type='method'><a href="Client.html#readRaw">readRaw</a></li><li data-type='method'><a href="Client.html#readRawByHandle">readRawByHandle</a></li><li data-type='method'><a href="Client.html#readRawByName">readRawByName</a></li><li data-type='method'><a href="Client.html#readRawBySymbol">readRawBySymbol</a></li><li data-type='method'><a href="Client.html#readRawMulti">readRawMulti</a></li><li data-type='method'><a href="Client.html#readSymbol">readSymbol</a></li><li data-type='method'><a href="Client.html#readSymbolVersion">readSymbolVersion</a></li><li data-type='method'><a href="Client.html#readSystemManagerState">readSystemManagerState</a></li><li data-type='method'><a href="Client.html#readUploadInfo">readUploadInfo</a></li><li data-type='method'><a href="Client.html#reconnect">reconnect</a></li><li data-type='method'><a href="Client.html#restartPlc">restartPlc</a></li><li data-type='method'><a href="Client.html#restartSystemManager">restartSystemManager</a></li><li data-type='method'><a href="Client.html#setDebugging">setDebugging</a></li><li data-type='method'><a href="Client.html#setSystemManagerToConfig">setSystemManagerToConfig</a></li><li data-type='method'><a href="Client.html#setSystemManagerToRun">setSystemManagerToRun</a></li><li data-type='method'><a href="Client.html#startPlc">startPlc</a></li><li data-type='method'><a href="Client.html#stopPlc">stopPlc</a></li><li data-type='method'><a href="Client.html#subscribe">subscribe</a></li><li data-type='method'><a href="Client.html#subscribeRaw">subscribeRaw</a></li><li data-type='method'><a href="Client.html#unsubscribe">unsubscribe</a></li><li data-type='method'><a href="Client.html#unsubscribeAll">unsubscribeAll</a></li><li data-type='method'><a href="Client.html#writeControl">writeControl</a></li><li data-type='method'><a href="Client.html#writeRaw">writeRaw</a></li><li data-type='method'><a href="Client.html#writeRawByHandle">writeRawByHandle</a></li><li data-type='method'><a href="Client.html#writeRawBySymbol">writeRawBySymbol</a></li><li data-type='method'><a href="Client.html#writeRawMulti">writeRawMulti</a></li><li data-type='method'><a href="Client.html#writeSymbol">writeSymbol</a></li></ul></li><li><a href="ClientException.html">ClientException</a></li></ul><h3>Namespaces</h3><ul><li><a href="-_LibraryInternals.html">_LibraryInternals</a><ul class='methods'><li data-type='method'><a href="-_LibraryInternals.html#._amsNedIdStrToByteArray">_amsNedIdStrToByteArray</a></li><li data-type='method'><a href="-_LibraryInternals.html#._byteArrayToAmsNedIdStr">_byteArrayToAmsNedIdStr</a></li><li data-type='method'><a href="-_LibraryInternals.html#._checkReceivedData">_checkReceivedData</a></li><li data-type='method'><a href="-_LibraryInternals.html#._console">_console</a></li><li data-type='method'><a href="-_LibraryInternals.html#._createAmsHeader">_createAmsHeader</a></li><li data-type='method'><a href="-_LibraryInternals.html#._createAmsTcpHeader">_createAmsTcpHeader</a></li><li data-type='method'><a href="-_LibraryInternals.html#._createAmsTcpRequest">_createAmsTcpRequest</a></li><li data-type='method'><a href="-_LibraryInternals.html#._deepMergeObjects">_deepMergeObjects</a></li><li data-type='method'><a href="-_LibraryInternals.html#._getDataTypeInfo">_getDataTypeInfo</a></li><li data-type='method'><a href="-_LibraryInternals.html#._getDataTypeRecursive">_getDataTypeRecursive</a></li><li data-type='method'><a href="-_LibraryInternals.html#._onAdsCommandReceived">_onAdsCommandReceived</a></li><li data-type='method'><a href="-_LibraryInternals.html#._onAmsTcpPacketReceived">_onAmsTcpPacketReceived</a></li><li data-type='method'><a href="-_LibraryInternals.html#._onConnectionLost">_onConnectionLost</a></li><li data-type='method'><a href="-_LibraryInternals.html#._onPlcRuntimeStateChanged">_onPlcRuntimeStateChanged</a></li><li data-type='method'><a href="-_LibraryInternals.html#._onRouterStateChanged">_onRouterStateChanged</a></li><li data-type='method'><a href="-_LibraryInternals.html#._onSymbolVersionChanged">_onSymbolVersionChanged</a></li><li data-type='method'><a href="-_LibraryInternals.html#._parseAdsData">_parseAdsData</a></li><li data-type='method'><a href="-_LibraryInternals.html#._parseAdsNotification">_parseAdsNotification</a></li><li data-type='method'><a href="-_LibraryInternals.html#._parseAmsHeader">_parseAmsHeader</a></li><li data-type='method'><a href="-_LibraryInternals.html#._parseAmsTcpHeader">_parseAmsTcpHeader</a></li><li data-type='method'><a href="-_LibraryInternals.html#._parseAmsTcpPacket">_parseAmsTcpPacket</a></li><li data-type='method'><a href="-_LibraryInternals.html#._parseDataType">_parseDataType</a></li><li data-type='method'><a href="-_LibraryInternals.html#._parseJsObjectToBuffer">_parseJsObjectToBuffer</a></li><li data-type='method'><a href="-_LibraryInternals.html#._parseJsVariableToPlc">_parseJsVariableToPlc</a></li><li data-type='method'><a href="-_LibraryInternals.html#._parsePlcDataToObject">_parsePlcDataToObject</a></li><li data-type='method'><a href="-_LibraryInternals.html#._parsePlcVariableToJs">_parsePlcVariableToJs</a></li><li data-type='method'><a href="-_LibraryInternals.html#._parseSymbolInfo">_parseSymbolInfo</a></li><li data-type='method'><a href="-_LibraryInternals.html#._readDataTypeInfo">_readDataTypeInfo</a></li><li data-type='method'><a href="-_LibraryInternals.html#._readSymbolInfo">_readSymbolInfo</a></li><li data-type='method'><a href="-_LibraryInternals.html#._registerAdsPort">_registerAdsPort</a></li><li data-type='method'><a href="-_LibraryInternals.html#._reInitializeInternals">_reInitializeInternals</a></li><li data-type='method'><a href="-_LibraryInternals.html#._reInitializeSubscriptions">_reInitializeSubscriptions</a></li><li data-type='method'><a href="-_LibraryInternals.html#._sendAdsCommand">_sendAdsCommand</a></li><li data-type='method'><a href="-_LibraryInternals.html#._socketReceive">_socketReceive</a></li><li data-type='method'><a href="-_LibraryInternals.html#._socketWrite">_socketWrite</a></li><li data-type='method'><a href="-_LibraryInternals.html#._subcribeToPlcRuntimeStateChanges">_subcribeToPlcRuntimeStateChanges</a></li><li data-type='method'><a href="-_LibraryInternals.html#._subscribe">_subscribe</a></li><li data-type='method'><a href="-_LibraryInternals.html#._subscribeToSymbolVersionChanges">_subscribeToSymbolVersionChanges</a></li><li data-type='method'><a href="-_LibraryInternals.html#._systemManagerStatePoller">_systemManagerStatePoller</a></li><li data-type='method'><a href="-_LibraryInternals.html#._trimPlcString">_trimPlcString</a></li><li data-type='method'><a href="-_LibraryInternals.html#._unregisterAdsPort">_unregisterAdsPort</a></li><li data-type='method'><a href="-_LibraryInternals.html#._unsubscribeAllInternals">_unsubscribeAllInternals</a></li></ul></li></ul><h3><a href="global.html">Global</a></h3>
+    <h2><a href="index.html">Home</a></h2><h3>Classes</h3><ul><li><a href="Client.html">Client</a><ul class='methods'><li data-type='method'><a href="Client.html#.defaultSettings">defaultSettings</a></li><li data-type='method'><a href="Client.html#connect">connect</a></li><li data-type='method'><a href="Client.html#convertFromRaw">convertFromRaw</a></li><li data-type='method'><a href="Client.html#convertToRaw">convertToRaw</a></li><li data-type='method'><a href="Client.html#createVariableHandle">createVariableHandle</a></li><li data-type='method'><a href="Client.html#deleteVariableHandle">deleteVariableHandle</a></li><li data-type='method'><a href="Client.html#disconnect">disconnect</a></li><li data-type='method'><a href="Client.html#getDataType">getDataType</a></li><li data-type='method'><a href="Client.html#getEmptyPlcType">getEmptyPlcType</a></li><li data-type='method'><a href="Client.html#getSymbolInfo">getSymbolInfo</a></li><li data-type='method'><a href="Client.html#readAndCacheDataTypes">readAndCacheDataTypes</a></li><li data-type='method'><a href="Client.html#readAndCacheSymbols">readAndCacheSymbols</a></li><li data-type='method'><a href="Client.html#readDeviceInfo">readDeviceInfo</a></li><li data-type='method'><a href="Client.html#readPlcRuntimeState">readPlcRuntimeState</a></li><li data-type='method'><a href="Client.html#readRaw">readRaw</a></li><li data-type='method'><a href="Client.html#readRawByHandle">readRawByHandle</a></li><li data-type='method'><a href="Client.html#readRawByName">readRawByName</a></li><li data-type='method'><a href="Client.html#readRawBySymbol">readRawBySymbol</a></li><li data-type='method'><a href="Client.html#readRawMulti">readRawMulti</a></li><li data-type='method'><a href="Client.html#readSymbol">readSymbol</a></li><li data-type='method'><a href="Client.html#readSymbolVersion">readSymbolVersion</a></li><li data-type='method'><a href="Client.html#readSystemManagerState">readSystemManagerState</a></li><li data-type='method'><a href="Client.html#readUploadInfo">readUploadInfo</a></li><li data-type='method'><a href="Client.html#readWriteRaw">readWriteRaw</a></li><li data-type='method'><a href="Client.html#reconnect">reconnect</a></li><li data-type='method'><a href="Client.html#restartPlc">restartPlc</a></li><li data-type='method'><a href="Client.html#restartSystemManager">restartSystemManager</a></li><li data-type='method'><a href="Client.html#setDebugging">setDebugging</a></li><li data-type='method'><a href="Client.html#setSystemManagerToConfig">setSystemManagerToConfig</a></li><li data-type='method'><a href="Client.html#setSystemManagerToRun">setSystemManagerToRun</a></li><li data-type='method'><a href="Client.html#startPlc">startPlc</a></li><li data-type='method'><a href="Client.html#stopPlc">stopPlc</a></li><li data-type='method'><a href="Client.html#subscribe">subscribe</a></li><li data-type='method'><a href="Client.html#subscribeRaw">subscribeRaw</a></li><li data-type='method'><a href="Client.html#unsubscribe">unsubscribe</a></li><li data-type='method'><a href="Client.html#unsubscribeAll">unsubscribeAll</a></li><li data-type='method'><a href="Client.html#writeControl">writeControl</a></li><li data-type='method'><a href="Client.html#writeRaw">writeRaw</a></li><li data-type='method'><a href="Client.html#writeRawByHandle">writeRawByHandle</a></li><li data-type='method'><a href="Client.html#writeRawBySymbol">writeRawBySymbol</a></li><li data-type='method'><a href="Client.html#writeRawMulti">writeRawMulti</a></li><li data-type='method'><a href="Client.html#writeSymbol">writeSymbol</a></li></ul></li><li><a href="ClientException.html">ClientException</a></li></ul><h3>Namespaces</h3><ul><li><a href="-_LibraryInternals.html">_LibraryInternals</a><ul class='methods'><li data-type='method'><a href="-_LibraryInternals.html#._amsNedIdStrToByteArray">_amsNedIdStrToByteArray</a></li><li data-type='method'><a href="-_LibraryInternals.html#._byteArrayToAmsNedIdStr">_byteArrayToAmsNedIdStr</a></li><li data-type='method'><a href="-_LibraryInternals.html#._checkReceivedData">_checkReceivedData</a></li><li data-type='method'><a href="-_LibraryInternals.html#._console">_console</a></li><li data-type='method'><a href="-_LibraryInternals.html#._createAmsHeader">_createAmsHeader</a></li><li data-type='method'><a href="-_LibraryInternals.html#._createAmsTcpHeader">_createAmsTcpHeader</a></li><li data-type='method'><a href="-_LibraryInternals.html#._createAmsTcpRequest">_createAmsTcpRequest</a></li><li data-type='method'><a href="-_LibraryInternals.html#._deepMergeObjects">_deepMergeObjects</a></li><li data-type='method'><a href="-_LibraryInternals.html#._getDataTypeInfo">_getDataTypeInfo</a></li><li data-type='method'><a href="-_LibraryInternals.html#._getDataTypeRecursive">_getDataTypeRecursive</a></li><li data-type='method'><a href="-_LibraryInternals.html#._onAdsCommandReceived">_onAdsCommandReceived</a></li><li data-type='method'><a href="-_LibraryInternals.html#._onAmsTcpPacketReceived">_onAmsTcpPacketReceived</a></li><li data-type='method'><a href="-_LibraryInternals.html#._onConnectionLost">_onConnectionLost</a></li><li data-type='method'><a href="-_LibraryInternals.html#._onPlcRuntimeStateChanged">_onPlcRuntimeStateChanged</a></li><li data-type='method'><a href="-_LibraryInternals.html#._onRouterStateChanged">_onRouterStateChanged</a></li><li data-type='method'><a href="-_LibraryInternals.html#._onSymbolVersionChanged">_onSymbolVersionChanged</a></li><li data-type='method'><a href="-_LibraryInternals.html#._parseAdsData">_parseAdsData</a></li><li data-type='method'><a href="-_LibraryInternals.html#._parseAdsNotification">_parseAdsNotification</a></li><li data-type='method'><a href="-_LibraryInternals.html#._parseAmsHeader">_parseAmsHeader</a></li><li data-type='method'><a href="-_LibraryInternals.html#._parseAmsTcpHeader">_parseAmsTcpHeader</a></li><li data-type='method'><a href="-_LibraryInternals.html#._parseAmsTcpPacket">_parseAmsTcpPacket</a></li><li data-type='method'><a href="-_LibraryInternals.html#._parseDataType">_parseDataType</a></li><li data-type='method'><a href="-_LibraryInternals.html#._parseJsObjectToBuffer">_parseJsObjectToBuffer</a></li><li data-type='method'><a href="-_LibraryInternals.html#._parseJsVariableToPlc">_parseJsVariableToPlc</a></li><li data-type='method'><a href="-_LibraryInternals.html#._parsePlcDataToObject">_parsePlcDataToObject</a></li><li data-type='method'><a href="-_LibraryInternals.html#._parsePlcVariableToJs">_parsePlcVariableToJs</a></li><li data-type='method'><a href="-_LibraryInternals.html#._parseSymbolInfo">_parseSymbolInfo</a></li><li data-type='method'><a href="-_LibraryInternals.html#._readDataTypeInfo">_readDataTypeInfo</a></li><li data-type='method'><a href="-_LibraryInternals.html#._readSymbolInfo">_readSymbolInfo</a></li><li data-type='method'><a href="-_LibraryInternals.html#._registerAdsPort">_registerAdsPort</a></li><li data-type='method'><a href="-_LibraryInternals.html#._reInitializeInternals">_reInitializeInternals</a></li><li data-type='method'><a href="-_LibraryInternals.html#._reInitializeSubscriptions">_reInitializeSubscriptions</a></li><li data-type='method'><a href="-_LibraryInternals.html#._sendAdsCommand">_sendAdsCommand</a></li><li data-type='method'><a href="-_LibraryInternals.html#._socketReceive">_socketReceive</a></li><li data-type='method'><a href="-_LibraryInternals.html#._socketWrite">_socketWrite</a></li><li data-type='method'><a href="-_LibraryInternals.html#._subcribeToPlcRuntimeStateChanges">_subcribeToPlcRuntimeStateChanges</a></li><li data-type='method'><a href="-_LibraryInternals.html#._subscribe">_subscribe</a></li><li data-type='method'><a href="-_LibraryInternals.html#._subscribeToSymbolVersionChanges">_subscribeToSymbolVersionChanges</a></li><li data-type='method'><a href="-_LibraryInternals.html#._systemManagerStatePoller">_systemManagerStatePoller</a></li><li data-type='method'><a href="-_LibraryInternals.html#._trimPlcString">_trimPlcString</a></li><li data-type='method'><a href="-_LibraryInternals.html#._unregisterAdsPort">_unregisterAdsPort</a></li><li data-type='method'><a href="-_LibraryInternals.html#._unsubscribeAllInternals">_unsubscribeAllInternals</a></li></ul></li></ul><h3><a href="global.html">Global</a></h3>
 </nav>
 
 <div id="main">
@@ -116,6 +116,7 @@ class Client {
    * @property {number} [checkStateInterval=1000] - Time (milliseconds) how often the system manager state is read to see if connection is OK - Optional (**default**: 1000 ms)
    * @property {number} [connectionDownDelay=5000] - Time (milliseconds) after no successful reading of the system manager state the connection is determined to be lost - Optional (**default**: 5000 ms)
    * @property {boolean} [allowHalfOpen=false] - If true, connect() is successful even if no PLC runtime is found (but target and system manager are available) - Can be useful if it's ok that after connect() the PLC runtime is not immediately available (example: connecting before uploading PLC code and reading data later)
+   * @property {boolean} [disableBigInt=false] - If true, 64 bit integer PLC variables are kept as Buffer objects instead of converting to Javascript BigInt variables (JSON.strigify and libraries that use it have no BigInt support)
    */
 
   
@@ -144,6 +145,7 @@ class Client {
       checkStateInterval: 1000,
       connectionDownDelay: 5000,
       allowHalfOpen: false,
+      disableBigInt: false
     }
   }
 
@@ -1420,7 +1422,11 @@ class Client {
         })
         .catch((res) => {
           debug(`unsubscribe(): Unsubscribing from notification ${notificationHandle} failed`)
-          reject(new ClientException(this, 'unsubscribe()', `Unsubscribing from notification ${JSON.stringify(this._internals.activeSubscriptions[notificationHandle].target)} failed`, res))
+          if (this._internals.activeSubscriptions[notificationHandle].target !== undefined) {
+            reject(new ClientException(this, 'unsubscribe()', `Unsubscribing from notification ${JSON.stringify(this._internals.activeSubscriptions[notificationHandle].target)} failed`, res))
+          } else {
+            reject(new ClientException(this, 'unsubscribe()', `Unsubscribing from notification with handle ${notificationHandle} failed`, res))
+          }
         })
     })
   }
@@ -1804,6 +1810,73 @@ class Client {
         .catch(res => {
           debug(`readRawMulti(): Reading ${targetArray.length} values (total length ${totalSize} bytes) failed: %o`, res)
           reject(new ClientException(this, 'readRawMulti()', `Reading data failed`, res))
+        })
+    })
+  }
+
+
+
+
+  
+
+  /**
+   * Writes given byte Buffer to the target and reads result. Uses ADS command ReadWrite.
+   * 
+   * @param {number} indexGroup - Index group in the PLC
+   * @param {number} indexOffset - Index offset in the PLC
+   * @param {number} readLength - Read data length in the PLC (bytes)
+   * @param {Buffer} dataBuffer - Data to write
+   * 
+   * @returns {Promise&lt;Buffer>} Returns a promise (async function)
+   * - If resolved, writing and reading was successful and data is returned (Buffer)
+   * - If rejected, command failed and error info is returned (object)
+   * 
+   */
+  readWriteRaw(indexGroup, indexOffset, readLength, dataBuffer) {
+    return new Promise(async (resolve, reject) => {
+
+      if (indexGroup == null || indexOffset == null || readLength == null || dataBuffer == null) {
+        return reject(new ClientException(this, 'writeRawByHandle()', `Some of parameters (indexGroup, indexOffset, readLength, dataBuffer) are not assigned`))
+      }
+      else if (!(dataBuffer instanceof Buffer)) {
+        return reject(new ClientException(this, 'writeRawByHandle()', `Required parameter dataBuffer is not a Buffer type`))
+      }
+      debug(`readWriteRaw(): Writing ${dataBuffer.byteLength} bytes and reading ${readLength} bytes data to ${JSON.stringify({ indexGroup, indexOffset })}`)
+      
+      //Allocating bytes for request
+      const data = Buffer.alloc(16 + dataBuffer.byteLength)
+      let pos = 0
+
+      //0..3 IndexGroup
+      data.writeUInt32LE(indexGroup, pos)
+      pos += 4
+  
+      //4..7 IndexOffset
+      data.writeUInt32LE(indexOffset, pos)
+      pos += 4
+
+      //8..11 Read data length
+      data.writeUInt32LE(readLength, pos) 
+      pos += 4
+
+      //12..15 Write data length
+      data.writeUInt32LE(dataBuffer.byteLength, pos) 
+      pos += 4
+            
+      //16..n Write data
+      dataBuffer.copy(data, pos)
+
+
+      _sendAdsCommand.call(this, ADS.ADS_COMMAND.ReadWrite, data)
+        .then(res => {
+          debug(`readWriteRaw(): Data written and ${res.ads.data.byteLength} bytes response received`)
+          
+          resolve(res.ads.data)
+        })
+        .catch((res) => {
+          debug(`readWriteRaw(): Command failed: %o`, res)
+          
+          reject(new ClientException(this, 'readWriteRaw()', `Command failed`, res))
         })
     })
   }
@@ -2890,6 +2963,10 @@ function _unregisterAdsPort() {
       return resolve()
     }
 
+    if (this._internals.socket == null) {
+      return resolve()
+    }
+
     const buffer = Buffer.alloc(8)
     let pos = 0
 
@@ -3474,6 +3551,11 @@ async function _onPlcRuntimeStateChanged(data, sub) {
       } else if(typeof target === 'string') {
         try {
           symbolInfo = await this.getSymbolInfo(target)
+
+          //Read symbol datatype to cache -> It's cached when we start getting notifications
+          //Otherwise with large structs and fast cycle times there might be some problems
+          await this.getDataType(symbolInfo.type)
+          
         } catch (err) {
           return reject(new ClientException(this, '_subscribe()', err))
         }
@@ -3533,26 +3615,30 @@ async function _onPlcRuntimeStateChanged(data, sub) {
               await client.unsubscribe(this.notificationHandle)
             },
             dataParser: async function (value) {
-              if (this.symbolInfo.type) {
-                const dataType = await client.getDataType(this.symbolInfo.type)
-                const data = _parsePlcDataToObject.call(client, value, dataType)
+              try {
+                if (this.symbolInfo.type) {
+                  const dataType = await client.getDataType(this.symbolInfo.type)
+                  const data = _parsePlcDataToObject.call(client, value, dataType)
                 
-                this.lastValue = data
+                  this.lastValue = data
 
-                return {
-                  value: data,
-                  timeStamp: null, //Added later
-                  type: dataType
+                  return {
+                    value: data,
+                    timeStamp: null, //Added later
+                    type: dataType
+                  }
                 }
-              }
 
-              //If we don't know the data type
-              this.lastValue = value
+                //If we don't know the data type
+                this.lastValue = value
                 
-              return {
-                value: value,
-                timeStamp: null, //Added later
-                type: null
+                return {
+                  value: value,
+                  timeStamp: null, //Added later
+                  type: null
+                }
+              } catch (err) {
+                throw err
               }
             }
           }
@@ -5007,14 +5093,19 @@ async function _onAdsCommandReceived(packet) {
             debug(`_onAdsCommandReceived(): Notification received for handle "${sample.notificationHandle}" (%o)`, sub.target)
             
             //First we parse the data from received byte buffer
-            const parsedValue = await sub.dataParser(sample.data)
-            parsedValue.timeStamp = stamp.timeStamp
+            try {
+              const parsedValue = await sub.dataParser(sample.data)
 
-            //Then lets call the users callback
-            sub.callback(
-              parsedValue,
-              sub
-            )
+              parsedValue.timeStamp = stamp.timeStamp
+  
+              //Then lets call the users callback
+              sub.callback(
+                parsedValue,
+                sub
+              )
+            } catch (err) {
+              debug(`_onAdsCommandReceived(): Ads notification received but parsing Javascript object failed: %o`, err)
+            }
 
           } else {
             debugD(`_onAdsCommandReceived(): Ads notification received with unknown notificationHandle "${sample.notificationHandle}" - Doing nothing`)
@@ -5568,7 +5659,7 @@ exports.Client = Client</code></pre>
 <br class="clear">
 
 <footer>
-    Documentation generated by <a href="https://github.com/jsdoc3/jsdoc">JSDoc 3.6.4</a> on Mon Jun 22 2020 19:24:18 GMT+0300 (GMT+03:00) using the <a href="https://github.com/clenemt/docdash">docdash</a> theme.
+    Documentation generated by <a href="https://github.com/jsdoc3/jsdoc">JSDoc 3.6.4</a> on Tue Jun 23 2020 19:15:15 GMT+0300 (GMT+03:00) using the <a href="https://github.com/clenemt/docdash">docdash</a> theme.
 </footer>
 
 <script>prettyPrint();</script>

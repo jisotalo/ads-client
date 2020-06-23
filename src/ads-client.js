@@ -72,6 +72,7 @@ class Client {
    * @property {number} [checkStateInterval=1000] - Time (milliseconds) how often the system manager state is read to see if connection is OK - Optional (**default**: 1000 ms)
    * @property {number} [connectionDownDelay=5000] - Time (milliseconds) after no successful reading of the system manager state the connection is determined to be lost - Optional (**default**: 5000 ms)
    * @property {boolean} [allowHalfOpen=false] - If true, connect() is successful even if no PLC runtime is found (but target and system manager are available) - Can be useful if it's ok that after connect() the PLC runtime is not immediately available (example: connecting before uploading PLC code and reading data later)
+   * @property {boolean} [disableBigInt=false] - If true, 64 bit integer PLC variables are kept as Buffer objects instead of converting to Javascript BigInt variables (JSON.strigify and libraries that use it have no BigInt support)
    */
 
   
@@ -100,6 +101,7 @@ class Client {
       checkStateInterval: 1000,
       connectionDownDelay: 5000,
       allowHalfOpen: false,
+      disableBigInt: false
     }
   }
 
@@ -1376,7 +1378,11 @@ class Client {
         })
         .catch((res) => {
           debug(`unsubscribe(): Unsubscribing from notification ${notificationHandle} failed`)
-          reject(new ClientException(this, 'unsubscribe()', `Unsubscribing from notification ${JSON.stringify(this._internals.activeSubscriptions[notificationHandle].target)} failed`, res))
+          if (this._internals.activeSubscriptions[notificationHandle].target !== undefined) {
+            reject(new ClientException(this, 'unsubscribe()', `Unsubscribing from notification ${JSON.stringify(this._internals.activeSubscriptions[notificationHandle].target)} failed`, res))
+          } else {
+            reject(new ClientException(this, 'unsubscribe()', `Unsubscribing from notification with handle ${notificationHandle} failed`, res))
+          }
         })
     })
   }
@@ -1760,6 +1766,73 @@ class Client {
         .catch(res => {
           debug(`readRawMulti(): Reading ${targetArray.length} values (total length ${totalSize} bytes) failed: %o`, res)
           reject(new ClientException(this, 'readRawMulti()', `Reading data failed`, res))
+        })
+    })
+  }
+
+
+
+
+  
+
+  /**
+   * Writes given byte Buffer to the target and reads result. Uses ADS command ReadWrite.
+   * 
+   * @param {number} indexGroup - Index group in the PLC
+   * @param {number} indexOffset - Index offset in the PLC
+   * @param {number} readLength - Read data length in the PLC (bytes)
+   * @param {Buffer} dataBuffer - Data to write
+   * 
+   * @returns {Promise<Buffer>} Returns a promise (async function)
+   * - If resolved, writing and reading was successful and data is returned (Buffer)
+   * - If rejected, command failed and error info is returned (object)
+   * 
+   */
+  readWriteRaw(indexGroup, indexOffset, readLength, dataBuffer) {
+    return new Promise(async (resolve, reject) => {
+
+      if (indexGroup == null || indexOffset == null || readLength == null || dataBuffer == null) {
+        return reject(new ClientException(this, 'writeRawByHandle()', `Some of parameters (indexGroup, indexOffset, readLength, dataBuffer) are not assigned`))
+      }
+      else if (!(dataBuffer instanceof Buffer)) {
+        return reject(new ClientException(this, 'writeRawByHandle()', `Required parameter dataBuffer is not a Buffer type`))
+      }
+      debug(`readWriteRaw(): Writing ${dataBuffer.byteLength} bytes and reading ${readLength} bytes data to ${JSON.stringify({ indexGroup, indexOffset })}`)
+      
+      //Allocating bytes for request
+      const data = Buffer.alloc(16 + dataBuffer.byteLength)
+      let pos = 0
+
+      //0..3 IndexGroup
+      data.writeUInt32LE(indexGroup, pos)
+      pos += 4
+  
+      //4..7 IndexOffset
+      data.writeUInt32LE(indexOffset, pos)
+      pos += 4
+
+      //8..11 Read data length
+      data.writeUInt32LE(readLength, pos) 
+      pos += 4
+
+      //12..15 Write data length
+      data.writeUInt32LE(dataBuffer.byteLength, pos) 
+      pos += 4
+            
+      //16..n Write data
+      dataBuffer.copy(data, pos)
+
+
+      _sendAdsCommand.call(this, ADS.ADS_COMMAND.ReadWrite, data)
+        .then(res => {
+          debug(`readWriteRaw(): Data written and ${res.ads.data.byteLength} bytes response received`)
+          
+          resolve(res.ads.data)
+        })
+        .catch((res) => {
+          debug(`readWriteRaw(): Command failed: %o`, res)
+          
+          reject(new ClientException(this, 'readWriteRaw()', `Command failed`, res))
         })
     })
   }
@@ -2846,6 +2919,10 @@ function _unregisterAdsPort() {
       return resolve()
     }
 
+    if (this._internals.socket == null) {
+      return resolve()
+    }
+
     const buffer = Buffer.alloc(8)
     let pos = 0
 
@@ -3430,6 +3507,11 @@ async function _onPlcRuntimeStateChanged(data, sub) {
       } else if(typeof target === 'string') {
         try {
           symbolInfo = await this.getSymbolInfo(target)
+
+          //Read symbol datatype to cache -> It's cached when we start getting notifications
+          //Otherwise with large structs and fast cycle times there might be some problems
+          await this.getDataType(symbolInfo.type)
+          
         } catch (err) {
           return reject(new ClientException(this, '_subscribe()', err))
         }
@@ -3489,26 +3571,30 @@ async function _onPlcRuntimeStateChanged(data, sub) {
               await client.unsubscribe(this.notificationHandle)
             },
             dataParser: async function (value) {
-              if (this.symbolInfo.type) {
-                const dataType = await client.getDataType(this.symbolInfo.type)
-                const data = _parsePlcDataToObject.call(client, value, dataType)
+              try {
+                if (this.symbolInfo.type) {
+                  const dataType = await client.getDataType(this.symbolInfo.type)
+                  const data = _parsePlcDataToObject.call(client, value, dataType)
                 
-                this.lastValue = data
+                  this.lastValue = data
 
-                return {
-                  value: data,
-                  timeStamp: null, //Added later
-                  type: dataType
+                  return {
+                    value: data,
+                    timeStamp: null, //Added later
+                    type: dataType
+                  }
                 }
-              }
 
-              //If we don't know the data type
-              this.lastValue = value
+                //If we don't know the data type
+                this.lastValue = value
                 
-              return {
-                value: value,
-                timeStamp: null, //Added later
-                type: null
+                return {
+                  value: value,
+                  timeStamp: null, //Added later
+                  type: null
+                }
+              } catch (err) {
+                throw err
               }
             }
           }
@@ -4963,14 +5049,19 @@ async function _onAdsCommandReceived(packet) {
             debug(`_onAdsCommandReceived(): Notification received for handle "${sample.notificationHandle}" (%o)`, sub.target)
             
             //First we parse the data from received byte buffer
-            const parsedValue = await sub.dataParser(sample.data)
-            parsedValue.timeStamp = stamp.timeStamp
+            try {
+              const parsedValue = await sub.dataParser(sample.data)
 
-            //Then lets call the users callback
-            sub.callback(
-              parsedValue,
-              sub
-            )
+              parsedValue.timeStamp = stamp.timeStamp
+  
+              //Then lets call the users callback
+              sub.callback(
+                parsedValue,
+                sub
+              )
+            } catch (err) {
+              debug(`_onAdsCommandReceived(): Ads notification received but parsing Javascript object failed: %o`, err)
+            }
 
           } else {
             debugD(`_onAdsCommandReceived(): Ads notification received with unknown notificationHandle "${sample.notificationHandle}" - Doing nothing`)
