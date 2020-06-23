@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Updated
 - `subscribe()` now reads and caches the data type before subscribing -> better operation with large data and fast cycle time
+- Added more fault checks to ADS notification related operations
 
 
 ## [1.6.0] - 22.06.2020
