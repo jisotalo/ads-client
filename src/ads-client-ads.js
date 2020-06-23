@@ -980,15 +980,15 @@ const BASE_DATA_TYPES = {
     {
       name: ['LWORD', 'ULINT', 'LTIME'],
       size: 8,
-      toBuffer: (value, buffer) => {
+      toBuffer: (value, buffer, settings) => {
         //64 bit integers are missing from older Node.js Buffer, so use buffer instead if so
-        if (buffer.writeBigUInt64LE)
+        if (buffer.writeBigUInt64LE && !settings.disableBigInt)
           buffer.writeBigUInt64LE(value)
         else
           value.copy(buffer)
       },
-      fromBuffer: buffer => {
-        if (buffer.readBigInt64LE)
+      fromBuffer: (buffer, settings) => {
+        if (buffer.readBigInt64LE && !settings.disableBigInt)
           return buffer.readBigUInt64LE(0)
         else
           return buffer
@@ -997,15 +997,15 @@ const BASE_DATA_TYPES = {
     {
       name: ['LINT'],
       size: 8,
-      toBuffer: (value, buffer) => {
+      toBuffer: (value, buffer, settings) => {
         //64 bit integers are missing from older Node.js Buffer, so use buffer instead if so
-        if (buffer.writeBigInt64LE)
+        if (buffer.writeBigInt64LE && !settings.disableBigInt)
           buffer.writeBigInt64LE(value)
         else
           value.copy(buffer)
       },
-      fromBuffer: buffer => {
-        if (buffer.readBigInt64LE)
+      fromBuffer: (buffer, settings) => {
+        if (buffer.readBigInt64LE && !settings.disableBigInt)
           return buffer.readBigInt64LE(0)
         else
           return buffer

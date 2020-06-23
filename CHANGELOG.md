@@ -4,6 +4,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.7.0] - 23.06.2020
+### Added
+- New method `readWriteRaw()`
+  - Wrapper for ADS ReadWrite command ([Issue #34](https://github.com/jisotalo/ads-client/issues/34))
+- New setting `disableBigInt` (default: false)
+  - If true, 64 bit integer PLC variables are kept as Buffer objects instead of converting to Javascript BigInt variables 
+  - JSON.strigify and libraries that use it have no BigInt support (like express json(), socket.io emit() etc.)
+
+### Updated
+- `subscribe()` now reads and caches the data type before subscribing -> better operation with large data and fast cycle time
+
+
 ## [1.6.0] - 22.06.2020
 ### Added
 - Automatic support for all kinds of byte alignments ([See issue #13](https://github.com/jisotalo/ads-client/issues/13))

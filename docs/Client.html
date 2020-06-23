@@ -3,7 +3,7 @@
 <head>
     
     <meta charset="utf-8">
-    <title>Client - Documentation</title>
+    <title>Client - Unofficial Node.js ADS library for connecting to Beckhoff TwinCAT automation systems </title>
     
     
     <script src="scripts/prettify/prettify.js"></script>
@@ -27,7 +27,7 @@
 
 <nav >
     
-    <h2><a href="index.html">Home</a></h2><h3>Classes</h3><ul><li><a href="Client.html">Client</a><ul class='methods'><li data-type='method'><a href="Client.html#.defaultSettings">defaultSettings</a></li><li data-type='method'><a href="Client.html#connect">connect</a></li><li data-type='method'><a href="Client.html#convertFromRaw">convertFromRaw</a></li><li data-type='method'><a href="Client.html#convertToRaw">convertToRaw</a></li><li data-type='method'><a href="Client.html#createVariableHandle">createVariableHandle</a></li><li data-type='method'><a href="Client.html#deleteVariableHandle">deleteVariableHandle</a></li><li data-type='method'><a href="Client.html#disconnect">disconnect</a></li><li data-type='method'><a href="Client.html#getDataType">getDataType</a></li><li data-type='method'><a href="Client.html#getEmptyPlcType">getEmptyPlcType</a></li><li data-type='method'><a href="Client.html#getSymbolInfo">getSymbolInfo</a></li><li data-type='method'><a href="Client.html#readAndCacheDataTypes">readAndCacheDataTypes</a></li><li data-type='method'><a href="Client.html#readAndCacheSymbols">readAndCacheSymbols</a></li><li data-type='method'><a href="Client.html#readDeviceInfo">readDeviceInfo</a></li><li data-type='method'><a href="Client.html#readPlcRuntimeState">readPlcRuntimeState</a></li><li data-type='method'><a href="Client.html#readRaw">readRaw</a></li><li data-type='method'><a href="Client.html#readRawByHandle">readRawByHandle</a></li><li data-type='method'><a href="Client.html#readRawByName">readRawByName</a></li><li data-type='method'><a href="Client.html#readRawBySymbol">readRawBySymbol</a></li><li data-type='method'><a href="Client.html#readRawMulti">readRawMulti</a></li><li data-type='method'><a href="Client.html#readSymbol">readSymbol</a></li><li data-type='method'><a href="Client.html#readSymbolVersion">readSymbolVersion</a></li><li data-type='method'><a href="Client.html#readSystemManagerState">readSystemManagerState</a></li><li data-type='method'><a href="Client.html#readUploadInfo">readUploadInfo</a></li><li data-type='method'><a href="Client.html#reconnect">reconnect</a></li><li data-type='method'><a href="Client.html#restartPlc">restartPlc</a></li><li data-type='method'><a href="Client.html#restartSystemManager">restartSystemManager</a></li><li data-type='method'><a href="Client.html#setDebugging">setDebugging</a></li><li data-type='method'><a href="Client.html#setSystemManagerToConfig">setSystemManagerToConfig</a></li><li data-type='method'><a href="Client.html#setSystemManagerToRun">setSystemManagerToRun</a></li><li data-type='method'><a href="Client.html#startPlc">startPlc</a></li><li data-type='method'><a href="Client.html#stopPlc">stopPlc</a></li><li data-type='method'><a href="Client.html#subscribe">subscribe</a></li><li data-type='method'><a href="Client.html#subscribeRaw">subscribeRaw</a></li><li data-type='method'><a href="Client.html#unsubscribe">unsubscribe</a></li><li data-type='method'><a href="Client.html#unsubscribeAll">unsubscribeAll</a></li><li data-type='method'><a href="Client.html#writeControl">writeControl</a></li><li data-type='method'><a href="Client.html#writeRaw">writeRaw</a></li><li data-type='method'><a href="Client.html#writeRawByHandle">writeRawByHandle</a></li><li data-type='method'><a href="Client.html#writeRawBySymbol">writeRawBySymbol</a></li><li data-type='method'><a href="Client.html#writeRawMulti">writeRawMulti</a></li><li data-type='method'><a href="Client.html#writeSymbol">writeSymbol</a></li></ul></li><li><a href="ClientException.html">ClientException</a></li></ul><h3>Namespaces</h3><ul><li><a href="-_LibraryInternals.html">_LibraryInternals</a><ul class='methods'><li data-type='method'><a href="-_LibraryInternals.html#._amsNedIdStrToByteArray">_amsNedIdStrToByteArray</a></li><li data-type='method'><a href="-_LibraryInternals.html#._byteArrayToAmsNedIdStr">_byteArrayToAmsNedIdStr</a></li><li data-type='method'><a href="-_LibraryInternals.html#._checkReceivedData">_checkReceivedData</a></li><li data-type='method'><a href="-_LibraryInternals.html#._console">_console</a></li><li data-type='method'><a href="-_LibraryInternals.html#._createAmsHeader">_createAmsHeader</a></li><li data-type='method'><a href="-_LibraryInternals.html#._createAmsTcpHeader">_createAmsTcpHeader</a></li><li data-type='method'><a href="-_LibraryInternals.html#._createAmsTcpRequest">_createAmsTcpRequest</a></li><li data-type='method'><a href="-_LibraryInternals.html#._deepMergeObjects">_deepMergeObjects</a></li><li data-type='method'><a href="-_LibraryInternals.html#._getDataTypeInfo">_getDataTypeInfo</a></li><li data-type='method'><a href="-_LibraryInternals.html#._getDataTypeRecursive">_getDataTypeRecursive</a></li><li data-type='method'><a href="-_LibraryInternals.html#._onAdsCommandReceived">_onAdsCommandReceived</a></li><li data-type='method'><a href="-_LibraryInternals.html#._onAmsTcpPacketReceived">_onAmsTcpPacketReceived</a></li><li data-type='method'><a href="-_LibraryInternals.html#._onConnectionLost">_onConnectionLost</a></li><li data-type='method'><a href="-_LibraryInternals.html#._onPlcRuntimeStateChanged">_onPlcRuntimeStateChanged</a></li><li data-type='method'><a href="-_LibraryInternals.html#._onRouterStateChanged">_onRouterStateChanged</a></li><li data-type='method'><a href="-_LibraryInternals.html#._onSymbolVersionChanged">_onSymbolVersionChanged</a></li><li data-type='method'><a href="-_LibraryInternals.html#._parseAdsData">_parseAdsData</a></li><li data-type='method'><a href="-_LibraryInternals.html#._parseAdsNotification">_parseAdsNotification</a></li><li data-type='method'><a href="-_LibraryInternals.html#._parseAmsHeader">_parseAmsHeader</a></li><li data-type='method'><a href="-_LibraryInternals.html#._parseAmsTcpHeader">_parseAmsTcpHeader</a></li><li data-type='method'><a href="-_LibraryInternals.html#._parseAmsTcpPacket">_parseAmsTcpPacket</a></li><li data-type='method'><a href="-_LibraryInternals.html#._parseDataType">_parseDataType</a></li><li data-type='method'><a href="-_LibraryInternals.html#._parseJsObjectToBuffer">_parseJsObjectToBuffer</a></li><li data-type='method'><a href="-_LibraryInternals.html#._parseJsVariableToPlc">_parseJsVariableToPlc</a></li><li data-type='method'><a href="-_LibraryInternals.html#._parsePlcDataToObject">_parsePlcDataToObject</a></li><li data-type='method'><a href="-_LibraryInternals.html#._parsePlcVariableToJs">_parsePlcVariableToJs</a></li><li data-type='method'><a href="-_LibraryInternals.html#._parseSymbolInfo">_parseSymbolInfo</a></li><li data-type='method'><a href="-_LibraryInternals.html#._readDataTypeInfo">_readDataTypeInfo</a></li><li data-type='method'><a href="-_LibraryInternals.html#._readSymbolInfo">_readSymbolInfo</a></li><li data-type='method'><a href="-_LibraryInternals.html#._registerAdsPort">_registerAdsPort</a></li><li data-type='method'><a href="-_LibraryInternals.html#._reInitializeInternals">_reInitializeInternals</a></li><li data-type='method'><a href="-_LibraryInternals.html#._reInitializeSubscriptions">_reInitializeSubscriptions</a></li><li data-type='method'><a href="-_LibraryInternals.html#._sendAdsCommand">_sendAdsCommand</a></li><li data-type='method'><a href="-_LibraryInternals.html#._socketReceive">_socketReceive</a></li><li data-type='method'><a href="-_LibraryInternals.html#._socketWrite">_socketWrite</a></li><li data-type='method'><a href="-_LibraryInternals.html#._subcribeToPlcRuntimeStateChanges">_subcribeToPlcRuntimeStateChanges</a></li><li data-type='method'><a href="-_LibraryInternals.html#._subscribe">_subscribe</a></li><li data-type='method'><a href="-_LibraryInternals.html#._subscribeToSymbolVersionChanges">_subscribeToSymbolVersionChanges</a></li><li data-type='method'><a href="-_LibraryInternals.html#._systemManagerStatePoller">_systemManagerStatePoller</a></li><li data-type='method'><a href="-_LibraryInternals.html#._trimPlcString">_trimPlcString</a></li><li data-type='method'><a href="-_LibraryInternals.html#._unregisterAdsPort">_unregisterAdsPort</a></li><li data-type='method'><a href="-_LibraryInternals.html#._unsubscribeAllInternals">_unsubscribeAllInternals</a></li></ul></li></ul><h3><a href="global.html">Global</a></h3>
+    <h2><a href="index.html">Home</a></h2><h3>Classes</h3><ul><li><a href="Client.html">Client</a><ul class='methods'><li data-type='method'><a href="Client.html#.defaultSettings">defaultSettings</a></li><li data-type='method'><a href="Client.html#connect">connect</a></li><li data-type='method'><a href="Client.html#convertFromRaw">convertFromRaw</a></li><li data-type='method'><a href="Client.html#convertToRaw">convertToRaw</a></li><li data-type='method'><a href="Client.html#createVariableHandle">createVariableHandle</a></li><li data-type='method'><a href="Client.html#deleteVariableHandle">deleteVariableHandle</a></li><li data-type='method'><a href="Client.html#disconnect">disconnect</a></li><li data-type='method'><a href="Client.html#getDataType">getDataType</a></li><li data-type='method'><a href="Client.html#getEmptyPlcType">getEmptyPlcType</a></li><li data-type='method'><a href="Client.html#getSymbolInfo">getSymbolInfo</a></li><li data-type='method'><a href="Client.html#readAndCacheDataTypes">readAndCacheDataTypes</a></li><li data-type='method'><a href="Client.html#readAndCacheSymbols">readAndCacheSymbols</a></li><li data-type='method'><a href="Client.html#readDeviceInfo">readDeviceInfo</a></li><li data-type='method'><a href="Client.html#readPlcRuntimeState">readPlcRuntimeState</a></li><li data-type='method'><a href="Client.html#readRaw">readRaw</a></li><li data-type='method'><a href="Client.html#readRawByHandle">readRawByHandle</a></li><li data-type='method'><a href="Client.html#readRawByName">readRawByName</a></li><li data-type='method'><a href="Client.html#readRawBySymbol">readRawBySymbol</a></li><li data-type='method'><a href="Client.html#readRawMulti">readRawMulti</a></li><li data-type='method'><a href="Client.html#readSymbol">readSymbol</a></li><li data-type='method'><a href="Client.html#readSymbolVersion">readSymbolVersion</a></li><li data-type='method'><a href="Client.html#readSystemManagerState">readSystemManagerState</a></li><li data-type='method'><a href="Client.html#readUploadInfo">readUploadInfo</a></li><li data-type='method'><a href="Client.html#readWriteRaw">readWriteRaw</a></li><li data-type='method'><a href="Client.html#reconnect">reconnect</a></li><li data-type='method'><a href="Client.html#restartPlc">restartPlc</a></li><li data-type='method'><a href="Client.html#restartSystemManager">restartSystemManager</a></li><li data-type='method'><a href="Client.html#setDebugging">setDebugging</a></li><li data-type='method'><a href="Client.html#setSystemManagerToConfig">setSystemManagerToConfig</a></li><li data-type='method'><a href="Client.html#setSystemManagerToRun">setSystemManagerToRun</a></li><li data-type='method'><a href="Client.html#startPlc">startPlc</a></li><li data-type='method'><a href="Client.html#stopPlc">stopPlc</a></li><li data-type='method'><a href="Client.html#subscribe">subscribe</a></li><li data-type='method'><a href="Client.html#subscribeRaw">subscribeRaw</a></li><li data-type='method'><a href="Client.html#unsubscribe">unsubscribe</a></li><li data-type='method'><a href="Client.html#unsubscribeAll">unsubscribeAll</a></li><li data-type='method'><a href="Client.html#writeControl">writeControl</a></li><li data-type='method'><a href="Client.html#writeRaw">writeRaw</a></li><li data-type='method'><a href="Client.html#writeRawByHandle">writeRawByHandle</a></li><li data-type='method'><a href="Client.html#writeRawBySymbol">writeRawBySymbol</a></li><li data-type='method'><a href="Client.html#writeRawMulti">writeRawMulti</a></li><li data-type='method'><a href="Client.html#writeSymbol">writeSymbol</a></li></ul></li><li><a href="ClientException.html">ClientException</a></li></ul><h3>Namespaces</h3><ul><li><a href="-_LibraryInternals.html">_LibraryInternals</a><ul class='methods'><li data-type='method'><a href="-_LibraryInternals.html#._amsNedIdStrToByteArray">_amsNedIdStrToByteArray</a></li><li data-type='method'><a href="-_LibraryInternals.html#._byteArrayToAmsNedIdStr">_byteArrayToAmsNedIdStr</a></li><li data-type='method'><a href="-_LibraryInternals.html#._checkReceivedData">_checkReceivedData</a></li><li data-type='method'><a href="-_LibraryInternals.html#._console">_console</a></li><li data-type='method'><a href="-_LibraryInternals.html#._createAmsHeader">_createAmsHeader</a></li><li data-type='method'><a href="-_LibraryInternals.html#._createAmsTcpHeader">_createAmsTcpHeader</a></li><li data-type='method'><a href="-_LibraryInternals.html#._createAmsTcpRequest">_createAmsTcpRequest</a></li><li data-type='method'><a href="-_LibraryInternals.html#._deepMergeObjects">_deepMergeObjects</a></li><li data-type='method'><a href="-_LibraryInternals.html#._getDataTypeInfo">_getDataTypeInfo</a></li><li data-type='method'><a href="-_LibraryInternals.html#._getDataTypeRecursive">_getDataTypeRecursive</a></li><li data-type='method'><a href="-_LibraryInternals.html#._onAdsCommandReceived">_onAdsCommandReceived</a></li><li data-type='method'><a href="-_LibraryInternals.html#._onAmsTcpPacketReceived">_onAmsTcpPacketReceived</a></li><li data-type='method'><a href="-_LibraryInternals.html#._onConnectionLost">_onConnectionLost</a></li><li data-type='method'><a href="-_LibraryInternals.html#._onPlcRuntimeStateChanged">_onPlcRuntimeStateChanged</a></li><li data-type='method'><a href="-_LibraryInternals.html#._onRouterStateChanged">_onRouterStateChanged</a></li><li data-type='method'><a href="-_LibraryInternals.html#._onSymbolVersionChanged">_onSymbolVersionChanged</a></li><li data-type='method'><a href="-_LibraryInternals.html#._parseAdsData">_parseAdsData</a></li><li data-type='method'><a href="-_LibraryInternals.html#._parseAdsNotification">_parseAdsNotification</a></li><li data-type='method'><a href="-_LibraryInternals.html#._parseAmsHeader">_parseAmsHeader</a></li><li data-type='method'><a href="-_LibraryInternals.html#._parseAmsTcpHeader">_parseAmsTcpHeader</a></li><li data-type='method'><a href="-_LibraryInternals.html#._parseAmsTcpPacket">_parseAmsTcpPacket</a></li><li data-type='method'><a href="-_LibraryInternals.html#._parseDataType">_parseDataType</a></li><li data-type='method'><a href="-_LibraryInternals.html#._parseJsObjectToBuffer">_parseJsObjectToBuffer</a></li><li data-type='method'><a href="-_LibraryInternals.html#._parseJsVariableToPlc">_parseJsVariableToPlc</a></li><li data-type='method'><a href="-_LibraryInternals.html#._parsePlcDataToObject">_parsePlcDataToObject</a></li><li data-type='method'><a href="-_LibraryInternals.html#._parsePlcVariableToJs">_parsePlcVariableToJs</a></li><li data-type='method'><a href="-_LibraryInternals.html#._parseSymbolInfo">_parseSymbolInfo</a></li><li data-type='method'><a href="-_LibraryInternals.html#._readDataTypeInfo">_readDataTypeInfo</a></li><li data-type='method'><a href="-_LibraryInternals.html#._readSymbolInfo">_readSymbolInfo</a></li><li data-type='method'><a href="-_LibraryInternals.html#._registerAdsPort">_registerAdsPort</a></li><li data-type='method'><a href="-_LibraryInternals.html#._reInitializeInternals">_reInitializeInternals</a></li><li data-type='method'><a href="-_LibraryInternals.html#._reInitializeSubscriptions">_reInitializeSubscriptions</a></li><li data-type='method'><a href="-_LibraryInternals.html#._sendAdsCommand">_sendAdsCommand</a></li><li data-type='method'><a href="-_LibraryInternals.html#._socketReceive">_socketReceive</a></li><li data-type='method'><a href="-_LibraryInternals.html#._socketWrite">_socketWrite</a></li><li data-type='method'><a href="-_LibraryInternals.html#._subcribeToPlcRuntimeStateChanges">_subcribeToPlcRuntimeStateChanges</a></li><li data-type='method'><a href="-_LibraryInternals.html#._subscribe">_subscribe</a></li><li data-type='method'><a href="-_LibraryInternals.html#._subscribeToSymbolVersionChanges">_subscribeToSymbolVersionChanges</a></li><li data-type='method'><a href="-_LibraryInternals.html#._systemManagerStatePoller">_systemManagerStatePoller</a></li><li data-type='method'><a href="-_LibraryInternals.html#._trimPlcString">_trimPlcString</a></li><li data-type='method'><a href="-_LibraryInternals.html#._unregisterAdsPort">_unregisterAdsPort</a></li><li data-type='method'><a href="-_LibraryInternals.html#._unsubscribeAllInternals">_unsubscribeAllInternals</a></li></ul></li></ul><h3><a href="global.html">Global</a></h3>
 </nav>
 
 <div id="main">
@@ -76,7 +76,7 @@
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="ads-client.js.html">ads-client.js</a>, <a href="ads-client.js.html#line118">line 118</a>
+        <a href="ads-client.js.html">ads-client.js</a>, <a href="ads-client.js.html#line120">line 120</a>
     </li></ul></dd>
     
 
@@ -256,7 +256,7 @@
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="ads-client.js.html">ads-client.js</a>, <a href="ads-client.js.html#line145">line 145</a>
+        <a href="ads-client.js.html">ads-client.js</a>, <a href="ads-client.js.html#line147">line 147</a>
     </li></ul></dd>
     
 
@@ -319,7 +319,7 @@
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="ads-client.js.html">ads-client.js</a>, <a href="ads-client.js.html#line219">line 219</a>
+        <a href="ads-client.js.html">ads-client.js</a>, <a href="ads-client.js.html#line221">line 221</a>
     </li></ul></dd>
     
 
@@ -392,7 +392,7 @@
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="ads-client.js.html">ads-client.js</a>, <a href="ads-client.js.html#line188">line 188</a>
+        <a href="ads-client.js.html">ads-client.js</a>, <a href="ads-client.js.html#line190">line 190</a>
     </li></ul></dd>
     
 
@@ -475,7 +475,7 @@
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="ads-client.js.html">ads-client.js</a>, <a href="ads-client.js.html#line83">line 83</a>
+        <a href="ads-client.js.html">ads-client.js</a>, <a href="ads-client.js.html#line84">line 84</a>
     </li></ul></dd>
     
 
@@ -584,7 +584,7 @@
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="ads-client.js.html">ads-client.js</a>, <a href="ads-client.js.html#line285">line 285</a>
+        <a href="ads-client.js.html">ads-client.js</a>, <a href="ads-client.js.html#line287">line 287</a>
     </li></ul></dd>
     
 
@@ -697,7 +697,7 @@
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="ads-client.js.html">ads-client.js</a>, <a href="ads-client.js.html#line2181">line 2181</a>
+        <a href="ads-client.js.html">ads-client.js</a>, <a href="ads-client.js.html#line2254">line 2254</a>
     </li></ul></dd>
     
 
@@ -882,7 +882,7 @@
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="ads-client.js.html">ads-client.js</a>, <a href="ads-client.js.html#line2227">line 2227</a>
+        <a href="ads-client.js.html">ads-client.js</a>, <a href="ads-client.js.html#line2300">line 2300</a>
     </li></ul></dd>
     
 
@@ -1106,7 +1106,7 @@
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="ads-client.js.html">ads-client.js</a>, <a href="ads-client.js.html#line2037">line 2037</a>
+        <a href="ads-client.js.html">ads-client.js</a>, <a href="ads-client.js.html#line2110">line 2110</a>
     </li></ul></dd>
     
 
@@ -1269,7 +1269,7 @@
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="ads-client.js.html">ads-client.js</a>, <a href="ads-client.js.html#line2122">line 2122</a>
+        <a href="ads-client.js.html">ads-client.js</a>, <a href="ads-client.js.html#line2195">line 2195</a>
     </li></ul></dd>
     
 
@@ -1431,7 +1431,7 @@
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="ads-client.js.html">ads-client.js</a>, <a href="ads-client.js.html#line484">line 484</a>
+        <a href="ads-client.js.html">ads-client.js</a>, <a href="ads-client.js.html#line486">line 486</a>
     </li></ul></dd>
     
 
@@ -1614,7 +1614,7 @@ and disconnects target system and ADS router</p>
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="ads-client.js.html">ads-client.js</a>, <a href="ads-client.js.html#line1001">line 1001</a>
+        <a href="ads-client.js.html">ads-client.js</a>, <a href="ads-client.js.html#line1003">line 1003</a>
     </li></ul></dd>
     
 
@@ -1777,7 +1777,7 @@ and disconnects target system and ADS router</p>
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="ads-client.js.html">ads-client.js</a>, <a href="ads-client.js.html#line2295">line 2295</a>
+        <a href="ads-client.js.html">ads-client.js</a>, <a href="ads-client.js.html#line2368">line 2368</a>
     </li></ul></dd>
     
 
@@ -1939,7 +1939,7 @@ and disconnects target system and ADS router</p>
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="ads-client.js.html">ads-client.js</a>, <a href="ads-client.js.html#line1028">line 1028</a>
+        <a href="ads-client.js.html">ads-client.js</a>, <a href="ads-client.js.html#line1030">line 1030</a>
     </li></ul></dd>
     
 
@@ -2102,7 +2102,7 @@ and disconnects target system and ADS router</p>
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="ads-client.js.html">ads-client.js</a>, <a href="ads-client.js.html#line911">line 911</a>
+        <a href="ads-client.js.html">ads-client.js</a>, <a href="ads-client.js.html#line913">line 913</a>
     </li></ul></dd>
     
 
@@ -2216,7 +2216,7 @@ and disconnects target system and ADS router</p>
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="ads-client.js.html">ads-client.js</a>, <a href="ads-client.js.html#line821">line 821</a>
+        <a href="ads-client.js.html">ads-client.js</a>, <a href="ads-client.js.html#line823">line 823</a>
     </li></ul></dd>
     
 
@@ -2330,7 +2330,7 @@ and disconnects target system and ADS router</p>
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="ads-client.js.html">ads-client.js</a>, <a href="ads-client.js.html#line620">line 620</a>
+        <a href="ads-client.js.html">ads-client.js</a>, <a href="ads-client.js.html#line622">line 622</a>
     </li></ul></dd>
     
 
@@ -2443,7 +2443,7 @@ and disconnects target system and ADS router</p>
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="ads-client.js.html">ads-client.js</a>, <a href="ads-client.js.html#line678">line 678</a>
+        <a href="ads-client.js.html">ads-client.js</a>, <a href="ads-client.js.html#line680">line 680</a>
     </li></ul></dd>
     
 
@@ -2556,7 +2556,7 @@ and disconnects target system and ADS router</p>
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="ads-client.js.html">ads-client.js</a>, <a href="ads-client.js.html#line1574">line 1574</a>
+        <a href="ads-client.js.html">ads-client.js</a>, <a href="ads-client.js.html#line1580">line 1580</a>
     </li></ul></dd>
     
 
@@ -2765,7 +2765,7 @@ and disconnects target system and ADS router</p>
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="ads-client.js.html">ads-client.js</a>, <a href="ads-client.js.html#line1448">line 1448</a>
+        <a href="ads-client.js.html">ads-client.js</a>, <a href="ads-client.js.html#line1454">line 1454</a>
     </li></ul></dd>
     
 
@@ -2985,7 +2985,7 @@ and disconnects target system and ADS router</p>
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="ads-client.js.html">ads-client.js</a>, <a href="ads-client.js.html#line1476">line 1476</a>
+        <a href="ads-client.js.html">ads-client.js</a>, <a href="ads-client.js.html#line1482">line 1482</a>
     </li></ul></dd>
     
 
@@ -3147,7 +3147,7 @@ and disconnects target system and ADS router</p>
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="ads-client.js.html">ads-client.js</a>, <a href="ads-client.js.html#line1541">line 1541</a>
+        <a href="ads-client.js.html">ads-client.js</a>, <a href="ads-client.js.html#line1547">line 1547</a>
     </li></ul></dd>
     
 
@@ -3309,7 +3309,7 @@ and disconnects target system and ADS router</p>
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="ads-client.js.html">ads-client.js</a>, <a href="ads-client.js.html#line1666">line 1666</a>
+        <a href="ads-client.js.html">ads-client.js</a>, <a href="ads-client.js.html#line1672">line 1672</a>
     </li></ul></dd>
     
 
@@ -3472,7 +3472,7 @@ and disconnects target system and ADS router</p>
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="ads-client.js.html">ads-client.js</a>, <a href="ads-client.js.html#line1078">line 1078</a>
+        <a href="ads-client.js.html">ads-client.js</a>, <a href="ads-client.js.html#line1080">line 1080</a>
     </li></ul></dd>
     
 
@@ -3634,7 +3634,7 @@ and disconnects target system and ADS router</p>
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="ads-client.js.html">ads-client.js</a>, <a href="ads-client.js.html#line711">line 711</a>
+        <a href="ads-client.js.html">ads-client.js</a>, <a href="ads-client.js.html#line713">line 713</a>
     </li></ul></dd>
     
 
@@ -3747,7 +3747,7 @@ and disconnects target system and ADS router</p>
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="ads-client.js.html">ads-client.js</a>, <a href="ads-client.js.html#line648">line 648</a>
+        <a href="ads-client.js.html">ads-client.js</a>, <a href="ads-client.js.html#line650">line 650</a>
     </li></ul></dd>
     
 
@@ -3861,7 +3861,7 @@ Uses ADS port 10000, which is system manager</p>
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="ads-client.js.html">ads-client.js</a>, <a href="ads-client.js.html#line743">line 743</a>
+        <a href="ads-client.js.html">ads-client.js</a>, <a href="ads-client.js.html#line745">line 745</a>
     </li></ul></dd>
     
 
@@ -3962,6 +3962,237 @@ Uses ADS port 10000, which is system manager</p>
 
     
 
+    <h4 class="name" id="readWriteRaw"><span class="type-signature"></span>readWriteRaw<span class="signature">(indexGroup, indexOffset, readLength, dataBuffer)</span><span class="type-signature"> &rarr; {Promise.&lt;Buffer>}</span></h4>
+
+    
+
+
+
+
+<dl class="details">
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="ads-client.js.html">ads-client.js</a>, <a href="ads-client.js.html#line1791">line 1791</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+<div class="description usertext">
+    <p>Writes given byte Buffer to the target and reads result. Uses ADS command ReadWrite.</p>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+    <h5>Parameters:</h5>
+    
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>indexGroup</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">number</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last"><p>Index group in the PLC</p></td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>indexOffset</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">number</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last"><p>Index offset in the PLC</p></td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>readLength</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">number</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last"><p>Read data length in the PLC (bytes)</p></td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>dataBuffer</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">Buffer</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last"><p>Data to write</p></td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<h5>Returns:</h5>
+
+        
+<div class="param-desc">
+    <p>Returns a promise (async function)</p>
+<ul>
+<li>If resolved, writing and reading was successful and data is returned (Buffer)</li>
+<li>If rejected, command failed and error info is returned (object)</li>
+</ul>
+</div>
+
+
+
+<dl class="param-type">
+    <dt>
+        Type
+    </dt>
+    <dd>
+        
+<span class="param-type">Promise.&lt;Buffer></span>
+
+
+    </dd>
+</dl>
+
+    
+
+
+
+        
+            
+
+    
+
     <h4 class="name" id="reconnect"><span class="type-signature"></span>reconnect<span class="signature">(forceDisconnect<span class="signature-attributes">opt</span>)</span><span class="type-signature"> &rarr; {Promise}</span></h4>
 
     
@@ -3974,7 +4205,7 @@ Uses ADS port 10000, which is system manager</p>
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="ads-client.js.html">ads-client.js</a>, <a href="ads-client.js.html#line576">line 576</a>
+        <a href="ads-client.js.html">ads-client.js</a>, <a href="ads-client.js.html#line578">line 578</a>
     </li></ul></dd>
     
 
@@ -4156,7 +4387,7 @@ Uses ADS port 10000, which is system manager</p>
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="ads-client.js.html">ads-client.js</a>, <a href="ads-client.js.html#line2474">line 2474</a>
+        <a href="ads-client.js.html">ads-client.js</a>, <a href="ads-client.js.html#line2547">line 2547</a>
     </li></ul></dd>
     
 
@@ -4319,7 +4550,7 @@ Uses ADS port 10000, which is system manager</p>
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="ads-client.js.html">ads-client.js</a>, <a href="ads-client.js.html#line2574">line 2574</a>
+        <a href="ads-client.js.html">ads-client.js</a>, <a href="ads-client.js.html#line2647">line 2647</a>
     </li></ul></dd>
     
 
@@ -4434,7 +4665,7 @@ Internally same as setSystemManagerToRun()</p>
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="ads-client.js.html">ads-client.js</a>, <a href="ads-client.js.html#line247">line 247</a>
+        <a href="ads-client.js.html">ads-client.js</a>, <a href="ads-client.js.html#line249">line 249</a>
     </li></ul></dd>
     
 
@@ -4578,7 +4809,7 @@ Another way for environment variable DEBUG:</p>
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="ads-client.js.html">ads-client.js</a>, <a href="ads-client.js.html#line2540">line 2540</a>
+        <a href="ads-client.js.html">ads-client.js</a>, <a href="ads-client.js.html#line2613">line 2613</a>
     </li></ul></dd>
     
 
@@ -4692,7 +4923,7 @@ Another way for environment variable DEBUG:</p>
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="ads-client.js.html">ads-client.js</a>, <a href="ads-client.js.html#line2509">line 2509</a>
+        <a href="ads-client.js.html">ads-client.js</a>, <a href="ads-client.js.html#line2582">line 2582</a>
     </li></ul></dd>
     
 
@@ -4806,7 +5037,7 @@ Another way for environment variable DEBUG:</p>
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="ads-client.js.html">ads-client.js</a>, <a href="ads-client.js.html#line2400">line 2400</a>
+        <a href="ads-client.js.html">ads-client.js</a>, <a href="ads-client.js.html#line2473">line 2473</a>
     </li></ul></dd>
     
 
@@ -4969,7 +5200,7 @@ Another way for environment variable DEBUG:</p>
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="ads-client.js.html">ads-client.js</a>, <a href="ads-client.js.html#line2437">line 2437</a>
+        <a href="ads-client.js.html">ads-client.js</a>, <a href="ads-client.js.html#line2510">line 2510</a>
     </li></ul></dd>
     
 
@@ -5132,7 +5363,7 @@ Another way for environment variable DEBUG:</p>
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="ads-client.js.html">ads-client.js</a>, <a href="ads-client.js.html#line1271">line 1271</a>
+        <a href="ads-client.js.html">ads-client.js</a>, <a href="ads-client.js.html#line1273">line 1273</a>
     </li></ul></dd>
     
 
@@ -5414,7 +5645,7 @@ Another way for environment variable DEBUG:</p>
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="ads-client.js.html">ads-client.js</a>, <a href="ads-client.js.html#line1308">line 1308</a>
+        <a href="ads-client.js.html">ads-client.js</a>, <a href="ads-client.js.html#line1310">line 1310</a>
     </li></ul></dd>
     
 
@@ -5750,7 +5981,7 @@ Another way for environment variable DEBUG:</p>
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="ads-client.js.html">ads-client.js</a>, <a href="ads-client.js.html#line1350">line 1350</a>
+        <a href="ads-client.js.html">ads-client.js</a>, <a href="ads-client.js.html#line1352">line 1352</a>
     </li></ul></dd>
     
 
@@ -5912,7 +6143,7 @@ Another way for environment variable DEBUG:</p>
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="ads-client.js.html">ads-client.js</a>, <a href="ads-client.js.html#line1399">line 1399</a>
+        <a href="ads-client.js.html">ads-client.js</a>, <a href="ads-client.js.html#line1405">line 1405</a>
     </li></ul></dd>
     
 
@@ -6025,7 +6256,7 @@ Another way for environment variable DEBUG:</p>
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="ads-client.js.html">ads-client.js</a>, <a href="ads-client.js.html#line2345">line 2345</a>
+        <a href="ads-client.js.html">ads-client.js</a>, <a href="ads-client.js.html#line2418">line 2418</a>
     </li></ul></dd>
     
 
@@ -6316,7 +6547,7 @@ WriteControl can be used to start/stop PLC, set TwinCAT system to run/config and
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="ads-client.js.html">ads-client.js</a>, <a href="ads-client.js.html#line1843">line 1843</a>
+        <a href="ads-client.js.html">ads-client.js</a>, <a href="ads-client.js.html#line1916">line 1916</a>
     </li></ul></dd>
     
 
@@ -6524,7 +6755,7 @@ WriteControl can be used to start/stop PLC, set TwinCAT system to run/config and
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="ads-client.js.html">ads-client.js</a>, <a href="ads-client.js.html#line1780">line 1780</a>
+        <a href="ads-client.js.html">ads-client.js</a>, <a href="ads-client.js.html#line1853">line 1853</a>
     </li></ul></dd>
     
 
@@ -6709,7 +6940,7 @@ WriteControl can be used to start/stop PLC, set TwinCAT system to run/config and
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="ads-client.js.html">ads-client.js</a>, <a href="ads-client.js.html#line1811">line 1811</a>
+        <a href="ads-client.js.html">ads-client.js</a>, <a href="ads-client.js.html#line1884">line 1884</a>
     </li></ul></dd>
     
 
@@ -6894,7 +7125,7 @@ WriteControl can be used to start/stop PLC, set TwinCAT system to run/config and
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="ads-client.js.html">ads-client.js</a>, <a href="ads-client.js.html#line1922">line 1922</a>
+        <a href="ads-client.js.html">ads-client.js</a>, <a href="ads-client.js.html#line1995">line 1995</a>
     </li></ul></dd>
     
 
@@ -7057,7 +7288,7 @@ WriteControl can be used to start/stop PLC, set TwinCAT system to run/config and
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="ads-client.js.html">ads-client.js</a>, <a href="ads-client.js.html#line1154">line 1154</a>
+        <a href="ads-client.js.html">ads-client.js</a>, <a href="ads-client.js.html#line1156">line 1156</a>
     </li></ul></dd>
     
 
@@ -7284,7 +7515,7 @@ WriteControl can be used to start/stop PLC, set TwinCAT system to run/config and
 <br class="clear">
 
 <footer>
-    Documentation generated by <a href="https://github.com/jsdoc3/jsdoc">JSDoc 3.6.4</a> on Mon Jun 22 2020 19:24:18 GMT+0300 (GMT+03:00) using the <a href="https://github.com/clenemt/docdash">docdash</a> theme.
+    Documentation generated by <a href="https://github.com/jsdoc3/jsdoc">JSDoc 3.6.4</a> on Tue Jun 23 2020 19:15:15 GMT+0300 (GMT+03:00) using the <a href="https://github.com/clenemt/docdash">docdash</a> theme.
 </footer>
 
 <script>prettyPrint();</script>
