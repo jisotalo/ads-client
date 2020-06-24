@@ -3933,9 +3933,68 @@ function _parseSymbolInfo(data) {
   //...... Symbol comment
   symbol.comment = _trimPlcString(iconv.decode(data.slice(pos, pos + symbol.commentLength + 1), 'cp1252'))
   pos += symbol.commentLength + 1
+  
+  //Array data
+  symbol.arrayData = []
+  for (let i = 0; i < symbol.arrayDimension; i++) {
+    const array = {}
 
-  //The rest of the data would contain ArrayInfo, TypeGuid, Attributes and reserved bytes
-  //Skipping for now
+    array.startIndex = data.readUInt32LE(pos)
+    pos += 4
+  
+    array.length = data.readUInt32LE(pos)
+    pos += 4
+
+    symbol.arrayData.push(array)
+  }
+
+   //If flags contain TypeGuid
+   if (symbol.flagsStr.includes('TypeGuid')) {
+    symbol.typeGuid = data.slice(pos, pos + 16).toString('hex')
+    pos += 16
+  }
+  
+  //If flags contain Attributes (TwinCAT.Ads.dll: AdsAttributeEntry)
+  //Attribute is for example, a pack-mode attribute above struct
+  if (symbol.flagsStr.includes('Attributes')) {
+    symbol.attributeCount = data.readUInt16LE(pos)
+    pos += 2
+
+    //Attributes
+    symbol.attributes = []
+    for (let i = 0; i < symbol.attributeCount; i++) {
+      let attr = {}
+
+      //Name length
+      let nameLen = data.readUInt8(pos)
+      pos += 1
+
+      //Value length
+      let valueLen = data.readUInt8(pos)
+      pos += 1
+
+      //Name
+      attr.name = _trimPlcString(iconv.decode(data.slice(pos, pos + nameLen + 1), 'cp1252'))
+      pos += (nameLen + 1)
+
+      //Value
+      attr.value = _trimPlcString(iconv.decode(data.slice(pos, pos + valueLen + 1), 'cp1252'))
+      pos += (valueLen + 1)
+
+      symbol.attributes.push(attr)
+    }
+  }
+
+   //If flags contain ExtendedFlags
+  if (symbol.flagsStr.includes('ExtendedFlags')) {
+    //Add later if required (32 bit integer)
+    symbol.ExtendedFlags = data.readUInt32LE(pos)
+    pos += 4
+  }
+
+  //Reserved, if any
+  symbol.reserved = data.slice(pos)
+
   return symbol
 }
 
