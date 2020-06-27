@@ -28,6 +28,7 @@ const ADS = require('./ads-client-ads.js')
 const net = require('net')
 const long = require('long')
 const iconv = require('iconv-lite')
+const { fromBytesBE } = require('long')
 
 //-------------- Debugs --------------
 const debug = require('debug')(PACKAGE_NAME)
@@ -2651,6 +2652,156 @@ class Client {
 
 
 
+
+
+
+
+
+  invokeRpcMethod(variableName, methodName, parameters = {}) {
+    return new Promise(async (resolve, reject) => {
+      try {
+        debug(`invokeRpcMethod(): Invoking RPC method ${variableName}.${methodName}`)
+
+        //Get symbol from cache or from PLC
+        let symbol = {}
+        try {
+          debugD(`invokeRpcMethod(): Reading symbol info for ${variableName}`)
+
+          symbol = await this.getSymbolInfo(variableName)
+        } catch (err) {
+          return reject(new ClientException(this, 'invokeRpcMethod()', `Reading symbol ${variableName} failed: Reading symbol info failed`, err))
+        }
+
+        //Create the data type
+        let dataType = {}
+        try {
+          debugD(`invokeRpcMethod(): Reading symbol data type for ${variableName}`)
+
+          dataType = await this.getDataType(symbol.type)
+        } catch (err) {
+          return reject(new ClientException(this, 'invokeRpcMethod()', `Reading symbol ${variableName} failed: Reading data type failed`, err))
+        }
+
+        //Get the required method if exist
+        const method = dataType.rpcMethods.find(m => m.name.toLowerCase() === methodName.toLowerCase().trim())
+
+        if (method == null) {
+          return reject(new ClientException(this, 'invokeRpcMethod()', `Given symbol ${variableName} has no RPC method "${methodName}". Make sure you have added pragma {attribute 'TcRpcEnable'} above method definition.`))
+        }
+
+
+        //Loop all parameters and create data buffer
+        let paramBuffer = Buffer.alloc(0)
+
+        for (let param of method.parameters) {
+          let foundParam = null
+
+          //First, try if we get the parameter easy way
+          if (parameters[param.name] !== undefined) {
+            foundParam = parameters[param.name]
+
+          } else {
+            //Not found, try case-insensitive way
+            try {
+              foundParam = Object.keys(parameters).find(objKey => objKey.toLowerCase().trim() === param.name.toLowerCase().trim())
+                
+            } catch (err) {
+              //value is null or not object or something else
+              foundParam = null
+            }
+          }
+
+          if (foundParam == null) {
+            return reject(new ClientException(this, 'invokeRpcMethod()', `Given parameters are missing at least parameter "${param.name}" (${param.type})`))
+          }
+
+          //Parse parameter to byte buffer
+          try {
+            debugD(`invokeRpcMethod(): Parsing parameter ${foundParam} to raw data`)
+
+            const dataBuffer = await this.convertToRaw(parameters[foundParam], param.type)
+            paramBuffer = Buffer.concat([paramBuffer, dataBuffer])
+            
+          } catch (err) {
+            return reject(new ClientException(this, 'invokeRpcMethod()', `Converting parameter ${foundParam} to raw data failed`, err))
+          }
+        }
+        
+        //Create handle to the method
+        let handle = 0
+        try {
+          debugD(`invokeRpcMethod(): Creating variable handle to RPC method`)
+
+          handle = await this.createVariableHandle(`${variableName}#${methodName}`)
+          
+        } catch (err) {
+          return reject(new ClientException(this, 'invokeRpcMethod()', `Creating variable handle to RPC method failed`, err))
+        }
+          
+      
+        //Allocating bytes for request
+        const data = Buffer.alloc(16 + paramBuffer.byteLength) 
+        let pos = 0
+
+        //0..3 IndexGroup
+        data.writeUInt32LE(ADS.ADS_RESERVED_INDEX_GROUPS.SymbolValueByHandle, pos)
+        pos += 4
+      
+        //4..7 IndexOffset
+        data.writeUInt32LE(handle.handle, pos)
+        pos += 4
+      
+        //8..11 Read data length
+        data.writeUInt32LE(method.returnSize, pos)
+        pos += 4
+
+        //12..15 Write data length
+        data.writeUInt32LE(paramBuffer.byteLength, pos)
+        pos += 4
+
+        //16..n Data
+        paramBuffer.copy(data, pos)
+        
+        _sendAdsCommand.call(this, ADS.ADS_COMMAND.ReadWrite, data)
+          .then(async res => {
+            debugD(`invokeRpcMethod(): Invoking RPC method was successful`)
+            
+            //Delete variable handle
+            try {
+              debugD(`invokeRpcMethod(): Deleting variable handle %o`, handle)
+              await this.deleteVariableHandle(handle)
+
+            } catch (err) {
+              return reject(new ClientException(this, 'invokeRpcMethod()', `Deleting variable handle failed`, err))
+            }
+
+            //Parse return data to Javascript object and resolve
+            try {
+              debugD(`invokeRpcMethod(): Converting return data (${res.ads.data.byteLength} bytes) to Javascript object`)
+              
+              const returnData = await this.convertFromRaw(res.ads.data, method.returnType)
+
+              debug(`invokeRpcMethod(): Invoking RPC method ${variableName}.${methodName} was successful and ${res.ads.data.byteLength} bytes data returned`)
+              return resolve(returnData)
+
+            } catch (err) {
+              return reject(new ClientException(this, 'invokeRpcMethod()', `Converting method return data to Javascript object failed`, err))
+            }
+
+          })
+          .catch((res) => {
+            debug(`invokeRpcMethod(): Invoking RPC method ${variableName}.${methodName} failed: %o`, res)
+            return reject(new ClientException(this, 'invokeRpcMethod()', `Invoking RPC method ${variableName}.${methodName} failed`, res))
+          })
+        
+      } catch (err) {
+        debug(`invokeRpcMethod(): Invoking RPC method ${variableName}.${methodName} failed`, err)
+        reject (err)
+      }
+    })
+  }
+
+
 }
 
 
@@ -3782,20 +3933,156 @@ async function _parseDataType(data) {
     pos += dataType.size
   }
 
+  dataType.rpcMethods = []
+
   //If flags contain MethodInfos (TwinCAT.Ads.dll: AdsMethodEntry)
   if (dataType.flagsStr.includes('MethodInfos')) {
     dataType.methodCount = data.readUInt16LE(pos)
     pos += 2
 
-    //Methods
-    dataType.methods = []
+    //RPC methods
     for (let i = 0; i < dataType.methodCount; i++) {
+      const method = {}
+
       //Get method length
       let len = data.readUInt32LE(pos)
       pos += 4
+      
+      //4..7 Version
+      method.version = data.readUInt32LE(pos)
+      pos += 4
 
-      //Lets skip the method parsing for now
-      pos += (len - 4)
+      //8..11 Virtual table index
+      method.vTableIndex = data.readUInt32LE(pos)
+      pos += 4
+
+      //12..15 Return size
+      method.returnSize = data.readUInt32LE(pos)
+      pos += 4
+
+      //16..19 Return align size
+      method.returnAlignSize = data.readUInt32LE(pos)
+      pos += 4
+
+      //20..23 Reserved
+      method.reserved = data.readUInt32LE(pos)
+      pos += 4
+
+      //24..27 Return type GUID
+      method.returnTypeGuid = data.slice(pos, pos + 16).toString('hex')
+      pos += 16
+
+      //28..31 Return data type
+      method.retunAdsDataType = data.readUInt32LE(pos)
+      method.retunAdsDataTypeStr = ADS.ADS_DATA_TYPES.toString(method.retunAdsDataType)
+      pos += 4
+
+      //27..30 Flags (AdsDataTypeFlags)
+      method.flags = data.readUInt16LE(pos)
+      method.flagsStr = ADS.ADS_DATA_TYPE_FLAGS.toStringArray(method.flags)
+      pos += 4
+  
+      //31..32 Name length
+      method.nameLength = data.readUInt16LE(pos)
+      pos += 2
+      
+      //33..34 Return type length
+      method.returnTypeLength = data.readUInt16LE(pos)
+      pos += 2
+      
+      //35..36 Comment length
+      method.commentLength = data.readUInt16LE(pos)
+      pos += 2
+      
+      //37..38 Parameter count
+      method.parameterCount = data.readUInt16LE(pos)
+      pos += 2
+          
+      //39.... Name
+      method.name = _trimPlcString(iconv.decode(data.slice(pos, pos + method.nameLength + 1), 'cp1252'))
+      pos += method.nameLength + 1
+
+      //...... Return type
+      method.returnType = _trimPlcString(iconv.decode(data.slice(pos, pos + method.returnTypeLength + 1), 'cp1252'))
+      pos += method.returnTypeLength + 1
+      
+      //...... Comment
+      method.comment = _trimPlcString(iconv.decode(data.slice(pos, pos + method.commentLength + 1), 'cp1252'))
+      pos += method.commentLength + 1 
+
+      method.parameters = []
+
+      for (let p = 0; p < method.parameterCount; p++) {
+        const param = {}
+
+        let paramStartPos = pos
+
+        //Get parameter length
+        let paramLen = data.readUInt32LE(pos)
+        pos += 4
+    
+        //4..7 Size
+        param.size = data.readUInt32LE(pos)
+        pos += 4
+
+        //8..11 Align size
+        param.alignSize = data.readUInt32LE(pos)
+        pos += 4
+
+        //12..15 Data type
+        param.adsDataType = data.readUInt32LE(pos)
+        param.adsDataTypeStr = ADS.ADS_DATA_TYPES.toString(param.adsDataType)
+        pos += 4
+  
+        //16..19 Flags (AdsDataTypeFlags)
+        param.flags = data.readUInt16LE(pos)
+        param.flagsStr = ADS.ADS_DATA_TYPE_FLAGS.toStringArray(param.flags)
+        pos += 4
+
+        //20..23 Reserved
+        param.reserved = data.readUInt32LE(pos)
+        pos += 4
+
+        //24..27 Type GUID
+        param.typeGuid = data.slice(pos, pos + 16).toString('hex')
+        pos += 16
+        
+        //28..31 LengthIsPara
+        param.lengthIsPara = data.readUInt16LE(pos)
+        pos += 2
+        
+        //32..33 Name length
+        param.nameLength = data.readUInt16LE(pos)
+        pos += 2
+        
+        //34..35 Type length
+        param.typeLength = data.readUInt16LE(pos)
+        pos += 2
+        
+        //36..37 Comment length
+        param.commentLength = data.readUInt16LE(pos)
+        pos += 2
+          
+        //38.... Name
+        param.name = _trimPlcString(iconv.decode(data.slice(pos, pos + param.nameLength + 1), 'cp1252'))
+        pos += param.nameLength + 1
+
+        //...... Type
+        param.type = _trimPlcString(iconv.decode(data.slice(pos, pos + param.typeLength + 1), 'cp1252'))
+        pos += param.typeLength + 1
+        
+        //...... Comment
+        param.comment = _trimPlcString(iconv.decode(data.slice(pos, pos + param.commentLength + 1), 'cp1252'))
+        pos += param.commentLength + 1 
+
+        if (pos - paramStartPos > paramLen) {
+          //There is some additional data
+          param.reserved2 = data.slice(pos)
+        }
+        method.parameters.push(param)
+      }
+
+      dataType.rpcMethods.push(method)
     }
   }
 
@@ -4444,6 +4731,7 @@ function _readDataTypeInfo(dataTypeName) {
         adsDataTypeStr: dataType.adsDataTypeStr,
         comment: dataType.comment,
         attributes: (dataType.attributes ? dataType.attributes : []),
+        rpcMethods: dataType.rpcMethods,
         arrayData: [],
         subItems: []
       }
