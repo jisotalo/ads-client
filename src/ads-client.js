@@ -28,7 +28,6 @@ const ADS = require('./ads-client-ads.js')
 const net = require('net')
 const long = require('long')
 const iconv = require('iconv-lite')
-const { fromBytesBE } = require('long')
 
 //-------------- Debugs --------------
 const debug = require('debug')(PACKAGE_NAME)
