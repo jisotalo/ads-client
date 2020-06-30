@@ -801,6 +801,44 @@ const ADS_DATA_TYPES = {
 }
 exports.ADS_DATA_TYPES = ADS_DATA_TYPES
 
+
+
+/**
+ * ADS RCP method parameter flags
+ * 
+ * Source: TwinCAT.Ads.dll By Beckhoff
+ */
+const RCP_METHOD_PARAM_FLAGS = {
+  /// <summary>Input Parameter (ADSMETHODPARAFLAG_IN)</summary>
+  In: 1,
+  /// <summary>Output Parameter (ADSMETHODPARAFLAG_OUT)</summary>
+  Out: 2,
+  /// <summary>
+  /// By reference Parameter (ADSMETHODPARAFLAG_BYREFERENCE)
+  /// </summary>
+  ByReference: 4,
+  /// <summary>Mask for In parameters.</summary>
+  MaskIn: 5,
+  /// <summary>Mask for Out parameters.</summary>
+  MaskOut: 6,
+
+  toStringArray: function (flags) {
+    let flagsStr = []
+
+    Object.keys(RCP_METHOD_PARAM_FLAGS).forEach((item) => {
+      //Check if flag is available
+      if ((flags & RCP_METHOD_PARAM_FLAGS[item]) === RCP_METHOD_PARAM_FLAGS[item]) {
+        if (flags === 0 || RCP_METHOD_PARAM_FLAGS[item] !== 0) flagsStr.push(item)
+      }
+    })
+      
+    return flagsStr
+  }
+}
+exports.RCP_METHOD_PARAM_FLAGS = RCP_METHOD_PARAM_FLAGS
+
+
+
 /**
  * AMS router state
  */
