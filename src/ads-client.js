@@ -2714,10 +2714,11 @@ class Client {
 
 
         //Gather output parametera (if any), loop input parameters and create data buffer
+        //Todo: Use bitmask instead of === as it COULD be possible to have multiple values
         const outputParameters = method.parameters.filter(p => p.flags === ADS.RCP_METHOD_PARAM_FLAGS.Out)
         let inputParamBuffer = Buffer.alloc(0)
 
-        for (let param of method.parameters.filter(p => p.flags == ADS.RCP_METHOD_PARAM_FLAGS.In)) {
+        for (let param of method.parameters.filter(p => p.flags === ADS.RCP_METHOD_PARAM_FLAGS.In)) {
           let foundParam = null
 
           //First, try if we get the parameter easy way
@@ -2777,7 +2778,7 @@ class Client {
         data.writeUInt32LE(handle.handle, pos)
         pos += 4
       
-        //8..11 Read data length
+        //8..11 Read data length (return value size + total var_output size)
         data.writeUInt32LE(method.returnSize + outputParameters.reduce((total, param) => total + param.size, 0), pos)
         pos += 4
 
@@ -2828,7 +2829,7 @@ class Client {
 
               return resolve(returnData)
             } catch (err) {
-              return reject(new ClientException(this, 'invokeRpcMethod()', `Converting method return data to Javascript object failed`, err))
+              return reject(new ClientException(this, 'invokeRpcMethod()', `Converting method return or output data to Javascript object failed`, err))
             }
 
           })
