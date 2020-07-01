@@ -2714,7 +2714,7 @@ class Client {
 
           //First, try if we get the parameter easy way
           if (parameters[param.name] !== undefined) {
-            foundParam = parameters[param.name]
+            foundParam = param.name
 
           } else {
             //Not found, try case-insensitive way
