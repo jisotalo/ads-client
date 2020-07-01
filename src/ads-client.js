@@ -2658,6 +2658,13 @@ class Client {
 
 
 
+  /**
+   * @typedef RpcMethodResult
+   * 
+   * @property {object} returnValue - The return value of the method
+   * @property {object} outputs - Object containing all VAR_OUTPUT variables of the method
+   * 
+   */
 
  
   /**
@@ -2669,8 +2676,8 @@ class Client {
    * @param {string} methodName Method name to invoke
    * @param {object} parameters Method parameters as object - Example: {param1: value, param2: value}
    * 
-   * @returns {Promise<object>} Returns a promise (async function)
-   * - If resolved, invoking was successful and method return data is returned
+   * @returns {Promise<RpcMethodResult>} Returns a promise (async function)
+   * - If resolved, invoking was successful and method return data (return value and outputs) is returned
    * - If rejected, command failed error info is returned (object)
    */
   invokeRpcMethod(variableName, methodName, parameters = {}) {
@@ -2688,6 +2695,7 @@ class Client {
           return reject(new ClientException(this, 'invokeRpcMethod()', `Invoking method ${methodName} failed. Reading symbol info for ${variableName} failed`, err))
         }
 
+
         //Create the data type
         let dataType = {}
         try {
@@ -2700,16 +2708,16 @@ class Client {
 
         //Get the required method if exist
         const method = dataType.rpcMethods.find(m => m.name.toLowerCase() === methodName.toLowerCase().trim())
-
         if (method == null) {
           return reject(new ClientException(this, 'invokeRpcMethod()', `Given symbol ${variableName} has no RPC method "${methodName}". Make sure you have added pragma {attribute 'TcRpcEnable'} above method definition.`))
         }
 
 
-        //Loop all parameters and create data buffer
-        let paramBuffer = Buffer.alloc(0)
+        //Gather output parametera (if any), loop input parameters and create data buffer
+        const outputParameters = method.parameters.filter(p => p.flags === ADS.RCP_METHOD_PARAM_FLAGS.Out)
+        let inputParamBuffer = Buffer.alloc(0)
 
-        for (let param of method.parameters) {
+        for (let param of method.parameters.filter(p => p.flags == ADS.RCP_METHOD_PARAM_FLAGS.In)) {
           let foundParam = null
 
           //First, try if we get the parameter easy way
@@ -2737,14 +2745,14 @@ class Client {
 
             //Note 'internal': So we get better error message for this use
             const dataBuffer = await this.convertToRaw(parameters[foundParam], param.type, 'internal')
-            paramBuffer = Buffer.concat([paramBuffer, dataBuffer])
+            inputParamBuffer = Buffer.concat([inputParamBuffer, dataBuffer])
             
           } catch (err) {
             return reject(new ClientException(this, 'invokeRpcMethod()', `Parsing RPC method parameter "${foundParam}" failed: ${err.message}`, err))
           }
         }
 
-
+        
         //Create handle to the method
         let handle = 0
         try {
@@ -2758,7 +2766,7 @@ class Client {
         
         
         //Allocating bytes for request
-        const data = Buffer.alloc(16 + paramBuffer.byteLength) 
+        const data = Buffer.alloc(16 + inputParamBuffer.byteLength) 
         let pos = 0
 
         //0..3 IndexGroup
@@ -2770,20 +2778,20 @@ class Client {
         pos += 4
       
         //8..11 Read data length
-        data.writeUInt32LE(method.returnSize, pos)
+        data.writeUInt32LE(method.returnSize + outputParameters.reduce((total, param) => total + param.size, 0), pos)
         pos += 4
 
         //12..15 Write data length
-        data.writeUInt32LE(paramBuffer.byteLength, pos)
+        data.writeUInt32LE(inputParamBuffer.byteLength, pos)
         pos += 4
 
         //16..n Data
-        paramBuffer.copy(data, pos) 
+        inputParamBuffer.copy(data, pos) 
         
         _sendAdsCommand.call(this, ADS.ADS_COMMAND.ReadWrite, data)
           .then(async res => {
             debugD(`invokeRpcMethod(): Invoking RPC method was successful`)
-            
+
             //Delete variable handle
             try {
               debugD(`invokeRpcMethod(): Deleting variable handle %o`, handle)
@@ -2793,11 +2801,28 @@ class Client {
               return reject(new ClientException(this, 'invokeRpcMethod()', `Deleting variable handle failed`, err))
             }
 
-            //Parse return data to Javascript object and resolve
+            //Parse return data
             try {
-              debugD(`invokeRpcMethod(): Converting return data (${res.ads.data.byteLength} bytes) to Javascript object`)
+              debugD(`invokeRpcMethod(): Converting return data (${res.ads.data.byteLength} bytes) to Javascript objects`)
               
-              const returnData = await this.convertFromRaw(res.ads.data, method.returnType)
+              let pos = 0
+
+              const returnData = {
+                returnValue: null,
+                outputs: {}
+              }
+
+              //Method return value
+              if (method.returnSize > 0) {
+                returnData.returnValue = await this.convertFromRaw(res.ads.data.slice(pos, pos + method.returnSize), method.returnType)
+                pos += method.returnSize
+              }
+
+              //VAR_OUTPUT parameters
+              for (let param of outputParameters) {
+                returnData.outputs[param.name] = await this.convertFromRaw(res.ads.data.slice(pos, pos + param.size), param.type)
+                pos += param.size
+              }
 
               debug(`invokeRpcMethod(): Invoking RPC method ${variableName}.${methodName} was successful and ${res.ads.data.byteLength} bytes data returned`)
 
