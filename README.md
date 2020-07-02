@@ -90,7 +90,8 @@ const ads = require('ads-client')
 - Automatic byte alignment support (all pack-modes automatically supported) 
   - **From version 1.6.0 upwards**
   - Older versions: `{attribute 'pack_mode' := '1'}` is required above STRUCT definition
-
+- Possibility to call function block methods (RPC - remote procedure call)
+  - **From version 1.8.0 upwards**
 
 
 # Supported and tested platforms

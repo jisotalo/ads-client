@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Input parameters (VAR_INPUT) can be provided as Javascript objects
   - Method return value is returned as Javascript object
   - Method outputs (VAR_OUTPUT) are also returned as Javascript objects
+- Support for `UNION` data type confirmed
 
 ## [1.7.1] - 24.06.2020
 ### Changed
