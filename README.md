@@ -55,6 +55,7 @@ Coded from scratch using [TwinCAT ADS specification](https://infosys.beckhoff.co
     - [Creating a variable handle and writing a raw value](#creating-a-variable-handle-and-writing-a-raw-value)
     - [Converting a raw value to Javascript object](#converting-a-raw-value-to-javascript-object)
     - [Converting a Javascript object to raw value](#converting-a-javascript-object-to-raw-value)
+  - [Calling a function block method with parameters using RPC (remote procedure call)](#calling-a-function-block-method-with-parameters-using-rpc-remote-procedure-call)
   - [Starting and stopping the PLC](#starting-and-stopping-the-plc)
   - [Starting and stopping the TwinCAT system](#starting-and-stopping-the-twincat-system)
 - [Debugging](#debugging)
@@ -89,7 +90,8 @@ const ads = require('ads-client')
 - Automatic byte alignment support (all pack-modes automatically supported) 
   - **From version 1.6.0 upwards**
   - Older versions: `{attribute 'pack_mode' := '1'}` is required above STRUCT definition
-
+- Possibility to call function block methods (RPC - remote procedure call)
+  - **From version 1.8.0 upwards**
 
 
 # Supported and tested platforms
@@ -1028,6 +1030,119 @@ const data = await client.convertToRaw(
 )
 console.log(data)
 //<Buffer 48 65 6c 6c 6f 20 ... >
+```
+
+## Calling a function block method with parameters using RPC (remote procedure call)
+Starting from version 1.8.0, it is possible to call function block methods directly from Node.js. Input and output parameters are available as well as method return value.
+
+---
+**WARNING - IMPORTANT NOTE**
+- Do not use online change if you change RPC method parameters or return data types
+- Make sure that parameters and return value have no `pack-mode` pragmas defined, otherwise data might be corrupted
+- Do not use `ARRAY` values directly in parameters or return value, encapsulate arrays inside struct and use the struct instead
+- The feature is new and there might some bugs as it's not well documented by Beckhoff
+---
+
+In the following example we have a function block named `FB_RpcTest`. There is an instance of it at global variable list with a path of `GVL_Test.RpcTest`.
+
+![image](https://user-images.githubusercontent.com/13457157/86382902-9cccb880-bc96-11ea-83b8-daae9de65a66.png)
+
+### Calling a simple RPC method
+
+The code of `Calculator` method is the following. It has also VAR_OUTPUT parameters. Idea is that calculation is returned as outputs and return value tells if it was succesful.
+```
+{attribute 'TcRpcEnable'}
+METHOD Calculator : BOOL
+VAR_INPUT
+  Value1	: REAL;
+  Value2	: REAL;
+END_VAR
+VAR_OUTPUT
+  Sum       : REAL;
+  Product   : REAL;
+  Division  : REAL;
+END_VAR
+
+//--- Code begins ---
+
+//Return TRUE if all success
+Calculator := TRUE;
+
+Sum := Value1 + Value2;
+Product := Value1 * Value2;
+
+IF Value2 <> 0 THEN
+	Division := Value1 / Value2;
+ELSE
+	Division := 0;
+	Calculator := FALSE;
+END_IF
+```
+
+The method can be called from Node.js:
+```js
+const result = await client.invokeRpcMethod("GVL_Test.RpcTest","Calculator", {
+    Value1: 100.50,
+    Value2: 2.2
+})
+
+console.log(result)
+
+/*
+Example console output:
+
+{
+  returnValue: true,
+  outputs: {
+    Sum: 102.69999694824219,
+    Product: 221.10000610351562,
+    Division: 45.68181610107422
+  }
+}
+*/
+```
+
+### Using structs with RPC methods
+
+The code of the `StructTest` method is following. It has only one input and a return value (both are structs).
+
+```
+{attribute 'TcRpcEnable'}
+METHOD StructTest : ST_Example
+VAR_INPUT
+	Input	: ST_Example;
+END_VAR
+
+//--- Code begins ---
+
+StructTest.SomeText := CONCAT('Response: ', Input.SomeText);
+StructTest.SomeReal := Input.SomeReal * 10.0;
+StructTest.SomeDate := Input.SomeDate + T#24H;
+```
+The method can be called from Node.js:
+
+```js
+const result = await client.invokeRpcMethod("GVL_Test.RpcTest","StructTest", {
+  Input: {
+    SomeText: 'Hello RPC method',
+    SomeReal: 1200.50,
+    SomeDate: new Date() //2020-07-03T14:57:22.000Z
+  }
+})
+
+console.log(result)
+/*
+Example console output:
+
+{
+  returnValue: {
+    SomeText: 'Response: Hello RPC method',
+    SomeReal: 12005,
+    SomeDate: 2020-07-03T15:57:22.000Z
+  },
+  outputs: {}
+}
+*/
 ```
 
 
