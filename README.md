@@ -55,6 +55,7 @@ Coded from scratch using [TwinCAT ADS specification](https://infosys.beckhoff.co
     - [Creating a variable handle and writing a raw value](#creating-a-variable-handle-and-writing-a-raw-value)
     - [Converting a raw value to Javascript object](#converting-a-raw-value-to-javascript-object)
     - [Converting a Javascript object to raw value](#converting-a-javascript-object-to-raw-value)
+  - [Calling a function block method with parameters using RPC (remote procedure call)](#calling-a-function-block-method-with-parameters-using-rpc-remote-procedure-call)
   - [Starting and stopping the PLC](#starting-and-stopping-the-plc)
   - [Starting and stopping the TwinCAT system](#starting-and-stopping-the-twincat-system)
 - [Debugging](#debugging)
