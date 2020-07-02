@@ -4,6 +4,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.8.0] - 02.07.2020
+### Added
+- New method `invokeRpcMethod()`
+  - Call any function block METHOD from Node.js (requires pragma `{attribute 'TcRpcEnable'}` to object definition)
+  - Input parameters (VAR_INPUT) can be provided as Javascript objects
+  - Method return value is returned as Javascript object
+  - Method outputs (VAR_OUTPUT) are also returned as Javascript objects
 
 ## [1.7.1] - 24.06.2020
 ### Changed
