@@ -23,7 +23,6 @@ SOFTWARE.
 */
 
 
-
 /**
  * AMS/TCP header length
  */
@@ -866,21 +865,7 @@ const BASE_DATA_TYPES = {
    * @param {string} name Data type name
    */
   isKnownType: function (name) {
-    name = name.trim()
-
-    let found = this.find(name) !== undefined
-
-    //We have special cases: STRING and WSTRING (they are detected @ parsing fom ADS types)
-    //But we still use isKnownType to detect them (This should be refractored later...)
-    if (!found) {
-      const regexName = ['^STRING$', '^STRING\\(', '^STRING\\[', '^WSTRING$', '^WSTRING\\(', '^WSTRING\\[']
-      
-      const re = new RegExp(regexName.join('|'), 'i')
-        
-      found = re.test(name)
-    }
-
-    return found
+    return this.find(name.trim()) != null
   },
 
 
@@ -891,7 +876,31 @@ const BASE_DATA_TYPES = {
    * @param {string} name Data type name
    */
   find: function (name) {
-    return this.types.find(type => type.name.includes(name.trim().toUpperCase()))
+    let regExpRes = null
+    
+    //Find the correct type with regular expressions
+    //We can find also STRING(xx), WSTRING(xx) and DWORD(100..2000) for example
+    let type = this.types.find(type => {
+      const re = new RegExp('^(' + type.name.join('|') + ')([\\[\\(](.*)[\\)\\]])*$', 'i')
+      
+      //Using match instead of test so we get capture groups too
+      regExpRes = name.trim().match(re)
+
+      return (regExpRes != null)
+    })
+
+    if (type == null)
+      return null
+    
+    //We are here -> type is found
+    //If string/wstring, regExpRes[3] is the string length -> use it
+    if (type.adsDataType === ADS_DATA_TYPES.ADST_STRING) {
+      type.size = (regExpRes[3] != null ? (parseInt(regExpRes[3]) + 1) : type.size)
+    } else if (type.adsDataType === ADS_DATA_TYPES.ADST_WSTRING) {
+      type.size = (regExpRes[3] != null ? (parseInt(regExpRes[3]) * 2 + 2) : type.size)
+    }
+
+    return type
   },
 
 
@@ -946,49 +955,67 @@ const BASE_DATA_TYPES = {
    */
   types: [
     {
-      name: ['BOOL'],
+      name: ['STRING'],
+      adsDataType: ADS_DATA_TYPES.ADST_STRING,
+      size: 81, //Just default size
+    },
+    {
+      name: ['WSTRING'],
+      adsDataType: ADS_DATA_TYPES.ADST_WSTRING,
+      size: 162, //Just default size
+    },
+    {
+      name: ['BOOL', 'BIT', 'BIT8'],
+      adsDataType: ADS_DATA_TYPES.ADST_BIT,
       size: 1,
       toBuffer: (value, buffer) => buffer.writeUInt8(value === true || value === 1 ? 1 : 0),
       fromBuffer: buffer => buffer.readUInt8(0) === 1
     },
     {
-      name: ['BYTE', 'USINT'],
+      name: ['BYTE', 'USINT', 'BITARR8', 'UINT8'],
+      adsDataType: ADS_DATA_TYPES.ADST_UINT8,
       size: 1,
       toBuffer: (value, buffer) => buffer.writeUInt8(value),
       fromBuffer: buffer => buffer.readUInt8(0)
     },
     {
-      name: ['SINT'],
+      name: ['SINT', 'INT8'],
+      adsDataType: ADS_DATA_TYPES.ADST_INT8,
       size: 1,
       toBuffer: (value, buffer) => buffer.writeInt8(value),
       fromBuffer: buffer => buffer.readInt8(0)
     },
     {
-      name: ['UINT', 'WORD'],
+      name: ['UINT', 'WORD', 'BITARR16', 'UINT16'],
+      adsDataType: ADS_DATA_TYPES.ADST_UINT16,
       size: 2,
       toBuffer: (value, buffer) => buffer.writeUInt16LE(value),
       fromBuffer: buffer => buffer.readInt16LE(0)
     },
     {
-      name: ['INT'],
+      name: ['INT', 'INT16'],
+      adsDataType: ADS_DATA_TYPES.ADST_INT16,
       size: 2,
       toBuffer: (value, buffer) => buffer.writeInt16LE(value),
       fromBuffer: buffer => buffer.readInt16LE(0)
     },
     {
-      name: ['DINT'],
+      name: ['DINT', 'INT32'],
+      adsDataType: ADS_DATA_TYPES.ADST_INT32,
       size: 4,
       toBuffer: (value, buffer) => buffer.writeInt32LE(value),
       fromBuffer: buffer => buffer.readInt32LE(0)
     },
     {
-      name: ['UDINT', 'DWORD', 'TIME', 'TIME_OF_DAY'],
+      name: ['UDINT', 'DWORD', 'TIME', 'TIME_OF_DAY', 'BITARR32', 'UINT32'],
+      adsDataType: ADS_DATA_TYPES.ADST_UINT32,
       size: 4,
       toBuffer: (value, buffer) => buffer.writeUInt32LE(value),
       fromBuffer: buffer => buffer.readUInt32LE(0)
     },
     {
       name: ['DATE_AND_TIME', 'DT', 'DATE'],
+      adsDataType: ADS_DATA_TYPES.ADST_UINT32,
       size: 4,
       toBuffer: (value, buffer, settings) => {
         if (settings.convertDatesToJavascript === true && value.getTime)
@@ -1004,19 +1031,22 @@ const BASE_DATA_TYPES = {
       }
     },
     {
-      name: ['REAL'],
+      name: ['REAL', 'FLOAT'],
+      adsDataType: ADS_DATA_TYPES.ADST_REAL32,
       size: 4,
       toBuffer: (value, buffer) => buffer.writeFloatLE(value),
       fromBuffer: buffer => buffer.readFloatLE(0)
     },
     {
-      name: ['LREAL'],
+      name: ['LREAL', 'DOUBLE'],
+      adsDataType: ADS_DATA_TYPES.ADST_REAL64,
       size: 8,
       toBuffer: (value, buffer) => buffer.writeDoubleLE(value),
       fromBuffer: buffer => buffer.readDoubleLE(0)
     },
     {
-      name: ['LWORD', 'ULINT', 'LTIME'],
+      name: ['LWORD', 'ULINT', 'LTIME', 'UINT64'],
+      adsDataType: ADS_DATA_TYPES.ADST_UINT64,
       size: 8,
       toBuffer: (value, buffer, settings) => {
         //64 bit integers are missing from older Node.js Buffer, so use buffer instead if so
@@ -1033,7 +1063,8 @@ const BASE_DATA_TYPES = {
       }
     },
     {
-      name: ['LINT'],
+      name: ['LINT', 'INT64'],
+      adsDataType: ADS_DATA_TYPES.ADST_INT64,
       size: 8,
       toBuffer: (value, buffer, settings) => {
         //64 bit integers are missing from older Node.js Buffer, so use buffer instead if so

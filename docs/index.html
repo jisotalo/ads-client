@@ -72,6 +72,7 @@
 <li><a href="#connection-setups-and-possibilities">Connection setups and possibilities</a></li>
 <li><a href="#enabling-localhost-support">Enabling localhost support</a></li>
 <li><a href="#important-writing-struct-variables">IMPORTANT: Writing STRUCT variables</a></li>
+<li><a href="#important-things-to-know-when-using-with-twincat-2">IMPORTANT: Things to know when using with TwinCAT 2</a></li>
 <li><a href="#getting-started">Getting started</a>
 <ul>
 <li><a href="data-types-used-in-getting-started">Data types used in getting started</a></li>
@@ -138,8 +139,9 @@
 </code></pre>
 <h1 id="features">Features</h1>
 <ul>
+<li>TwinCAT 2 and TwinCAT 3 support</li>
 <li>Promise and async/await support</li>
-<li>Supports connecting to the local TwinCAT runtime (see <a href="#localhost-support">enabling localhost support</a>)</li>
+<li>Supports connecting to the local TwinCAT 3 runtime (see <a href="#localhost-support">enabling localhost support</a>)</li>
 <li>Supports multiple connections from the same host</li>
 <li>Reading and writing all any PLC variable</li>
 <li>Subscribing to PLC variables (ADS notifications)</li>
@@ -163,10 +165,15 @@
 <h1 id="supported-and-tested-platforms">Supported and tested platforms</h1>
 <p>The ads-client package is tested so far with the following setups:</p>
 <ul>
-<li><strong>At the moment, TwinCAT 4022 or newer is required</strong> (see issue <a href="https://github.com/jisotalo/ads-client/issues/21">#21</a>)</li>
+<li>TwinCAT 2.11 running on VirtualBox Windows XP 32bit <strong>(from version 1.9.0 upwards)</strong>
+<ul>
+<li>TwinCAT 2 support not tested with hardware PLC yet but should work</li>
+</ul>
+</li>
+<li>TwinCAT 3 4020 running on 64bit Windows 10 <strong>(TC3 builds &lt;= 4020 are working from version 1.9.0 upwards)</strong></li>
 <li>TwinCAT 3 4022.27 running on 64bit Windows 10</li>
 <li>TwinCAT 3 4024.4 running on 64bit Windows 10</li>
-<li>TwinCAT 3 4022.27 running on 64bit Windows 7 Embedded @ Beckhoff PLC</li>
+<li>TwinCAT 3 4022.27 running on 32bit and 64bit Windows 7 Embedded on Beckhoff PLC</li>
 <li>Node.js v10.16.3 and newer
 <ul>
 <li>NOTE: 64 bit integer values are supported only with Node.js v.12+</li>
@@ -272,8 +279,9 @@
 })
 
 </code></pre>
-<h1 id="enabling-localhost-support">Enabling localhost support</h1>
-<p><em>NOTE: Only required for TwinCAT versions older than 4024.5. Newer versions should have this already enabled.</em></p>
+<h1 id="enabling-localhost-support-on-twincat-3">Enabling localhost support on TwinCAT 3</h1>
+<p><em>NOTE: Only required for TwinCAT 3 versions older than 4024.5. Newer versions should have this already enabled.</em></p>
+<p><em><strong>Note:</strong> Probably not working for TwinCAT 2</em></p>
 <p>If you want to connect to the local TwinCAT runtime (Node.js and the TwinCAT on the same computer - <strong>as example setup 4</strong>), the ADS router TCP loopback feature has to be enabled. Tested with TwinCAT 4022.27 and 4024.4.</p>
 <p>The following method is from <a href="https://www.nuget.org/packages/Beckhoff.TwinCAT.Ads/5.0.0-preview6">Beckhoff.TwinCAT.Ads nuget package</a> installation guide.</p>
 <ol>
@@ -321,6 +329,24 @@ HKEY_LOCAL_MACHINE\SOFTWARE\WOW6432Node\Beckhoff\TwinCAT3\System\
   SOMEtext: 'good day'
 }
 </code></pre>
+<h1 id="important%3A-things-to-know-when-using-with-twincat-2">IMPORTANT: Things to know when using with TwinCAT 2</h1>
+<p>Almost everything should work with TwinCAT 2 but please understand the following</p>
+<h2 id="twincat-2-first-plc-runtime-ads-port-is-801-instead-of-851">TwinCAT 2 first PLC runtime ADS port is 801 instead of 851</h2>
+<pre class="prettyprint source lang-js"><code>const client = new ads.Client({
+  targetAmsNetId: '...', 
+  targetAdsPort: 801, //NOTE
+})
+</code></pre>
+<h2 id="variable-names-are-returned-in-uppercase-on-tc2-systems">Variable names are returned in UPPERCASE on TC2 systems</h2>
+<p>This might cause problems if your app is used with both TC2 &amp; TC3 systems.</p>
+<p><img src="https://user-images.githubusercontent.com/13457157/86540055-96df0d80-bf0a-11ea-8f94-7e04515213c2.png" alt="image"></p>
+<h2 id="global-variable-paths-are-given-different-on-tc2">Global variable paths are given different on TC2</h2>
+<p>The GVL name is not given, dot (.) is used instead.</p>
+<pre class="prettyprint source lang-js"><code>await client.readSymbol('GVL_Test.ExampleSTRUCT') //TwinCAT 3
+await client.readSymbol('.ExampleSTRUCT') //TwinCAT 2
+</code></pre>
+<h2 id="invokerpcmethod-is-not-possible-on-tc2">InvokeRpcMethod is not possible on TC2</h2>
+<p>This is the only one non-working feature as there are no methods in TC2.</p>
 <h1 id="getting-started">Getting started</h1>
 <p>This chapter includes some short getting started examples. See the JSDoc <a href="#documentation">documentation</a> for detailed description of library classes and methods.</p>
 <h2 id="data-types-used-in-getting-started">Data types used in getting started</h2>
@@ -918,7 +944,7 @@ console.log(data)
 //&lt;Buffer 48 65 6c 6c 6f 20 ... >
 </code></pre>
 <h2 id="calling-a-function-block-method-with-parameters-using-rpc-(remote-procedure-call)">Calling a function block method with parameters using RPC (remote procedure call)</h2>
-<p>Starting from version 1.8.0, it is possible to call function block methods directly from Node.js. Input and output parameters are available as well as method return value.</p>
+<p>Starting from version 1.8.0, it is possible to call function block methods directly from Node.js. Input and output parameters are available as well as method return value. <strong>Only supported on TwinCAT 3.</strong></p>
 <hr>
 <p><strong>WARNING - IMPORTANT NOTE</strong></p>
 <ul>
@@ -1102,10 +1128,15 @@ await client.restartSystemManager()
 <li>Edit StaticRoutes.xml file from your PLC</li>
 <li>Connect from Raspberry using the PLC IP address as router address and the local AMS Net Id you wrote to StaticRoutes.xml</li>
 </ol>
+<h3 id="receiving-ads-error-1808-symbol-not-found-even-when-it-should-be-found">Receiving ADS error 1808 <code>Symbol not found</code> even when it should be found</h3>
+<ul>
+<li>Make sure you have updated the latest PLC software using <em>download</em>. It seems that online change isn't updating everything.</li>
+<li>If you are using TwinCAT 2, see chapter <a href="#important-things-to-know-when-using-with-twincat-2">IMPORTANT: Things to know when using with TwinCAT 2</a></li>
+</ul>
 <h1 id="documentation">Documentation</h1>
 <p>You can find the full html documentation from the project <a href="https://jisotalo.github.io/ads-client/">GitHub home page</a> as well as from <code>./docs/</code> folder in the repository.</p>
 <h1 id="license">License</h1>
-<p>Licensed under <a href="http://www.opensource.org/licenses/MIT">MIT License</a>.</p>
+<p>Licensed under <a href="http://www.opensource.org/licenses/MIT">MIT License</a> so commercial use is possible but without any warranty. Please respect the license, linking to this page is also much appreciated as the project has taken over 200 hours :)</p>
 <p>Copyright (c) 2020 Jussi Isotalo &lt;<a href="mailto:j.isotalo91@gmail.com">j.isotalo91@gmail.com</a>&gt;</p>
 <p>Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the &quot;Software&quot;), to deal
@@ -1136,7 +1167,7 @@ SOFTWARE.</p></article>
 <br class="clear">
 
 <footer>
-    Documentation generated by <a href="https://github.com/jsdoc3/jsdoc">JSDoc 3.6.4</a> on Thu Jul 02 2020 19:37:58 GMT+0300 (GMT+03:00) using the <a href="https://github.com/clenemt/docdash">docdash</a> theme.
+    Documentation generated by <a href="https://github.com/jsdoc3/jsdoc">JSDoc 3.6.4</a> on Sun Jul 05 2020 22:20:33 GMT+0300 (GMT+03:00) using the <a href="https://github.com/clenemt/docdash">docdash</a> theme.
 </footer>
 
 <script>prettyPrint();</script>
