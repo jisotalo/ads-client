@@ -412,6 +412,10 @@ class Client {
         try {
           await _reInitializeInternals.call(this)
 
+          if (this.metaData.deviceInfo.majorVersion < 3) {
+            _console.call(this, 'WARNING: TwinCAT 2 detected - there might be some bugs (development ongoing)')
+          }
+
         } catch (err) { 
           if (this.settings.allowHalfOpen !== true) {
             try {
@@ -1108,7 +1112,8 @@ class Client {
       try {
         debugD(`readSymbol(): Reading symbol data type for ${variableName}`)
 
-        dataType = await this.getDataType(symbol.type)
+        //dataType = await this.getDataType(symbol.type)
+        dataType = await _getDataTypeRecursive.call(this, symbol.type, true, symbol.size)
       } catch (err) {
         return reject(new ClientException(this, 'readSymbol()', `Reading symbol ${variableName} failed: Reading data type failed`, err))
       }
@@ -1127,7 +1132,8 @@ class Client {
 
       resolve({
         value: data,
-        type: dataType
+        type: dataType,
+        symbol: symbol
       })
     })
   }
@@ -3251,6 +3257,10 @@ async function _reInitializeInternals() {
   await this.readPlcRuntimeState()
   await _subcribeToPlcRuntimeStateChanges.call(this)
 
+  //Read device info
+  await this.readDeviceInfo()
+  await this.readUploadInfo()
+
   //Read symbol version and subscribe to its changes
   if (!this.settings.disableSymbolVersionMonitoring) await this.readSymbolVersion()
   if (!this.settings.disableSymbolVersionMonitoring) await _subscribeToSymbolVersionChanges.call(this)
@@ -4747,6 +4757,7 @@ function _readDataTypeInfo(dataTypeName) {
    * 
    * @param {string} dataTypeName - Data type name in the PLC - Example: 'INT', 'E_SomeEnum', 'ST_SomeStruct' etc. 
    * @param {boolean} [firstLevel] **DO NOT ASSIGN MANUALLY** True if this is the first recursion / top level of the data type
+   * @param {number} [size] - The size of the data type. This is used if we are connected to older runtime that doesn't provide base data type info -> we need to know the size at least in some cases
    * 
    * @returns {Promise<object>} Returns a promise (async function)
    * - If resolved, data type is returned (object)
@@ -4754,14 +4765,57 @@ function _readDataTypeInfo(dataTypeName) {
  * 
  * @memberof _LibraryInternals
    */
-  function _getDataTypeRecursive(dataTypeName, firstLevel = true) {
+  function _getDataTypeRecursive(dataTypeName, firstLevel = true, size = null) {
     return new Promise(async (resolve, reject) => {
       let dataType = {}
 
       try {
         dataType = await _getDataTypeInfo.call(this, dataTypeName)
+
       } catch (err) {
-        return reject(new ClientException(this, '_getDataTypeRecursive()', err))
+        //Empty dummy data type
+        dataType = {
+          version: 1,
+          hashValue: 0,
+          typeHashValue: 0,
+          size: 0,
+          offset: 0,
+          adsDataType: 0,
+          adsDataTypeStr: '',
+          flags: [ADS.ADS_DATA_TYPE_FLAGS.DataType],
+          flagsStr: ADS.ADS_DATA_TYPE_FLAGS.toStringArray([ADS.ADS_DATA_TYPE_FLAGS.DataType]),
+          nameLength: '',
+          typeLength: 0,
+          commentLength: 0,
+          arrayDimension: 0,
+          subItemCount: 0,
+          name: '',
+          type: '',
+          comment: '',
+          arrayData: [],
+          subItems: [],
+          attributes: [],
+          rpcMethods: []
+        }
+
+        //Not found. Try if it's base type (to support TwinCAT 2 and 3.1.4020 and lower)
+        if (ADS.BASE_DATA_TYPES.isPseudoType(dataTypeName)) {
+          dataTypeName = ADS.BASE_DATA_TYPES.getTypeByPseudoType(dataTypeName, size)
+        }
+
+        if (ADS.BASE_DATA_TYPES.isKnownType(dataTypeName)) {
+          const baseDataType = ADS.BASE_DATA_TYPES.find(dataTypeName)
+
+          dataType.size = (size == null ? baseDataType.size : size)
+          dataType.adsDataType = baseDataType.adsDataType
+          dataType.adsDataTypeStr = ADS.ADS_DATA_TYPES.toString(dataType.adsDataType)
+          dataType.nameLength = dataTypeName.length//baseDataType.name.length
+          dataType.name = dataTypeName//baseDataType.name
+
+        } else {
+          //Unknown type
+          return reject(new ClientException(this, '_getDataTypeRecursive()', err))
+        }
       }
 
       //Select default values. Edit this to add more to the end-user data type object
@@ -4779,18 +4833,34 @@ function _readDataTypeInfo(dataTypeName) {
         subItems: []
       }
 
+      if (dataTypeName.toUpperCase() == 'ST_EMPTY') {
+        let stop = 1
+      }
+
+      
       //If data type has subItems, loop them through
       if (dataType.subItemCount > 0) {
       
         for (let i = 0; i < dataType.subItemCount; i++) {
           //Get the actual data type for subItem
-          const subItemType = await _getDataTypeRecursive.call(this, dataType.subItems[i].type, false)
- 
-          //Let's keep some data from the parent
-          subItemType.type = subItemType.name
-          subItemType.name = dataType.subItems[i].name
-          subItemType.offset = dataType.subItems[i].offset
-          subItemType.comment = dataType.subItems[i].comment
+          if (dataType.subItems[i].type == 'ST_Empty') {
+            let stop = 1
+          }
+
+          let subItemType = {}
+
+          //Support for TwinCAT 3 < 4022: If we have empty struct, do nothing. ADS API will not return data type for empty struct.
+          if (dataType.subItems[i].size === 0) {
+            subItemType = dataType.subItems[i]
+          } else {
+            subItemType = await _getDataTypeRecursive.call(this, dataType.subItems[i].type, false, dataType.subItems[i].size)
+          
+            //Let's keep some data from the parent
+            subItemType.type = subItemType.name
+            subItemType.name = dataType.subItems[i].name
+            subItemType.offset = dataType.subItems[i].offset
+            subItemType.comment = dataType.subItems[i].comment
+          }
 
           parsedDataType.subItems.push(subItemType)
         }
@@ -4839,6 +4909,10 @@ function _readDataTypeInfo(dataTypeName) {
         })
       
 
+      //Added because of TwinCAT 2 - If we have empty struct, it's size is not 0 but it has no subitems
+      } else if (dataType.subItemCount === 0 && dataType.adsDataType === ADS.ADS_DATA_TYPES.ADST_BIGTYPE) {
+        let stop = 1
+        
       //This is not the final data type, continue parsing
       } else {
         const childType = await _getDataTypeRecursive.call(this, dataType.type, false)
