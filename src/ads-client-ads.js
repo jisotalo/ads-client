@@ -22,6 +22,8 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
 
+const { ADS } = require("./ads-client")
+
 
 
 /**
@@ -861,37 +863,12 @@ exports.AMS_ROUTER_STATE = AMS_ROUTER_STATE
 const BASE_DATA_TYPES = {
 
   /**
-   * Thanks to TwinCAT 2 and TwinCAT 3 < 4022 we have to parse STRING(xx) in some cases
-   * 
-   * @param {string} name Data type name
-   * 
-   * @returns {object} {isString, size}
-   */
-  parseString: function (name) {
-    const result = {
-      isString: false,
-      stringType: '',
-      size: 0
-    }
-
-    let regExpRes = name.trim().match(/^(string|wstring)[\[\(](.*)[\)\]]$/i)
-    if (regExpRes != null) {
-      result.isString = true
-      result.stringType = regExpRes[1]
-      result.size = parseInt(regExpRes[2]) * (regExpRes[1].toLowerCase() === 'wstring' ? 2 : 1) + 1
-    }
-
-    return result
-  },
-
-
-  /**
    * Returns true if given data type is found and known
    * 
    * @param {string} name Data type name
    */
   isKnownType: function (name) {
-    return this.find(name.trim()) !== undefined
+    return this.find(name.trim()) != null
   },
 
 
@@ -902,20 +879,30 @@ const BASE_DATA_TYPES = {
    * @param {string} name Data type name
    */
   find: function (name) {
-    let type = this.types.find(type => type.name.includes(name.trim().toUpperCase()))
-
-    //If not found, it's probably a string
-    if (type == null) {
-      const strData = this.parseString(name.trim())
+    let regExpRes = null
+    
+    //Find the correct type with regular expressions
+    //We can find also STRING(xx), WSTRING(xx) and DWORD(100..2000) for example
+    let type = this.types.find(type => {
+      const re = new RegExp('^(' + type.name.join('|') + ')([\\[\\(](.*)[\\)\\]])*$', 'i')
       
-      if (strData.isString === true) {
-        type = this.types.find(type => type.name.includes(strData.stringType))
-        type.size = strData.size
-        type.name = name
-      } else {
-       // throw new Error(`Error: Base type ${name} not found from BaseDataTypes - If this should be found, report an issue`)
-      }
+      //Using match instead of test so we get capture groups too
+      regExpRes = name.trim().match(re)
+
+      return (regExpRes != null)
+    })
+
+    if (type == null)
+      return null
+    
+    //We are here -> type is found
+    //If string/wstring, regExpRes[3] is the string length -> use it
+    if (type.adsDataType === ADS_DATA_TYPES.ADST_STRING) {
+      type.size = (regExpRes[3] != null ? (parseInt(regExpRes[3]) + 1) : type.size)
+    } else if (type.adsDataType === ADS_DATA_TYPES.ADST_WSTRING) {
+      type.size = (regExpRes[3] != null ? (parseInt(regExpRes[3]) * 2 + 2) : type.size)
     }
+
     return type
   },
 
@@ -978,7 +965,7 @@ const BASE_DATA_TYPES = {
     {
       name: ['WSTRING'],
       adsDataType: ADS_DATA_TYPES.ADST_WSTRING,
-      size: 161, //Just default size
+      size: 162, //Just default size
     },
     {
       name: ['BOOL', 'BIT', 'BIT8'],
