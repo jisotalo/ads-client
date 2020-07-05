@@ -21,6 +21,7 @@ Coded from scratch using [TwinCAT ADS specification](https://infosys.beckhoff.co
 - [Connection setups and possibilities](#connection-setups-and-possibilities)
 - [Enabling localhost support](#enabling-localhost-support)
 - [IMPORTANT: Writing STRUCT variables](#important-writing-struct-variables)
+- [IMPORTANT: Things to know when using with TwinCAT 2](#important-things-to-know-when-using-with-twincat-2)
 - [Getting started](#getting-started)
   - [Data types used in getting started](data-types-used-in-getting-started)
   - [Creating a new Client instance](#creating-a-new-client-instance)
@@ -77,8 +78,9 @@ const ads = require('ads-client')
 ```
 # Features
 
+- TwinCAT 2 and TwinCAT 3 support
 - Promise and async/await support
-- Supports connecting to the local TwinCAT runtime (see [enabling localhost support](#localhost-support))
+- Supports connecting to the local TwinCAT 3 runtime (see [enabling localhost support](#localhost-support))
 - Supports multiple connections from the same host
 - Reading and writing all any PLC variable
 - Subscribing to PLC variables (ADS notifications)
@@ -97,10 +99,12 @@ const ads = require('ads-client')
 # Supported and tested platforms
 
 The ads-client package is tested so far with the following setups:
-  - **At the moment, TwinCAT 4022 or newer is required** (see issue [#21](https://github.com/jisotalo/ads-client/issues/21))
+  - TwinCAT 2.11 running on VirtualBox Windows XP 32bit **(from version 1.9.0 upwards)**
+    - TwinCAT 2 support not tested with hardware PLC yet but should work
+  - TwinCAT 3 4020 running on 64bit Windows 10 **(TC3 builds <= 4020 are working from version 1.9.0 upwards)**
   - TwinCAT 3 4022.27 running on 64bit Windows 10
   - TwinCAT 3 4024.4 running on 64bit Windows 10
-  - TwinCAT 3 4022.27 running on 64bit Windows 7 Embedded @ Beckhoff PLC
+  - TwinCAT 3 4022.27 running on 32bit and 64bit Windows 7 Embedded on Beckhoff PLC
   - Node.js v10.16.3 and newer
     - NOTE: 64 bit integer values are supported only with Node.js v.12+
 
@@ -211,8 +215,10 @@ const client = new ads.Client({
 ```
 
 
-# Enabling localhost support 
-*NOTE: Only required for TwinCAT versions older than 4024.5. Newer versions should have this already enabled.*
+# Enabling localhost support on TwinCAT 3
+*NOTE: Only required for TwinCAT 3 versions older than 4024.5. Newer versions should have this already enabled.*
+
+***Note:** Probably not working for TwinCAT 2*
 
 If you want to connect to the local TwinCAT runtime (Node.js and the TwinCAT on the same computer - **as example setup 4**), the ADS router TCP loopback feature has to be enabled. Tested with TwinCAT 4022.27 and 4024.4.
 
@@ -268,6 +274,38 @@ In practise this means that the following Javascript objects are used as-equals 
   SOMEtext: 'good day'
 }
 ```
+
+
+# IMPORTANT: Things to know when using with TwinCAT 2
+
+Almost everything should work with TwinCAT 2 but please understand the following
+
+## TwinCAT 2 first PLC runtime ADS port is 801 instead of 851
+
+```js
+const client = new ads.Client({
+  targetAmsNetId: '...', 
+  targetAdsPort: 801, //NOTE
+})
+```
+
+## Variable names are returned in UPPERCASE on TC2 systems
+This might cause problems if your app is used with both TC2 & TC3 systems.
+
+![image](https://user-images.githubusercontent.com/13457157/86540055-96df0d80-bf0a-11ea-8f94-7e04515213c2.png)
+
+## Global variable paths are given different on TC2
+
+The GVL name is not given, dot (.) is used instead.
+
+```js
+await client.readSymbol('GVL_Test.ExampleSTRUCT') //TwinCAT 3
+await client.readSymbol('.ExampleSTRUCT') //TwinCAT 2
+```
+
+## InvokeRpcMethod is not possible on TC2
+This is the only one non-working feature as there are no methods in TC2.
+
 
 # Getting started
 
@@ -1033,7 +1071,7 @@ console.log(data)
 ```
 
 ## Calling a function block method with parameters using RPC (remote procedure call)
-Starting from version 1.8.0, it is possible to call function block methods directly from Node.js. Input and output parameters are available as well as method return value.
+Starting from version 1.8.0, it is possible to call function block methods directly from Node.js. Input and output parameters are available as well as method return value. **Only supported on TwinCAT 3.**
 
 ---
 **WARNING - IMPORTANT NOTE**
@@ -1258,13 +1296,18 @@ Absolutely. See chapter "Supported platforms and setups", but basically:
 2. Edit StaticRoutes.xml file from your PLC
 3. Connect from Raspberry using the PLC IP address as router address and the local AMS Net Id you wrote to StaticRoutes.xml
 
+### Receiving ADS error 1808 `Symbol not found` even when it should be found
+
+- Make sure you have updated the latest PLC software using *download*. It seems that online change isn't updating everything.
+- If you are using TwinCAT 2, see chapter [IMPORTANT: Things to know when using with TwinCAT 2](#important-things-to-know-when-using-with-twincat-2)
+
 # Documentation
 
 You can find the full html documentation from the project [GitHub home page](https://jisotalo.github.io/ads-client/) as well as from `./docs/` folder in the repository.
 
 # License
 
-Licensed under [MIT License](http://www.opensource.org/licenses/MIT). 
+Licensed under [MIT License](http://www.opensource.org/licenses/MIT) so commercial use is possible but without any warranty. Please respect the license, linking to this page is also much appreciated as the project has taken over 200 hours :)
 
 
 Copyright (c) 2020 Jussi Isotalo <<j.isotalo91@gmail.com>>
