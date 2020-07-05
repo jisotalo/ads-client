@@ -1231,7 +1231,8 @@ class Client {
 
       resolve({
         value: value,
-        type: dataType
+        type: dataType,
+        symbol: symbol
       })
     })
   }
@@ -3780,7 +3781,8 @@ async function _onPlcRuntimeStateChanged(data, sub) {
                   return {
                     value: data,
                     timeStamp: null, //Added later
-                    type: dataType
+                    type: dataType,
+                    symbol: this.symbolInfo
                   }
                 }
 
@@ -3790,7 +3792,8 @@ async function _onPlcRuntimeStateChanged(data, sub) {
                 return {
                   value: value,
                   timeStamp: null, //Added later
-                  type: null
+                  type: null,
+                  symbol: null
                 }
               } catch (err) {
                 throw err
