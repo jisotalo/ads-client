@@ -4139,12 +4139,12 @@ async function _parseDataType(data) {
 
   //If flags contain Attributes (TwinCAT.Ads.dll: AdsAttributeEntry)
   //Attribute is for example, a pack-mode attribute above struct
+  dataType.attributes = []
   if (dataType.flagsStr.includes('Attributes')) {
     dataType.attributeCount = data.readUInt16LE(pos)
     pos += 2
 
     //Attributes
-    dataType.attributes = []
     for (let i = 0; i < dataType.attributeCount; i++) {
       let attr = {}
 

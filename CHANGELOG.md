@@ -8,7 +8,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - TwinCAT 2 support!
 - TwinCAT 3 support for older versions than 4022!
+
+### Changed
 - Symbol info (`symbol`) is returned in addition to the data type (`type`) and value in `readSymbol()` and similar
+- Device info is read when connected
 
 ## [1.8.0] - 02.07.2020
 ### Added
