@@ -60,7 +60,7 @@ Coded from scratch using [TwinCAT ADS specification](https://infosys.beckhoff.co
   - [Calling a function block method with parameters using RPC (remote procedure call)](#calling-a-function-block-method-with-parameters-using-rpc-remote-procedure-call)
   - [Starting and stopping the PLC](#starting-and-stopping-the-plc)
   - [Starting and stopping the TwinCAT system](#starting-and-stopping-the-twincat-system)
-  - [Available ads-client events](#listening-for-ads-client-events)
+  - [Available ads-client events](#available-ads-client-events)
 - [Debugging](#debugging)
 - [FAQ](#faq)
 - [Documentation](#documentation)
