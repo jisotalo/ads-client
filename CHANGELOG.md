@@ -4,6 +4,23 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.10.0] - 09.07.2020
+### Added
+- Added new methods `createVariableHandleMulti()` and `deleteVariableHandleMulti()`
+- Client class now implements EventEmitter class -> added new events that can be listened
+  - `Client.on('connectionLost')`
+  - `Client.on('symbolVersionChange', symbolVersion)`
+  - `Client.on('systemManagerStateChange', state)`
+  - `Client.on('routerStateChange', state)`
+  - `Client.on('plcRuntimeStateChange', state)`
+  - `Client.on('ads-client-error', err)`
+  - `Client.on('connect', connectionInfo)`
+  - `Client.on('disconnect')`
+  - `Client.on('reconnect)`
+
+### Changed
+- If not connected when calling any method, an error is thrown 
+
 ## [1.9.0] - 05.07.2020
 ### Added
 - TwinCAT 2 support!

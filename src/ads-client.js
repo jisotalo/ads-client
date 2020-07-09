@@ -28,6 +28,7 @@ const ADS = require('./ads-client-ads.js')
 const net = require('net')
 const long = require('long')
 const iconv = require('iconv-lite')
+const EventEmitter = require('events')
 
 //-------------- Debugs --------------
 const debug = require('debug')(PACKAGE_NAME)
@@ -44,7 +45,7 @@ const debugIO = require('debug')(`${PACKAGE_NAME}:raw-data`)
  * 
  * This library is not related to Beckhoff in any way.
  */
-class Client {
+class Client extends EventEmitter {
 
   /**
    * @typedef Settings
@@ -71,7 +72,7 @@ class Client {
    * @property {number} [reconnectInterval=2000] - Time (milliseconds) how often the lost connection is tried to re-establish - Optional (**default**: 2000 ms)
    * @property {number} [checkStateInterval=1000] - Time (milliseconds) how often the system manager state is read to see if connection is OK - Optional (**default**: 1000 ms)
    * @property {number} [connectionDownDelay=5000] - Time (milliseconds) after no successful reading of the system manager state the connection is determined to be lost - Optional (**default**: 5000 ms)
-   * @property {boolean} [allowHalfOpen=false] - If true, connect() is successful even if no PLC runtime is found (but target and system manager are available) - Can be useful if it's ok that after connect() the PLC runtime is not immediately available (example: connecting before uploading PLC code and reading data later)
+   * @property {boolean} [allowHalfOpen=false] - If true, connect() is successful even if no PLC runtime is found (but target and system manager are available) - Can be useful if it's ok that after connect() the PLC runtime is not immediately available (example: connecting before uploading PLC code and reading data later) - WARNING: If true, reinitializing subscriptions might fail after connection loss.
    * @property {boolean} [disableBigInt=false] - If true, 64 bit integer PLC variables are kept as Buffer objects instead of converting to Javascript BigInt variables (JSON.strigify and libraries that use it have no BigInt support)
    */
 
@@ -118,6 +119,9 @@ class Client {
    * @throws {ClientException} If required settings are missing, an error is thrown
    */
   constructor(settings) {
+    //Call EventEmitter constructor
+    super()
+
     //Check the required settings
     if (settings.targetAmsNetId == null) {
       throw new ClientException(this, 'Client()', 'Required setting "targetAmsNetId" is missing.')
@@ -439,6 +443,8 @@ class Client {
         socket.on('error', this._internals.socketErrorHandler)
 
         //We are connected to the target
+        this.emit('connect', this.connection)
+
         resolve(this.connection)
       })
 
@@ -507,6 +513,8 @@ class Client {
         this.connection.localAdsPort = null
         this._internals.socket = null
 
+        this.emit('disconnect')
+
         return resolve()
       }
 
@@ -553,8 +561,12 @@ class Client {
 
       if (error !== null) {
         error.message = `Disconnected but something failed: ${error.message}`
+        this.emit('disconnect')
+
         return reject(error)
       }
+      
+      this.emit('disconnect')
       resolve()
     })
   }
@@ -594,6 +606,8 @@ class Client {
       return this.connect()
         .then(res => {
           debug(`reconnect(): Connected!`)
+          this.emit('reconnect')
+
           resolve(res)
         })
         .catch(err => {
@@ -621,6 +635,10 @@ class Client {
      */
   readDeviceInfo() {
     return new Promise(async (resolve, reject) => {
+      
+      if (!this.connection.connected) 
+        return reject(new ClientException(this, 'readDeviceInfo()', `Client is not connected. Use connect() to connect to the target first.`))
+      
       debug(`readDeviceInfo(): Reading device info`)
     
       _sendAdsCommand.call(this, ADS.ADS_COMMAND.ReadDeviceInfo, Buffer.alloc(0), ADS.ADS_RESERVED_PORTS.SystemService)
@@ -649,6 +667,10 @@ class Client {
     */
   readSystemManagerState() {
     return new Promise(async (resolve, reject) => {
+      
+      if (!this.connection.connected) 
+        return reject(new ClientException(this, 'readSystemManagerState()', `Client is not connected. Use connect() to connect to the target first.`))
+      
       debugD(`readSystemManagerState(): Reading device system manager state`)
 
       _sendAdsCommand.call(this, ADS.ADS_COMMAND.ReadState, Buffer.alloc(0), ADS.ADS_RESERVED_PORTS.SystemService)
@@ -679,6 +701,10 @@ class Client {
     */
   readPlcRuntimeState(adsPort = this.settings.targetAdsPort) {
     return new Promise(async (resolve, reject) => {
+      
+      if (!this.connection.connected) 
+        return reject(new ClientException(this, 'readPlcRuntimeState()', `Client is not connected. Use connect() to connect to the target first.`))
+      
       debug(`readPlcRuntimeState(): Reading PLC runtime (port ${adsPort}) state`)
 
       _sendAdsCommand.call(this, ADS.ADS_COMMAND.ReadState, Buffer.alloc(0), adsPort)
@@ -712,6 +738,10 @@ class Client {
     */
   readSymbolVersion() {
     return new Promise(async (resolve, reject) => {
+      
+      if (!this.connection.connected) 
+        return reject(new ClientException(this, 'readSymbolVersion()', `Client is not connected. Use connect() to connect to the target first.`))
+      
       debug(`readSymbolVersion(): Reading symbol version`)
 
       this.readRaw(ADS.ADS_RESERVED_INDEX_GROUPS.SymbolVersion, 0, 1)
@@ -744,6 +774,10 @@ class Client {
     */
   readUploadInfo() {
     return new Promise(async (resolve, reject) => {
+      
+      if (!this.connection.connected) 
+        return reject(new ClientException(this, 'readUploadInfo()', `Client is not connected. Use connect() to connect to the target first.`))
+      
       debug(`readUploadInfo(): Reading upload info`)
 
       //Allocating bytes for request
@@ -822,7 +856,10 @@ class Client {
     */
   readAndCacheSymbols() {
     return new Promise(async (resolve, reject) => {
-
+      
+      if (!this.connection.connected) 
+        return reject(new ClientException(this, 'readAndCacheSymbols()', `Client is not connected. Use connect() to connect to the target first.`))
+      
       debug(`readAndCacheSymbols(): Starting to download symbols`)
 
       //First, download most recent upload info (=symbol count & byte length)
@@ -912,6 +949,10 @@ class Client {
    */
   readAndCacheDataTypes() {
     return new Promise(async (resolve, reject) => {
+      
+      if (!this.connection.connected) 
+        return reject(new ClientException(this, 'readAndCacheDataTypes()', `Client is not connected. Use connect() to connect to the target first.`))
+      
       debug(`readAndCacheDataTypes(): Reading all data types`)
 
       //First, download most recent upload info (=symbol count & byte length)
@@ -1002,6 +1043,10 @@ class Client {
    */
   getDataType(dataTypeName) {
     return new Promise(async (resolve, reject) => {
+      
+      if (!this.connection.connected) 
+        return reject(new ClientException(this, 'getDataType()', `Client is not connected. Use connect() to connect to the target first.`))
+      
       //Wrapper for _getDataTypeRecursive
       _getDataTypeRecursive.call(this, dataTypeName.trim())
         .then(res => resolve(res))
@@ -1029,6 +1074,10 @@ class Client {
    */
   getSymbolInfo(variableName) {
     return new Promise(async (resolve, reject) => {
+      
+      if (!this.connection.connected) 
+        return reject(new ClientException(this, 'getSymbolInfo()', `Client is not connected. Use connect() to connect to the target first.`))
+      
       const varName = variableName.trim().toLowerCase()
 
       debug(`getSymbolInfo(): Symbol info requested for ${variableName}`)
@@ -1079,6 +1128,10 @@ class Client {
    */
   readSymbol(variableName) {
     return new Promise(async (resolve, reject) => {
+      
+      if (!this.connection.connected) 
+        return reject(new ClientException(this, 'readSymbol()', `Client is not connected. Use connect() to connect to the target first.`))
+      
       debug(`readSymbol(): Reading symbol ${variableName}`)
 
       variableName = variableName.trim()
@@ -1156,6 +1209,10 @@ class Client {
    */
   writeSymbol(variableName, value, autoFill = false) {
     return new Promise(async (resolve, reject) => {
+
+      if (!this.connection.connected) 
+        return reject(new ClientException(this, 'writeSymbol()', `Client is not connected. Use connect() to connect to the target first.`))
+      
       debug(`writeSymbol(): Writing symbol ${variableName}`)
 
       variableName = variableName.trim()
@@ -1274,6 +1331,10 @@ class Client {
    */
   subscribe(variableName, callback, cycleTime = 10, onChange = true, initialDelay = 0) {
     return new Promise(async (resolve, reject) => {
+
+      if (!this.connection.connected) 
+        return reject(new ClientException(this, 'subscribe()', `Client is not connected. Use connect() to connect to the target first.`))
+            
       debug(`subscribe(): Subscribing to ${variableName}`)
 
       _subscribe.call(
@@ -1290,6 +1351,10 @@ class Client {
       .catch(err => reject(new ClientException(this, 'subscribe()', `Subscribing to ${variableName} failed`, err)))
     })
   }
+
+
+
+
 
 
 
@@ -1311,6 +1376,10 @@ class Client {
    */
   subscribeRaw(indexGroup, indexOffset, size, callback, cycleTime = 10, onChange = true, initialDelay = 0) {
     return new Promise(async (resolve, reject) => {
+
+      if (!this.connection.connected) 
+        return reject(new ClientException(this, 'subscribeRaw()', `Client is not connected. Use connect() to connect to the target first.`))
+            
       const target = {
         indexGroup,
         indexOffset,
@@ -1354,6 +1423,9 @@ class Client {
   unsubscribe(notificationHandle) {
     return new Promise(async (resolve, reject) => {
 
+      if (!this.connection.connected) 
+        return reject(new ClientException(this, 'unsubscribe()', `Client is not connected. Use connect() to connect to the target first.`))
+      
       const sub = this._internals.activeSubscriptions[notificationHandle]
 
       if (!sub) {
@@ -1406,6 +1478,10 @@ class Client {
    */
   unsubscribeAll() {
     return new Promise(async (resolve, reject) => {
+
+      if (!this.connection.connected) 
+        return reject(new ClientException(this, 'unsubscribeAll()', `Client is not connected. Use connect() to connect to the target first.`))
+      
       debug(`unsubscribeAll(): Unsubscribing from all notifications`)
 
       let firstError = null, unSubCount = 0
@@ -1455,13 +1531,19 @@ class Client {
    */
   readRawByHandle(handle, size = 0xFFFFFFFF) {
     return new Promise(async (resolve, reject) => {
+      
+      if (!this.connection.connected) 
+        return reject(new ClientException(this, 'readRawByHandle()', `Client is not connected. Use connect() to connect to the target first.`))
+      
       debug(`readRawByHandle(): Reading data using handle "${handle}" ${(size !== 0xFFFFFFFF ? `and size of ${size} bytes` : ``)}`)
 
       if (handle == null) {
         return reject(new ClientException(this, 'readRawByHandle()', `Required parameter handle is not assigned`))
-      } else if (typeof handle === 'object' && handle.handle && handle.size) {
-        size = handle.size
+      } else if (typeof handle === 'object' && handle.handle) {
         handle = handle.handle
+        if (handle.size) {
+          size = handle.size
+        }
       }
 
       this.readRaw(ADS.ADS_RESERVED_INDEX_GROUPS.SymbolValueByHandle, handle, size)
@@ -1483,6 +1565,10 @@ class Client {
    */
   readRawByName(variableName) {
     return new Promise(async (resolve, reject) => {
+      
+      if (!this.connection.connected) 
+        return reject(new ClientException(this, 'readRawByName()', `Client is not connected. Use connect() to connect to the target first.`))
+      
       if (variableName == null) {
         return reject(new ClientException(this, 'readRawByName()', `Required parameter variableName is not assigned`))
       }
@@ -1548,6 +1634,10 @@ class Client {
    */
   readRawBySymbol(symbol) {
     return new Promise(async (resolve, reject) => {
+      
+      if (!this.connection.connected) 
+        return reject(new ClientException(this, 'readRawBySymbol()', `Client is not connected. Use connect() to connect to the target first.`))
+      
       if (symbol == null) {
         return reject(new ClientException(this, 'readRawBySymbol()', `Required parameter symbol is not assigned`))
       }
@@ -1581,7 +1671,10 @@ class Client {
    */
   readRaw(indexGroup, indexOffset, size) {
     return new Promise(async (resolve, reject) => {
-
+      
+      if (!this.connection.connected) 
+        return reject(new ClientException(this, 'readRaw()', `Client is not connected. Use connect() to connect to the target first.`))
+      
       if (indexGroup == null || indexOffset == null || size == null) {
         return reject(new ClientException(this, 'readRaw()', `Some of parameters (indexGroup, indexOffset, size) are not assigned`))
       }
@@ -1673,7 +1766,10 @@ class Client {
    */
   readRawMulti(targetArray) {
     return new Promise(async (resolve, reject) => {
-
+      
+      if (!this.connection.connected) 
+        return reject(new ClientException(this, 'readRawMulti()', `Client is not connected. Use connect() to connect to the target first.`))
+      
       if (Array.isArray(targetArray) !== true) {
         return reject(new ClientException(this, 'readRawMulti()', `Given targetArray parameter is not an array`))
       }
@@ -1792,7 +1888,10 @@ class Client {
    */
   readWriteRaw(indexGroup, indexOffset, readLength, dataBuffer) {
     return new Promise(async (resolve, reject) => {
-
+      
+      if (!this.connection.connected) 
+        return reject(new ClientException(this, 'readWriteRaw()', `Client is not connected. Use connect() to connect to the target first.`))
+      
       if (indexGroup == null || indexOffset == null || readLength == null || dataBuffer == null) {
         return reject(new ClientException(this, 'writeRawByHandle()', `Some of parameters (indexGroup, indexOffset, readLength, dataBuffer) are not assigned`))
       }
@@ -1854,6 +1953,10 @@ class Client {
    */
   writeRawByHandle(handle, dataBuffer) {
     return new Promise(async (resolve, reject) => {
+
+      if (!this.connection.connected) 
+        return reject(new ClientException(this, 'writeRawByHandle()', `Client is not connected. Use connect() to connect to the target first.`))
+      
       if (handle == null || dataBuffer == null) {
         return reject(new ClientException(this, 'writeRawByHandle()', `Some of required parameters (handle, dataBuffer) are not assigned`))
 
@@ -1885,6 +1988,10 @@ class Client {
    */
   writeRawBySymbol(symbol, dataBuffer) {
     return new Promise(async (resolve, reject) => {
+
+      if (!this.connection.connected) 
+        return reject(new ClientException(this, 'writeRawBySymbol()', `Client is not connected. Use connect() to connect to the target first.`))
+      
       if (symbol == null || dataBuffer == null) {
         return reject(new ClientException(this, 'writeRawBySymbol()', `Some of required parameters (symbol, dataBuffer) are not assigned`))
 
@@ -1918,6 +2025,9 @@ class Client {
   writeRaw(indexGroup, indexOffset, dataBuffer) {
     return new Promise(async (resolve, reject) => {
 
+      if (!this.connection.connected) 
+        return reject(new ClientException(this, 'writeRaw()', `Client is not connected. Use connect() to connect to the target first.`))
+      
       if (indexGroup == null || indexOffset == null || dataBuffer == null) {
         return reject(new ClientException(this, 'writeRaw()', `Some of parameters (indexGroup, indexOffset, dataBuffer) are not assigned`))
 
@@ -1997,6 +2107,9 @@ class Client {
   writeRawMulti(targetArray) {
     return new Promise(async (resolve, reject) => {
 
+      if (!this.connection.connected) 
+        return reject(new ClientException(this, 'writeRawMulti()', `Client is not connected. Use connect() to connect to the target first.`))
+      
       if (Array.isArray(targetArray) !== true) {
         return reject(new ClientException(this, 'writeRawMulti()', `Given targetArray parameter is not an array`))
       }
@@ -2099,18 +2212,31 @@ class Client {
 
 
   /**
+   * @typedef CreateVariableHandleResult
+   * 
+   * @property {number} handle - Received variable handle
+   * @property {number} size - Received target variable size
+   * @property {string} type - Received target variable type
+   * 
+   */
+
+  /**
    * Creates an ADS variable handle to given PLC variable. 
    * 
    * Using the handle, read and write operations are possible to that variable with readRawByHandle() and writeRawByHandle()
    * 
    * @param {string} variableName Variable name in the PLC (full path) - Example: 'MAIN.SomeStruct.SomeValue' 
    * 
-   * @returns {Promise<object>} Returns a promise (async function)
+   * @returns {Promise<CreateVariableHandleResult>} Returns a promise (async function)
    * - If resolved, creating handle was successful and handle, size and data type are returned (object)
    * - If rejected, creating failed and error info is returned (object)
    */
   createVariableHandle(variableName) {
     return new Promise(async (resolve, reject) => {
+      
+      if (!this.connection.connected) 
+        return reject(new ClientException(this, 'createVariableHandle()', `Client is not connected. Use connect() to connect to the target first.`))
+      
       if (variableName == null) {
         return reject(new ClientException(this, 'createVariableHandle()', `Parameter variableName is not assigned`))
       }
@@ -2186,6 +2312,150 @@ class Client {
 
 
   /**
+   * @typedef CreateVariableHandleMultiResult
+   * 
+   * @property {boolean} success - True if creating handle was successful
+   * @property {MultiErrorInfo} errorInfo - Error information (if any)
+   * @property {string} target - Target variable name
+   * @property {number} handle - Returned variable handle (if successful)
+   * 
+   */
+
+
+  /**
+   * Creates ADS variable handles to given PLC variables. 
+   * 
+   * Using the handle, read and write operations are possible to that variable with readRawByHandle() and writeRawByHandle()
+   * 
+   * **NOTE:** Returns only handle, not data type and size like createVariableHandle()
+   * 
+   * @param {Array<string>} targetArray Variable names as array in the PLC (full path) - Example: ['MAIN.value1', 'MAIN.value2'] 
+   * 
+   * @returns {Promise<Array.<CreateVariableHandleMultiResult>>} Returns a promise (async function)
+   * - If resolved, command was successful and results for each handle request are returned(object)
+   * - If rejected, command failed and error info is returned (object)
+   */
+  createVariableHandleMulti(targetArray) {
+    return new Promise(async (resolve, reject) => {
+      
+      if (!this.connection.connected)
+        return reject(new ClientException(this, 'createVariableHandleMulti()', `Client is not connected. Use connect() to connect to the target first.`))
+  
+      if (Array.isArray(targetArray) !== true) {
+        return reject(new ClientException(this, 'createVariableHandleMulti()', `Given targetArray parameter is not an array`))
+      }
+  
+      const totalVariableNamesLength = targetArray.reduce((total, target) => total + target.length + 1, 0)
+
+      debug(`createVariableHandleMulti(): Creating ${targetArray.length} variable handles`)
+  
+      //Allocating bytes for request
+      const data = Buffer.alloc(16 + targetArray.length * 16 + totalVariableNamesLength)
+      let pos = 0
+
+      //0..3 IndexGroup
+      data.writeUInt32LE(ADS.ADS_RESERVED_INDEX_GROUPS.SumCommandReadWrite, pos)
+      pos += 4
+
+      //4..7 IndexOffset - Number of read requests
+      data.writeUInt32LE(targetArray.length, pos)
+      pos += 4
+
+      //8..11 Read data length
+      data.writeUInt32LE(12 * targetArray.length, pos)
+      pos += 4
+
+      //12..15 Write data length
+      data.writeUInt32LE(targetArray.length * 16 + totalVariableNamesLength, pos)
+      pos += 4
+
+      //16..n All read targets
+      targetArray.forEach(target => {
+        //0..3 IndexGroup
+        data.writeUInt32LE(ADS.ADS_RESERVED_INDEX_GROUPS.SymbolHandleByName, pos)
+        pos += 4
+    
+        //4..7 IndexOffset
+        data.writeUInt32LE(0, pos)
+        pos += 4
+      
+        //8..11 Read data length
+        data.writeUInt32LE(ADS.ADS_INDEX_OFFSET_LENGTH, pos)
+        pos += 4
+
+        //12..15 Write data length
+        data.writeUInt32LE(target.length + 1, pos) //Note: String end delimeter
+        pos += 4
+      })
+
+      //All write data
+      targetArray.forEach(target => {
+        //16..n Data
+        iconv.encode(target, 'cp1252').copy(data, pos)
+        pos += target.length + 1 //Note: string end delimeter
+      })
+
+      _sendAdsCommand.call(this, ADS.ADS_COMMAND.ReadWrite, data)
+        .then(res => {
+          debug(`createVariableHandleMulti(): Command done - ${res.ads.data.byteLength} bytes received`)
+      
+          let pos = 0, results = []
+
+          //First we have ADS error codes and data length for each target
+          targetArray.forEach(target => {
+
+            //Error code
+            const errorCode = res.ads.data.readUInt32LE(pos)
+            pos += 4
+
+            //Data length
+            const size = res.ads.data.readUInt32LE(pos)
+            pos += 4
+
+            const result = {
+              success: errorCode === 0,
+              errorInfo: {
+                error: errorCode > 0,
+                errorCode: errorCode,
+                errorStr: ADS.ADS_ERROR[errorCode]
+              },
+              target: target,
+              handle: null,
+              size: size
+            }
+
+            results.push(result)
+          })
+
+          //And now the handle for each target
+          for (let i = 0; i < targetArray.length; i++) {
+            if (results[i].size === 4) {
+              results[i].handle = res.ads.data.readUInt32LE(pos)
+              pos += 4
+            } else {
+              //It's not a handle, do nothing (error code should be available)
+              pos += results[i].size
+            }
+            
+            //We can delete the return data size, not relevant to the end user
+            delete results[i].size
+          }
+
+          resolve(results)
+        })
+        .catch(res => {
+          debug(`createVariableHandleMulti(): Creating ${targetArray.length} variable handles failed: %o`, res)
+          reject(new ClientException(this, 'createVariableHandleMulti()', `Creating variable handles failed`, res))
+        })
+    })
+  }
+
+
+
+
+
+
+  /**
    * Deletes the given previously created ADS variable handle
    * 
    * @param {number} handle Variable handle to delete (created previously using createVariableHandle())
@@ -2196,10 +2466,16 @@ class Client {
    */
   deleteVariableHandle(handle) {
     return new Promise(async (resolve, reject) => {
+      
+      if (!this.connection.connected) 
+        return reject(new ClientException(this, 'deleteVariableHandle()', `Client is not connected. Use connect() to connect to the target first.`))
+      
       if (handle == null) {
         return reject(new ClientException(this, 'deleteVariableHandle()', `Parameter handle is not assigned`))
+
       } else if (typeof handle === 'object' && handle.handle) {
         handle = handle.handle
+
       } else if (typeof handle !== 'number') {
         return reject(new ClientException(this, 'deleteVariableHandle()', `Parameter handle is not correct type`))
       }
@@ -2235,10 +2511,130 @@ class Client {
         })
         .catch((err) => {
           debug(`deleteVariableHandle(): Deleting handle "${handle}" failed:  %o`, err)
-          reject(new ClientException(this, 'createVariableHandle()', `Deleting vaiable handle failed`, err))
+          reject(new ClientException(this, 'createVariableHandle()', `Deleting variable handle failed`, err))
         })
     })
   }
+
+
+
+
+
+
+
+  /**
+   * @typedef DeleteVariableHandleMultiResult
+   * 
+   * @property {boolean} success - True if deleting handle was successful
+   * @property {MultiErrorInfo} errorInfo - Error information (if any)
+   * @property {number} handle - The variable handle that was tried to be deleted
+   * 
+   */
+
+  /**
+   * Deletes the given previously created ADS variable handles
+   * 
+   * @param {Array<string>} handleArray Variable handles to be deleted as array (can also be array of objects that contain 'handle' key)
+   * 
+   * @returns {Promise<Array.<DeleteVariableHandleMultiResult>>} Returns a promise (async function)
+   * - If resolved, command was successful and results for each request are returned(object)
+   * - If rejected, command failed and error info is returned (object)
+   */
+  deleteVariableHandleMulti(handleArray) {
+    return new Promise(async (resolve, reject) => {
+      
+      if (!this.connection.connected)
+        return reject(new ClientException(this, 'deleteVariableHandleMulti()', `Client is not connected. Use connect() to connect to the target first.`))
+  
+      if (Array.isArray(handleArray) !== true) {
+        return reject(new ClientException(this, 'deleteVariableHandleMulti()', `Given handleArray parameter is not an array`))
+      }
+
+      debug(`deleteVariableHandleMulti(): Deleting ${handleArray.length} variable handles`)
+  
+      //Allocating bytes for request
+      const data = Buffer.alloc(16 + handleArray.length * 16)
+      let pos = 0
+
+      //0..3 IndexGroup
+      data.writeUInt32LE(ADS.ADS_RESERVED_INDEX_GROUPS.SumCommandWrite, pos)
+      pos += 4
+
+      //4..7 IndexOffset - Number of requests
+      data.writeUInt32LE(handleArray.length, pos)
+      pos += 4
+
+      //8..11 Read data length
+      data.writeUInt32LE(4 * handleArray.length, pos)
+      pos += 4
+
+      //12..15 Write data length
+      data.writeUInt32LE(16 * handleArray.length, pos)
+      pos += 4
+
+      //16..n Commands for each handle
+      handleArray.forEach(handle => {
+        //0..3 IndexGroup
+        data.writeUInt32LE(ADS.ADS_RESERVED_INDEX_GROUPS.SymbolReleaseHandle, pos)
+        pos += 4
+    
+        //4..7 IndexOffset
+        data.writeUInt32LE(0, pos)
+        pos += 4
+      
+        //8..11 Write data length
+        data.writeUInt32LE(ADS.ADS_INDEX_OFFSET_LENGTH, pos) 
+        pos += 4
+      })
+
+      //Each handle
+      handleArray.forEach(handle => {
+        if (typeof handle === 'object' && handle.handle) {
+          data.writeUInt32LE(handle.handle, pos)
+        } else {
+          data.writeUInt32LE(handle, pos)
+        }
+        pos += 4
+      })
+
+      _sendAdsCommand.call(this, ADS.ADS_COMMAND.ReadWrite, data)
+        .then(res => {
+          debug(`deleteVariableHandleMulti(): Command done - ${res.ads.data.byteLength} bytes received`)
+      
+          let pos = 0, results = [] 
+
+          //Result has ADS error codes for each target
+          handleArray.forEach(handle => {
+
+            //Error code
+            const errorCode = res.ads.data.readUInt32LE(pos)
+            pos += 4
+
+            const result = {
+              success: errorCode === 0,
+              errorInfo: {
+                error: errorCode > 0,
+                errorCode: errorCode,
+                errorStr: ADS.ADS_ERROR[errorCode]
+              },
+              handle: ((typeof handle === 'object' && handle.handle) ? handle.handle : handle)
+            }
+
+            results.push(result)
+          })
+
+          resolve(results)
+        })
+        .catch(res => {
+          debug(`deleteVariableHandleMulti(): Deleting ${handleArray.length} variable handles failed: %o`, res)
+          reject(new ClientException(this, 'deleteVariableHandleMulti()', `Deleting variable handles failed`, res))
+        })
+    })
+  }
+
+
+
+
 
 
   
@@ -2255,6 +2651,10 @@ class Client {
    */
   convertFromRaw(rawData, dataTypeName) {
     return new Promise(async (resolve, reject) => {
+
+      if (!this.connection.connected) 
+        return reject(new ClientException(this, 'convertFromRaw()', `Client is not connected. Use connect() to connect to the target first.`))
+
       debug(`convertFromRaw(): Converting ${rawData.byteLength} bytes of data to ${dataTypeName}`)
       
       //1. Get data type
@@ -2302,6 +2702,10 @@ class Client {
    */
   convertToRaw(value, dataTypeName, autoFill = false) {
     return new Promise(async (resolve, reject) => {
+      
+      if (!this.connection.connected) 
+        return reject(new ClientException(this, 'convertToRaw()', `Client is not connected. Use connect() to connect to the target first.`))
+      
       debug(`convertToRaw(): Converting given object to ${dataTypeName}`)
 
       //1. Get data type
@@ -2374,6 +2778,10 @@ class Client {
    */
   getEmptyPlcType(dataTypeName) {
     return new Promise(async (resolve, reject) => {
+      
+      if (!this.connection.connected) 
+        return reject(new ClientException(this, 'getEmptyPlcType()', `Client is not connected. Use connect() to connect to the target first.`))
+      
       debug(`getEmptyPlcType(): Converting given object to ${dataTypeName}`)
       
       //1. Get data type
@@ -2424,6 +2832,10 @@ class Client {
    */
   writeControl(adsPort, adsState, deviceState = 0, data = Buffer.alloc(0)) {
     return new Promise(async (resolve, reject) => {
+
+      if (!this.connection.connected) 
+        return reject(new ClientException(this, 'writeControl()', `Client is not connected. Use connect() to connect to the target first.`))
+      
       debug(`writeControl(): Sending writeControl command to port ${adsPort} - adsState: ${adsState}, deviceState: ${deviceState} and ${data.byteLength} bytes data`)
       
       //Allocating bytes for request
@@ -2479,7 +2891,10 @@ class Client {
    */
   startPlc(adsPort = this.settings.targetAdsPort) {
     return new Promise(async (resolve, reject) => {
-      
+
+      if (!this.connection.connected) 
+        return reject(new ClientException(this, 'startPlc()', `Client is not connected. Use connect() to connect to the target first.`))
+            
       debug(`startPlc(): Starting PLC at ADS port ${adsPort}`)
       
       try {
@@ -2516,6 +2931,10 @@ class Client {
    */
   stopPlc(adsPort = this.settings.targetAdsPort) {
     return new Promise(async (resolve, reject) => {
+
+      if (!this.connection.connected) 
+        return reject(new ClientException(this, 'stopPlc()', `Client is not connected. Use connect() to connect to the target first.`))
+            
       debug(`stopPlc(): Stopping PLC at ADS port ${adsPort}`)
 
       try {
@@ -2553,6 +2972,10 @@ class Client {
    */
   restartPlc(adsPort = this.settings.targetAdsPort) {
     return new Promise(async (resolve, reject) => {
+      
+      if (!this.connection.connected) 
+        return reject(new ClientException(this, 'restartPlc()', `Client is not connected. Use connect() to connect to the target first.`))
+      
       try {
         debug(`restartPlc(): Restarting PLC at ADS port ${adsPort}`)
 
@@ -2588,6 +3011,10 @@ class Client {
    */
   setSystemManagerToRun() {
     return new Promise(async (resolve, reject) => {
+
+      if (!this.connection.connected) 
+        return reject(new ClientException(this, 'setSystemManagerToRun()', `Client is not connected. Use connect() to connect to the target first.`))
+      
       try {
         debug(`setSystemManagerToRun(): Starting TwinCAT system to run mode`)
         //Read deviceState (we don't want to change it, as we have no idea what it does)
@@ -2619,6 +3046,10 @@ class Client {
    */
   setSystemManagerToConfig() {
     return new Promise(async (resolve, reject) => {
+
+      if (!this.connection.connected) 
+        return reject(new ClientException(this, 'setSystemManagerToConfig()', `Client is not connected. Use connect() to connect to the target first.`))
+      
       try {
         debug(`setSystemManagerToConfig(): Setting TwinCAT system to config mode`)
 
@@ -2652,6 +3083,10 @@ class Client {
    * - If rejected, command failed error info is returned (object)
    */
   restartSystemManager() {
+      
+    if (!this.connection.connected) 
+      return reject(new ClientException(this, 'restartSystemManager()', `Client is not connected. Use connect() to connect to the target first.`))
+    
     debug(`restartSystemManager(): Restarting TwinCAT system`)
     return this.setSystemManagerToRun()
   }
@@ -2684,6 +3119,10 @@ class Client {
    */
   invokeRpcMethod(variableName, methodName, parameters = {}) {
     return new Promise(async (resolve, reject) => {
+      
+      if (!this.connection.connected) 
+        return reject(new ClientException(this, 'invokeRpcMethod()', `Client is not connected. Use connect() to connect to the target first.`))
+      
       try {
         debug(`invokeRpcMethod(): Invoking RPC method ${variableName}.${methodName}`)
 
@@ -3174,6 +3613,8 @@ function _unregisterAdsPort() {
 async function _onConnectionLost(socketFailure = false) {
   debug(`_onConnectionLost(): Connection was lost. Socket failure: ${socketFailure}`)
 
+  this.emit('connectionLost')
+  
   if (this.settings.autoReconnect !== true) {
     _console.call(this, 'WARNING: Connection was lost and setting autoReconnect=false. Quiting.')
     try {
@@ -3432,6 +3873,7 @@ async function _onSymbolVersionChanged(data) {
   if (version !== this.metaData.symbolVersion) {
     debug(`_onSymbolVersionChanged(): Symbol version changed from ${this.metaData.symbolVersion} to ${version}`)
     this.metaData.symbolVersion = version
+    this.emit('symbolVersionChange', version)
       
     //Clear all cached symbols and data types (might be incorrect)
     this.metaData.symbols = {}
@@ -3512,8 +3954,9 @@ function _systemManagerStatePoller() {
       this._internals.firstStateReadFaultTime = null
 
       if (oldState.adsState !== this.metaData.systemManagerState.adsState) {
-        //TODO: Throw event (system manager state changed)
         debug(`_systemManagerStatePoller(): System manager state has changed to ${this.metaData.systemManagerState.adsStateStr}`)
+
+        this.emit('systemManagerStateChange', this.metaData.systemManagerState.adsState)
 
         if (this.metaData.systemManagerState.adsState !== ADS.ADS_STATE.Run) {
           //Now state is config/something else -> connection is lost
@@ -3613,6 +4056,8 @@ async function _onRouterStateChanged(data) {
     stateStr: ADS.AMS_ROUTER_STATE.toString(state)
   }
 
+  this.emit('routerStateChange', this.metaData.routerState)
+
   //If we have a local connection, connection needs to be reinitialized
   if (this.connection.isLocal === true) {
     //We should stop polling system manager, it will be reinitialized later
@@ -3652,14 +4097,22 @@ async function _onPlcRuntimeStateChanged(data, sub) {
   //2..3 Device state
   state.deviceState = data.value.readUInt16LE(pos)
   
+  let changed = false
+
   if (this.metaData.plcRuntimeState.adsState !== state.adsState) {
     debug(`_onPlcRuntimeStateChanged(): PLC runtime state changed from ${this.metaData.plcRuntimeState.adsStateStr} to ${state.adsStateStr}`)
+    changed = true
   }
   if (this.metaData.plcRuntimeState.deviceState !== state.deviceState) {
     debug(`_onPlcRuntimeStateChanged(): PLC runtime state (deviceState) changed from ${this.metaData.plcRuntimeState.deviceState} to ${state.deviceState}`)
+    changed = true
   } 
 
   this.metaData.plcRuntimeState = state
+
+  if (changed) 
+    this.emit('plcRuntimeStateChange', state)
+  
 }
 
 
@@ -5517,10 +5970,12 @@ async function _onAdsCommandReceived(packet) {
               )
             } catch (err) {
               debug(`_onAdsCommandReceived(): Ads notification received but parsing Javascript object failed: %o`, err)
+              this.emit('ads-client-error', new ClientException(this, `_onAdsCommandReceived`, `Ads notification received but parsing data to Javascript object failed. Subscription: ${JSON.stringify(sub)}`, err, sub))
             }
 
           } else {
             debugD(`_onAdsCommandReceived(): Ads notification received with unknown notificationHandle "${sample.notificationHandle}" - Doing nothing`)
+            this.emit('ads-client-error', new ClientException(this, `_onAdsCommandReceived`, `Ads notification received but it has unknown notificationHandle (${sample.notificationHandle}). Use unsubscribe() to save resources.`))
           }
         })
       })
@@ -5541,6 +5996,7 @@ async function _onAdsCommandReceived(packet) {
       }
       else {
         debugD(`_onAdsCommandReceived(): Ads command received with unknown invokeId "${packet.ams.invokeId}" - Doing nothing`)
+        this.emit('ads-client-error', new ClientException(this, `_onAdsCommandReceived`, `Ads command received with unknown invokeId "${packet.ams.invokeId}".`, packet))
       }
 
       break
