@@ -54,11 +54,13 @@ Coded from scratch using [TwinCAT ADS specification](https://infosys.beckhoff.co
     - [Writing multiple raw values](#writing-multiple-raw-values)
     - [Creating a variable handle and reading a raw value](#creating-a-variable-handle-and-reading-a-raw-value)
     - [Creating a variable handle and writing a raw value](#creating-a-variable-handle-and-writing-a-raw-value)
+    - [Creating and deleting multiple variable handles](#creating-and-deleting-multiple-variable-handles)
     - [Converting a raw value to Javascript object](#converting-a-raw-value-to-javascript-object)
     - [Converting a Javascript object to raw value](#converting-a-javascript-object-to-raw-value)
   - [Calling a function block method with parameters using RPC (remote procedure call)](#calling-a-function-block-method-with-parameters-using-rpc-remote-procedure-call)
   - [Starting and stopping the PLC](#starting-and-stopping-the-plc)
   - [Starting and stopping the TwinCAT system](#starting-and-stopping-the-twincat-system)
+  - [Available ads-client events](#listening-for-ads-client-events)
 - [Debugging](#debugging)
 - [FAQ](#faq)
 - [Documentation](#documentation)
@@ -1017,6 +1019,56 @@ await client.writeRawByHandle(handle, data)
 await client.deleteVariableHandle(handle)
 ```
 
+### Creating and deleting multiple variable handles
+
+Since version 1.10.0 it is possible to create and delete multiple handles at once. This is faster than one by one as everything is sent in one packet. 
+
+**NOTE:** It `createVariableHandleMulti()` returns only the handle as number. No size and data type are returned as in `createVariableHandle()`.
+
+```js
+//Create three handles at once
+const handles = (await client.createVariableHandleMulti([
+  'GVL_Test.TestINT',
+  'GVL_Test.TestENUM',
+  'GVL_Test.THIS_IS_NOT_FOUND'
+]))
+
+console.log(handles)
+/*
+[
+  {
+    success: true,
+    errorInfo: { error: false, errorCode: 0, errorStr: 'No error' },
+    target: 'GVL_Test.TestINT',
+    handle: 570425600
+  },
+  {
+    success: true,
+    errorInfo: { error: false, errorCode: 0, errorStr: 'No error' },
+    target: 'GVL_Test.TestENUM',
+    handle: 570425601
+  },
+  {
+    success: false,
+    errorInfo: { error: true, errorCode: 1808, errorStr: 'Symbol not found' },
+    target: 'GVL_Test.THIS_IS_NOT_FOUND',
+    handle: null
+  }
+]
+*/
+
+//Read data from first handle, note that raw methods understand object as input
+console.log(await client.readRawByHandle(handles[0])) //Output: <Buffer d2 04>
+
+//Read data from second handle, note that only handle number is given
+console.log(await client.readRawByHandle(handles[1].handle)) //Output: <Buffer 64 00>
+
+//Delete handles
+await client.deleteVariableHandleMulti(handles)
+```
+
+
+
 ### Converting a raw value to Javascript object
 Using `convertFromRaw` method, raw data can be converted to Javascript object. The conversion works internally like in `readSymbol`.
 
@@ -1244,6 +1296,54 @@ The TwinCAT system state can always be read using `readSystemManagerState()` and
 await client.readSystemManagerState() //{ adsState: 5, adsStateStr: 'Run', deviceState: 1 }
 ```
 
+# Available ads-client events
+
+Since version 1.10.0 there are different events available from `Client` class instance.
+
+  - `on('connectionLost')`
+    - Emitted when connection to target is lost
+  - `on('symbolVersionChange', symbolVersion)`
+    - Emitted when target symbol version changes
+  - `on('systemManagerStateChange', state)`
+    - Emitted when system manager state changes
+    - Note: Not available in all connection setups
+  - `on('routerStateChange', state)`
+    - Emitted when ADS router state changes
+    - Note: Not available in all connection setups
+  - `on('plcRuntimeStateChange', state)`
+    - Emitted when target PLC runtime state changes
+  - `on('ads-client-error', err)`
+    - Emitted when errors during communication
+      - Only those that aren't catched otherwise: Like if unknown command or unknown notification is received.
+      - No errors that are thrown in method calls!
+  - `on('connect', connectionInfo)`
+    - Emitted when connection is established to the target
+  - `on('disconnect')`
+    - Emitted when disconnected from the target
+  - `on('reconnect)`
+    - Emitted when connection is re-established (like after connectionLost event)
+
+## Example: Printing to console when PLC runtime state changes:
+```js
+client.on('plcRuntimeStateChange', state => {
+  console.log('State is now:', state)
+})
+
+//When PLC is stopped:
+//State is now: { adsState: 6, adsStateStr: 'Stop', deviceState: 0 }
+``` 
+
+## Example: Catching an error that is not directly from a method call
+```js
+client.on('ads-client-error', err => {
+  console.log('Error:', err.message)
+})
+//When unknown notification data is received:
+//Error: Ads notification received but it has unknown notificationHandle (30). Use unsubscribe() to save resources.
+``` 
+
+
+
 
 # Debugging
 If you have problems or you are interested, you can enabled debug output to console. The ads-client uses `debug` package for debugging.
@@ -1307,7 +1407,7 @@ You can find the full html documentation from the project [GitHub home page](htt
 
 # License
 
-Licensed under [MIT License](http://www.opensource.org/licenses/MIT) so commercial use is possible but without any warranty. Please respect the license, linking to this page is also much appreciated as the project has taken over 200 hours :)
+Licensed under [MIT License](http://www.opensource.org/licenses/MIT) so commercial use is possible. Please respect the license, linking to this page is also much appreciated.
 
 
 Copyright (c) 2020 Jussi Isotalo <<j.isotalo91@gmail.com>>
