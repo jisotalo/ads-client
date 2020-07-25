@@ -4,6 +4,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.10.1] - 25.07.2020
+### Changed
+- Dependecy updated by dependabot[bot] <support@github.com>
+  - Bumps [lodash](https://github.com/lodash/lodash) from 4.17.15 to 4.17.19.
+    - [Release notes](https://github.com/lodash/lodash/releases)
+    - [Commits](lodash/lodash@4.17.15...4.17.19)
+
+
 ## [1.10.0] - 09.07.2020
 ### Added
 - Added new methods `createVariableHandleMulti()` and `deleteVariableHandleMulti()`
