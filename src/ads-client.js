@@ -2843,11 +2843,11 @@ class Client extends EventEmitter {
       let pos = 0
 
       //0..1 ADS state
-      dataBuffer.writeUInt32LE(adsState, pos)
+      dataBuffer.writeUInt16LE(adsState, pos)
       pos += 2
     
       //2..3 Device state
-      dataBuffer.writeUInt32LE(deviceState, pos)
+      dataBuffer.writeUInt16LE(deviceState, pos)
       pos += 2
     
       //4..7 Data length
@@ -3667,7 +3667,7 @@ async function _onConnectionLost(socketFailure = false) {
         if (firstTime)
           _console.call(this, `WARNING: Reconnecting failed. Keeping trying in the background every ${this.settings.reconnectInterval} ms...`)
         
-        reconnectionTimer = setTimeout(tryToReconnect, this.settings.reconnectInterval)
+        this._internals.reconnectionTimer = setTimeout(tryToReconnect, this.settings.reconnectInterval)
     })
   }
 

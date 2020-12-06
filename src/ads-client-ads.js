@@ -151,7 +151,7 @@ const ADS_RESERVED_PORTS = {
   //Tc3 PLC RuntimeSystem 4 (Port 854)
   Tc3_Plc4: 854,
   //Tc3 PLC RuntimeSystem 5 (Port 855)
-  Tc3_Plc4: 855,
+  Tc3_Plc5: 855,
   //Camshaft Controller (R0) (Port 900)
   CamshaftController: 900, // 0x00000384
   //R0 CAM Tool (Port 950)
