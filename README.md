@@ -10,7 +10,10 @@ Unofficial node.js ADS library for connecting to Beckhoff TwinCAT automation sys
 
 Coded from scratch using [TwinCAT ADS specification](https://infosys.beckhoff.com/content/1033/tc3_ads_intro/116157835.html?id=124964102706356243) and [Beckhoff.TwinCAT.Ads nuget package](https://www.nuget.org/packages/Beckhoff.TwinCAT.Ads/5.0.0-preview6). Inspiration from similar projects like [node-ads](https://www.npmjs.com/package/node-ads), [beckhoff-js](https://www.npmjs.com/package/beckhoff-js) and [iecstruct](https://www.npmjs.com/package/iecstruct).
 
+# Project status
+This project is currently "ready". It's maintained actively and used in projects by the author and others.
 
+Bugs are fixed if found and new features can be added. Please let me know if you have any ideas!
 
 
 # Table of contents
@@ -163,6 +166,7 @@ Suggested use cases:
 - When fast connection is required (1 router less -> faster response)
 
 Requirements:
+- NOTE: Only one connection / client is possible!
 - PLC has TCP port 48898 open (default router port)
   - NOTE: Windows Firewall might block, make sure Ethernet connection is handled as "private"
 - Local AmsNetId and ADS port are given manually
@@ -1400,6 +1404,15 @@ Absolutely. See chapter "Supported platforms and setups", but basically:
 
 - Make sure you have updated the latest PLC software using *download*. It seems that online change isn't updating everything.
 - If you are using TwinCAT 2, see chapter [IMPORTANT: Things to know when using with TwinCAT 2](#important-things-to-know-when-using-with-twincat-2)
+
+### Having timeouts and/or 'mailbox is full' errors when sending lot's of ADS commands
+
+- The AMS router is capable of handling only limited number of requests in a certain time. 
+- Other possible reason is that operating system TCP window is full because of large number of requests.
+
+Solution: 
+- Use structs or arrays to send data in larger packets 
+- Try raw/multi commands to decrease data usage
 
 # Documentation
 
