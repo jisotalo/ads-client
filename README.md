@@ -113,6 +113,11 @@ The ads-client package is tested so far with the following setups:
   - Node.js v10.16.3 and newer
     - NOTE: 64 bit integer values are supported only with Node.js v.12+
 
+Tested on the following operating systems / platforms
+  - Windows 7 and 10
+  - Raspberry Pi 4
+  - OSX Catalina
+
 
 # Connection setups and possibilities
 
@@ -198,6 +203,7 @@ Adding a route to the PLC can be done editing `TwinCAT\3.1\Target\StaticRoutes.x
 </Route>
 ```
 
+See also [this issue comment](https://github.com/jisotalo/ads-client/issues/51#issuecomment-758016428) by hansipete for one possible way how to do adding the route.
 
 ## Setup 4 - Connect to the localhost (PLC and client on the same machine)
 
@@ -1413,6 +1419,14 @@ Absolutely. See chapter "Supported platforms and setups", but basically:
 Solution: 
 - Use structs or arrays to send data in larger packets 
 - Try raw/multi commands to decrease data usage
+
+### Having problems to connect from OSX or Raspberry Pi to target PLC
+
+- You need to connect to the PLC AMS router instead
+
+Solution:
+- See [this issue comment](https://github.com/jisotalo/ads-client/issues/51#issuecomment-758016428) by hansipete how to do it.
+
 
 # Documentation
 
