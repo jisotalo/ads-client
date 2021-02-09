@@ -990,7 +990,7 @@ const BASE_DATA_TYPES = {
       adsDataType: ADS_DATA_TYPES.ADST_UINT16,
       size: 2,
       toBuffer: (value, buffer) => buffer.writeUInt16LE(value),
-      fromBuffer: buffer => buffer.readInt16LE(0)
+      fromBuffer: buffer => buffer.readUInt16LE(0)
     },
     {
       name: ['INT', 'INT16'],
