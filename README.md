@@ -419,9 +419,11 @@ Disconnected
 
 ## Reading any type PLC variable
 
-Using `readSymbol` method it is possible to read variables of **any type** from the PLC. These include base scalar type variables, structs, function blocks, arrays and so on. These examples cover just a few cases.
+Using `readSymbol` method it is possible to read variables of **any type** from the PLC (except references and pointers). These include base scalar type variables, structs, function blocks, arrays and so on. These examples cover just a few cases.
 
 See full `readSymbol` documentation [from the docs](https://jisotalo.github.io/ads-client/Client.html#readSymbol).
+
+For references and pointers see the separate chapter.
 
 ### Example: Reading `INT` type variable
 ```js
@@ -595,9 +597,11 @@ Value read: { IN: false, PT: 2500, Q: false, ET: 0, M: false, StartTime: 0 }
 
 ## Writing any type PLC variable
 
-Using `writeSymbol` method it is possible to write variables of **any type** to the PLC. These include base scalar type variables, structs, function blocks, arrays and so on. These examples cover just a few cases.
+Using `writeSymbol` method it is possible to write variables of **any type** to the PLC (except references and pointers). These include base scalar type variables, structs, function blocks, arrays and so on. These examples cover just a few cases.
 
 See full `writeSymbol` documentation [from the docs](https://jisotalo.github.io/ads-client/Client.html#writeSymbol).
+
+For references and pointers see the separate chapter.
 
 ---
 
@@ -1132,6 +1136,115 @@ console.log(data)
 //<Buffer 48 65 6c 6c 6f 20 ... >
 ```
 
+## Reading and writing `POINTER TO` and `REFERENCE TO` variables
+
+It's also possible to work with both `POINTER TO xxx` and `REFERENCE TO xxx` variables with `ads-client`.
+
+- Note that using `ReadSymbol()` and `WriteSymbol()` is not possible
+- Easiest way to read is `readRawByName()`
+- Writing is can be done with `createVariableHandle()`, which is suitable for reading too
+- Pointers require dereference operator ^ in order to work
+
+
+### Reading a `REFERENCE TO` value
+
+The value needs to be read as a raw Buffer first and then it can be converted to correct data type. `createVariableHandle()` works too but this is slightly faster and easier.
+
+```js
+//GVL_Test has variable TestREFERENCE : REFERENCE TO ST_Example;
+
+const value = await client.convertFromRaw(
+  await client.readRawByName('GVL_Test.TestREFERENCE'),
+  'ST_Example'
+)
+console.log(value)
+/*
+{
+  SomeText: 'Hello ads-client',
+  SomeReal: 3.1415927410125732,
+  SomeDate: 2020-04-13T12:25:33.000Z
+}
+*/
+```
+
+
+### Writing a `REFERENCE TO` value
+
+In order to write a reference, a variable handle needs to be created. Also the data neeeds to be converted to a raw Buffer before writing.
+
+```js
+//GVL_Test has variable TestREFERENCE : REFERENCE TO ST_Example;
+
+const value = {
+  SomeText: 'Hello reference variable',
+  SomeReal: 12345,
+  SomeDate: new Date()
+}
+
+//Creating handle to the varialbe
+const handle = await client.createVariableHandle('GVL_Test.TestREFERENCE')
+
+//Writing raw Buffer data that is first created from object
+await client.writeRawByHandle(
+  handle,
+  await client.convertToRaw(value, 'ST_Example')
+)
+
+//Always delete the handle if not reusing it later
+await client.deleteVariableHandle(handle)
+```
+
+
+
+### Reading a `POINTER TO` value
+
+Similar as with reference except that a dereference operator `^` is required.
+
+```js
+//GVL_Test has variable TestPOINTER	: POINTER TO ST_Example;
+
+const value = await client.convertFromRaw(
+  await client.readRawByName('GVL_Test.TestPOINTER^'), //note ^
+  'ST_Example'
+)
+console.log(value)
+/*
+{
+  SomeText: 'Hello ads-client',
+  SomeReal: 3.1415927410125732,
+  SomeDate: 2020-04-13T12:25:33.000Z
+}
+*/
+```
+
+
+### Writing a `POINTER TO` value
+
+Similar as with reference except that a dereference operator `^` is required.
+
+```js
+//GVL_Test has variable TestPOINTER	: POINTER TO ST_Example;
+
+const value = {
+  SomeText: 'Hello pointer variable',
+  SomeReal: 12345,
+  SomeDate: new Date()
+}
+
+//Creating handle to the varialbe
+const handle = await client.createVariableHandle('GVL_Test.TestPOINTER^') //note ^
+
+//Writing raw Buffer data that is first created from object
+await client.writeRawByHandle(
+  handle,
+  await client.convertToRaw(value, 'ST_Example')
+)
+
+//Always delete the handle if not reusing it later
+await client.deleteVariableHandle(handle)
+```
+
+
 ## Calling a function block method with parameters using RPC (remote procedure call)
 Starting from version 1.8.0, it is possible to call function block methods directly from Node.js. Input and output parameters are available as well as method return value. **Only supported on TwinCAT 3.**
 
@@ -1426,6 +1539,20 @@ Solution:
 
 Solution:
 - See [this issue comment](https://github.com/jisotalo/ads-client/issues/51#issuecomment-758016428) by hansipete how to do it.
+
+
+
+### A data type is not found even when it should be
+
+If you use methods like `convertFromRaw()` and `getDataType()` but receive an error similar to `ClientException: Finding data type *data type* failed`, make sure you have really written the data type correctly.
+
+For example, when copying a variable name from TwinCAT online view using CTRL+C, it might not work:
+- Displayed name: `ARRAY [0..1, 0..1] OF ST_Example`
+- The value copied to clipboard `ARRAY [0..1, 0..1] OF ST_Example`
+- --> **This causes error!**
+- The real data type name that needs to be used is `ARRAY [0..1,0..1] OF ST_Example` (note no whitespace between array dimensions)
+
+If you have problems, try to read the variable information using `readSymbolInfo()`. The final solution is to read all data types using `readAndCacheDataTypes()` and manually finding the correct type.
 
 
 # Documentation

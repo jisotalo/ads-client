@@ -2668,8 +2668,17 @@ class Client extends EventEmitter {
       }
 
       //Make sure lengths are the same
-      if (dataType.size != rawData.byteLength) {
+      if (dataType.arrayData.length === 0 && dataType.size != rawData.byteLength) {
+        //Not an array (plain data type)
         return reject(new ClientException(this, 'convertFromRaw()', `Given data buffer and data type sizes mismatch: Buffer is ${rawData.byteLength} bytes and data type is ${dataType.size} bytes`))
+
+      } else if (dataType.arrayData.length > 0) {
+        //Data type is array, calculate array size and compare to given Buffer
+        const totalLength = dataType.arrayData.reduce((total, dimension) => total + dimension.length * dataType.size, 0)
+
+        if (totalLength != rawData.byteLength) {
+          return reject(new ClientException(this, 'convertFromRaw()', `Given data buffer and data type sizes mismatch: Buffer is ${rawData.byteLength} bytes and data type is ${totalLength} bytes`))
+        }
       }
 
       //2. Parse the data to javascript object
