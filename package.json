@@ -1,7 +1,7 @@
 {
   "name": "ads-client",
   "version": "1.10.3",
-  "description": "Unofficial Node.js library for connecting to Beckhoff TwinCAT automation systems using ADS protocol",
+  "description": "Beckhoff TwinCAT ADS client library for Node.js (unofficial). Connects to Beckhoff TwinCAT automation systems using ADS protocol.",
   "main": "./src/ads-client.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",

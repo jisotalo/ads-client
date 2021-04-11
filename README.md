@@ -6,7 +6,7 @@
 [![GitHub](https://img.shields.io/badge/View%20on-GitHub-brightgreen)](https://github.com/jisotalo/ads-client)
 [![License](https://img.shields.io/github/license/jisotalo/ads-client)](https://choosealicense.com/licenses/mit/)
 
-Unofficial node.js ADS library for connecting to Beckhoff TwinCAT automation systems using ADS protocol.
+Beckhoff TwinCAT ADS client library for Node.js (unofficial). Connects to Beckhoff TwinCAT automation systems using ADS protocol.
 
 Coded from scratch using [TwinCAT ADS specification](https://infosys.beckhoff.com/content/1033/tc3_ads_intro/116157835.html?id=124964102706356243) and [Beckhoff.TwinCAT.Ads nuget package](https://www.nuget.org/packages/Beckhoff.TwinCAT.Ads/5.0.0-preview6). Inspiration from similar projects like [node-ads](https://www.npmjs.com/package/node-ads), [beckhoff-js](https://www.npmjs.com/package/beckhoff-js) and [iecstruct](https://www.npmjs.com/package/iecstruct).
 
@@ -60,6 +60,11 @@ Bugs are fixed if found and new features can be added. Please let me know if you
     - [Creating and deleting multiple variable handles](#creating-and-deleting-multiple-variable-handles)
     - [Converting a raw value to Javascript object](#converting-a-raw-value-to-javascript-object)
     - [Converting a Javascript object to raw value](#converting-a-javascript-object-to-raw-value)
+  - [Reading and writing POINTER TO and REFERENCE TO variables](#reading-and-writing-pointer-to-and-reference-to-variables)
+    - [Reading a REFERENCE TO value](#reading-a-reference-to-value)
+    - [Writing a REFERENCE TO value](#writing-a-reference-to-value)
+    - [Reading a POINTER TO value](#reading-a-pointer-to-value)
+    - [Writing a POINTER TO value](#writing-a-pointer-to-value)
   - [Calling a function block method with parameters using RPC (remote procedure call)](#calling-a-function-block-method-with-parameters-using-rpc-remote-procedure-call)
   - [Starting and stopping the PLC](#starting-and-stopping-the-plc)
   - [Starting and stopping the TwinCAT system](#starting-and-stopping-the-twincat-system)
