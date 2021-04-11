@@ -62,7 +62,7 @@
 <a href="https://github.com/jisotalo/ads-client/milestone/1"><img src="https://img.shields.io/github/milestones/progress-percent/jisotalo/ads-client/1" alt="GitHub milestone"></a>
 <a href="https://github.com/jisotalo/ads-client"><img src="https://img.shields.io/badge/View%20on-GitHub-brightgreen" alt="GitHub"></a>
 <a href="https://choosealicense.com/licenses/mit/"><img src="https://img.shields.io/github/license/jisotalo/ads-client" alt="License"></a></p>
-<p>Unofficial node.js ADS library for connecting to Beckhoff TwinCAT automation systems using ADS protocol.</p>
+<p>Beckhoff TwinCAT ADS client library for Node.js (unofficial). Connects to Beckhoff TwinCAT automation systems using ADS protocol.</p>
 <p>Coded from scratch using <a href="https://infosys.beckhoff.com/content/1033/tc3_ads_intro/116157835.html?id=124964102706356243">TwinCAT ADS specification</a> and <a href="https://www.nuget.org/packages/Beckhoff.TwinCAT.Ads/5.0.0-preview6">Beckhoff.TwinCAT.Ads nuget package</a>. Inspiration from similar projects like <a href="https://www.npmjs.com/package/node-ads">node-ads</a>, <a href="https://www.npmjs.com/package/beckhoff-js">beckhoff-js</a> and <a href="https://www.npmjs.com/package/iecstruct">iecstruct</a>.</p>
 <h1 id="project-status">Project status</h1>
 <p>This project is currently &quot;ready&quot;. It's maintained actively and used in projects by the author and others.</p>
@@ -124,6 +124,14 @@
 <li><a href="#converting-a-javascript-object-to-raw-value">Converting a Javascript object to raw value</a></li>
 </ul>
 </li>
+<li><a href="#reading-and-writing-pointer-to-and-reference-to-variables">Reading and writing POINTER TO and REFERENCE TO variables</a>
+<ul>
+<li><a href="#reading-a-reference-to-value">Reading a REFERENCE TO value</a></li>
+<li><a href="#writing-a-reference-to-value">Writing a REFERENCE TO value</a></li>
+<li><a href="#reading-a-pointer-to-value">Reading a POINTER TO value</a></li>
+<li><a href="#writing-a-pointer-to-value">Writing a POINTER TO value</a></li>
+</ul>
+</li>
 <li><a href="#calling-a-function-block-method-with-parameters-using-rpc-remote-procedure-call">Calling a function block method with parameters using RPC (remote procedure call)</a></li>
 <li><a href="#starting-and-stopping-the-plc">Starting and stopping the PLC</a></li>
 <li><a href="#starting-and-stopping-the-twincat-system">Starting and stopping the TwinCAT system</a></li>
@@ -179,6 +187,7 @@
 <li>TwinCAT 3 4022.27 running on 64bit Windows 10</li>
 <li>TwinCAT 3 4024.4 running on 64bit Windows 10</li>
 <li>TwinCAT 3 4022.27 running on 32bit and 64bit Windows 7 Embedded on Beckhoff PLC</li>
+<li>TwinCAT 3 4024.12 running on 64bit Windows 7 Embedded on Beckhoff PLC</li>
 <li>Node.js v10.16.3 and newer
 <ul>
 <li>NOTE: 64 bit integer values are supported only with Node.js v.12+</li>
@@ -438,8 +447,9 @@ Disconnected
 */
 </code></pre>
 <h2 id="reading-any-type-plc-variable">Reading any type PLC variable</h2>
-<p>Using <code>readSymbol</code> method it is possible to read variables of <strong>any type</strong> from the PLC. These include base scalar type variables, structs, function blocks, arrays and so on. These examples cover just a few cases.</p>
+<p>Using <code>readSymbol</code> method it is possible to read variables of <strong>any type</strong> from the PLC (except references and pointers). These include base scalar type variables, structs, function blocks, arrays and so on. These examples cover just a few cases.</p>
 <p>See full <code>readSymbol</code> documentation <a href="https://jisotalo.github.io/ads-client/Client.html#readSymbol">from the docs</a>.</p>
+<p>For references and pointers see chapter <a href="#reading-and-writing-pointer-to-and-reference-to-variables">Reading and writing POINTER TO and REFERENCE TO variables</a>.</p>
 <h3 id="example%3A-reading-int-type-variable">Example: Reading <code>INT</code> type variable</h3>
 <pre class="prettyprint source lang-js"><code>//Using Promises
 client.readSymbol('GVL_Test.TestSTRING')
@@ -573,8 +583,9 @@ Value read: { IN: false, PT: 2500, Q: false, ET: 0, M: false, StartTime: 0 }
 </code></pre>
 <hr>
 <h2 id="writing-any-type-plc-variable">Writing any type PLC variable</h2>
-<p>Using <code>writeSymbol</code> method it is possible to write variables of <strong>any type</strong> to the PLC. These include base scalar type variables, structs, function blocks, arrays and so on. These examples cover just a few cases.</p>
+<p>Using <code>writeSymbol</code> method it is possible to write variables of <strong>any type</strong> to the PLC (except references and pointers). These include base scalar type variables, structs, function blocks, arrays and so on. These examples cover just a few cases.</p>
 <p>See full <code>writeSymbol</code> documentation <a href="https://jisotalo.github.io/ads-client/Client.html#writeSymbol">from the docs</a>.</p>
+<p>For references and pointers see chapter <a href="#reading-and-writing-pointer-to-and-reference-to-variables">Reading and writing POINTER TO and REFERENCE TO variables</a>.</p>
 <hr>
 <h3 id="example%3A-writing-int-type-variable">Example: Writing <code>INT</code> type variable</h3>
 <pre class="prettyprint source lang-js"><code>try {
@@ -999,6 +1010,92 @@ console.log(data) //&lt;Buffer 39 30>
 console.log(data)
 //&lt;Buffer 48 65 6c 6c 6f 20 ... >
 </code></pre>
+<h2 id="reading-and-writing-pointer-to-and-reference-to-variables">Reading and writing <code>POINTER TO</code> and <code>REFERENCE TO</code> variables</h2>
+<p>It's also possible to work with both <code>POINTER TO xxx</code> and <code>REFERENCE TO xxx</code> variables with <code>ads-client</code>.</p>
+<ul>
+<li>Note that using <code>ReadSymbol()</code> and <code>WriteSymbol()</code> is not possible</li>
+<li>Easiest way to read is <code>readRawByName()</code></li>
+<li>Writing is can be done with <code>createVariableHandle()</code>, which is suitable for reading too</li>
+<li>Pointers require dereference operator ^ in order to work</li>
+</ul>
+<h3 id="reading-a-reference-to-value">Reading a <code>REFERENCE TO</code> value</h3>
+<p>The value needs to be read as a raw Buffer first and then it can be converted to correct data type. <code>createVariableHandle()</code> works too but this is slightly faster and easier.</p>
+<pre class="prettyprint source lang-js"><code>//GVL_Test has variable TestREFERENCE : REFERENCE TO ST_Example;
+
+const value = await client.convertFromRaw(
+  await client.readRawByName('GVL_Test.TestREFERENCE'),
+  'ST_Example'
+)
+console.log(value)
+/*
+{
+  SomeText: 'Hello ads-client',
+  SomeReal: 3.1415927410125732,
+  SomeDate: 2020-04-13T12:25:33.000Z
+}
+*/
+</code></pre>
+<h3 id="writing-a-reference-to-value">Writing a <code>REFERENCE TO</code> value</h3>
+<p>In order to write a reference, a variable handle needs to be created. Also the data neeeds to be converted to a raw Buffer before writing.</p>
+<pre class="prettyprint source lang-js"><code>//GVL_Test has variable TestREFERENCE : REFERENCE TO ST_Example;
+
+const value = {
+  SomeText: 'Hello reference variable',
+  SomeReal: 12345,
+  SomeDate: new Date()
+}
+
+//Creating handle to the varialbe
+const handle = await client.createVariableHandle('GVL_Test.TestREFERENCE')
+
+//Writing raw Buffer data that is first created from object
+await client.writeRawByHandle(
+  handle,
+  await client.convertToRaw(value, 'ST_Example')
+)
+
+//Always delete the handle if not reusing it later
+await client.deleteVariableHandle(handle)
+</code></pre>
+<h3 id="reading-a-pointer-to-value">Reading a <code>POINTER TO</code> value</h3>
+<p>Similar as with reference except that a dereference operator <code>^</code> is required.</p>
+<pre class="prettyprint source lang-js"><code>//GVL_Test has variable TestPOINTER : POINTER TO ST_Example;
+
+const value = await client.convertFromRaw(
+  await client.readRawByName('GVL_Test.TestPOINTER^'), //note ^
+  'ST_Example'
+)
+console.log(value)
+/*
+{
+  SomeText: 'Hello ads-client',
+  SomeReal: 3.1415927410125732,
+  SomeDate: 2020-04-13T12:25:33.000Z
+}
+*/
+</code></pre>
+<h3 id="writing-a-pointer-to-value">Writing a <code>POINTER TO</code> value</h3>
+<p>Similar as with reference except that a dereference operator <code>^</code> is required.</p>
+<pre class="prettyprint source lang-js"><code>//GVL_Test has variable TestPOINTER : POINTER TO ST_Example;
+
+const value = {
+  SomeText: 'Hello pointer variable',
+  SomeReal: 12345,
+  SomeDate: new Date()
+}
+
+//Creating handle to the varialbe
+const handle = await client.createVariableHandle('GVL_Test.TestPOINTER^') //note ^
+
+//Writing raw Buffer data that is first created from object
+await client.writeRawByHandle(
+  handle,
+  await client.convertToRaw(value, 'ST_Example')
+)
+
+//Always delete the handle if not reusing it later
+await client.deleteVariableHandle(handle)
+</code></pre>
 <h2 id="calling-a-function-block-method-with-parameters-using-rpc-(remote-procedure-call)">Calling a function block method with parameters using RPC (remote procedure call)</h2>
 <p>Starting from version 1.8.0, it is possible to call function block methods directly from Node.js. Input and output parameters are available as well as method return value. <strong>Only supported on TwinCAT 3.</strong></p>
 <hr>
@@ -1278,6 +1375,16 @@ await client.restartSystemManager()
 <ul>
 <li>See <a href="https://github.com/jisotalo/ads-client/issues/51#issuecomment-758016428">this issue comment</a> by hansipete how to do it.</li>
 </ul>
+<h3 id="a-data-type-is-not-found-even-when-it-should-be">A data type is not found even when it should be</h3>
+<p>If you use methods like <code>convertFromRaw()</code> and <code>getDataType()</code> but receive an error similar to <code>ClientException: Finding data type *data type* failed</code>, make sure you have really written the data type correctly.</p>
+<p>For example, when copying a variable name from TwinCAT online view using CTRL+C, it might not work:</p>
+<ul>
+<li>Displayed name: <code>ARRAY [0..1, 0..1] OF ST_Example</code></li>
+<li>The value copied to clipboard <code>ARRAY [0..1, 0..1] OF ST_Example</code></li>
+<li>--&gt; <strong>This causes error!</strong></li>
+<li>The real data type name that needs to be used is <code>ARRAY [0..1,0..1] OF ST_Example</code> (note no whitespace between array dimensions)</li>
+</ul>
+<p>If you have problems, try to read the variable information using <code>readSymbolInfo()</code>. The final solution is to read all data types using <code>readAndCacheDataTypes()</code> and manually finding the correct type.</p>
 <h1 id="documentation">Documentation</h1>
 <p>You can find the full html documentation from the project <a href="https://jisotalo.github.io/ads-client/">GitHub home page</a> as well as from <code>./docs/</code> folder in the repository.</p>
 <h1 id="license">License</h1>
@@ -1312,7 +1419,7 @@ SOFTWARE.</p></article>
 <br class="clear">
 
 <footer>
-    Documentation generated by <a href="https://github.com/jsdoc3/jsdoc">JSDoc 3.6.4</a> on Tue Feb 09 2021 16:55:01 GMT+0200 (GMT+02:00) using the <a href="https://github.com/clenemt/docdash">docdash</a> theme.
+    Documentation generated by <a href="https://github.com/jsdoc3/jsdoc">JSDoc 3.6.4</a> on Sun Apr 11 2021 10:58:28 GMT+0300 (GMT+03:00) using the <a href="https://github.com/clenemt/docdash">docdash</a> theme.
 </footer>
 
 <script>prettyPrint();</script>
