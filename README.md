@@ -429,7 +429,7 @@ Using `readSymbol` method it is possible to read variables of **any type** from 
 
 See full `readSymbol` documentation [from the docs](https://jisotalo.github.io/ads-client/Client.html#readSymbol).
 
-For references and pointers see the separate chapter.
+For references and pointers see chapter [Reading and writing POINTER TO and REFERENCE TO variables](#reading-and-writing-pointer-to-and-reference-to-variables).
 
 ### Example: Reading `INT` type variable
 ```js
@@ -607,7 +607,7 @@ Using `writeSymbol` method it is possible to write variables of **any type** to 
 
 See full `writeSymbol` documentation [from the docs](https://jisotalo.github.io/ads-client/Client.html#writeSymbol).
 
-For references and pointers see the separate chapter.
+For references and pointers see chapter [Reading and writing POINTER TO and REFERENCE TO variables](#reading-and-writing-pointer-to-and-reference-to-variables).
 
 ---
 
