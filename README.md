@@ -1207,7 +1207,7 @@ await client.deleteVariableHandle(handle)
 Similar as with reference except that a dereference operator `^` is required.
 
 ```js
-//GVL_Test has variable TestPOINTER	: POINTER TO ST_Example;
+//GVL_Test has variable TestPOINTER : POINTER TO ST_Example;
 
 const value = await client.convertFromRaw(
   await client.readRawByName('GVL_Test.TestPOINTER^'), //note ^
@@ -1229,7 +1229,7 @@ console.log(value)
 Similar as with reference except that a dereference operator `^` is required.
 
 ```js
-//GVL_Test has variable TestPOINTER	: POINTER TO ST_Example;
+//GVL_Test has variable TestPOINTER : POINTER TO ST_Example;
 
 const value = {
   SomeText: 'Hello pointer variable',
