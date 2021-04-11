@@ -115,6 +115,7 @@ The ads-client package is tested so far with the following setups:
   - TwinCAT 3 4022.27 running on 64bit Windows 10
   - TwinCAT 3 4024.4 running on 64bit Windows 10
   - TwinCAT 3 4022.27 running on 32bit and 64bit Windows 7 Embedded on Beckhoff PLC
+  - TwinCAT 3 4024.12 running on 64bit Windows 7 Embedded on Beckhoff PLC
   - Node.js v10.16.3 and newer
     - NOTE: 64 bit integer values are supported only with Node.js v.12+
 
