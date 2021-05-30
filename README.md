@@ -15,6 +15,9 @@ This project is currently "ready". It's maintained actively and used in projects
 
 Bugs are fixed if found and new features can be added. Please let me know if you have any ideas!
 
+# Using Node-RED?
+Check out the [node-red-contrib-ads-client](https://www.npmjs.com/package/node-red-contrib-ads-client) package. It's an `ads-client` wrapper for Node-RED to get the same functionality.
+
 
 # Table of contents
 

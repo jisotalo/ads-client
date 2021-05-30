@@ -397,6 +397,15 @@ class Client extends EventEmitter {
         socket.removeAllListeners('error')
         socket.removeAllListeners('close')
         socket.removeAllListeners('end')
+ 
+        //Listening connection lost events
+        this._internals.socketConnectionLostHandler = _onConnectionLost.bind(this, true)
+        socket.on('close', this._internals.socketConnectionLostHandler)
+        socket.on('end', this._internals.socketConnectionLostHandler)
+
+        //TODO: If socket error happens, should something to be done? Now probably close/end is called afterwards.
+        this._internals.socketErrorHandler = err => _console.call(this, `WARNING: Socket connection error: ${JSON.stringify(err)}`)
+        socket.on('error', this._internals.socketErrorHandler)
 
         try {
           //Try to read system manager state - If it's OK, connection is successful to the target
@@ -416,7 +425,7 @@ class Client extends EventEmitter {
         try {
           await _reInitializeInternals.call(this)
 
-        } catch (err) { 
+        } catch (err) {
           if (this.settings.allowHalfOpen !== true) {
             try {
               await this.disconnect()
@@ -427,20 +436,11 @@ class Client extends EventEmitter {
           }
 
           //Todo: Redesign this
-          if(this.metaData.systemManagerState.adsState !== ADS.ADS_STATE.Run)
+          if (this.metaData.systemManagerState.adsState !== ADS.ADS_STATE.Run)
             _console.call(this, `WARNING: Target is connected but not in RUN mode (mode: ${this.metaData.systemManagerState.adsStateStr}) - connecting to runtime (ADS port ${this.settings.targetAdsPort}) failed`)
           else
             _console.call(this, `WARNING: Target is connected but connecting to runtime (ADS port ${this.settings.targetAdsPort}) failed - Check the port number and that the target system state (${this.metaData.systemManagerState.adsStateStr}) is valid.`)
         }
- 
-        //Listening connection lost events
-        this._internals.socketConnectionLostHandler = _onConnectionLost.bind(this, true)
-        socket.on('close', this._internals.socketConnectionLostHandler)
-        socket.on('end', this._internals.socketConnectionLostHandler)
-
-        //TODO: If socket error happens, should something to be done? Now probably close/end is called afterwards.
-        this._internals.socketErrorHandler = err => _console.call(this, `WARNING: Socket connection error: ${JSON.stringify(err)}`)
-        socket.on('error', this._internals.socketErrorHandler)
 
         //We are connected to the target
         this.emit('connect', this.connection)
@@ -4411,7 +4411,7 @@ async function _parseDataType(data) {
   for (let i = 0; i < dataType.arrayDimension; i++) {
     const array = {}
 
-    array.startIndex = data.readUInt32LE(pos)
+    array.startIndex = data.readInt32LE(pos)
     pos += 4
   
     array.length = data.readUInt32LE(pos)
@@ -4739,7 +4739,7 @@ function _parseSymbolInfo(data) {
   for (let i = 0; i < symbol.arrayDimension; i++) {
     const array = {}
 
-    array.startIndex = data.readUInt32LE(pos)
+    array.startIndex = data.readInt32LE(pos)
     pos += 4
   
     array.length = data.readUInt32LE(pos)

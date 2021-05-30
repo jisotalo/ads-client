@@ -4,6 +4,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.10.5] - 30.05.2021
+### Changed
+- Optimized data type parsing to be a little faster ([See issue #57](https://github.com/jisotalo/ads-client/issues/57))
+- Bug fix: Array information startIndex is unsigned when it should be signed ([See issue #59](https://github.com/jisotalo/ads-client/issues/59))
+- Bug fix: Uncaught socket expression during connect ([See issue #63](https://github.com/jisotalo/ads-client/issues/63))
+- Updated npm packages
+  - Two vulnerabilities in some devDependencies (not used in production)
+- Updated README
+  - Added information about Node-RED package ([node-red-contrib-ads-client](https://www.npmjs.com/package/node-red-contrib-ads-client))
+
 ## [1.10.4] - 11.04.2021
 ### Changed
 - Bug fix: Converting array data from raw Buffer failed ([See issue #53](https://github.com/jisotalo/ads-client/issues/53))
