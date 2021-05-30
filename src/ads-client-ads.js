@@ -877,18 +877,23 @@ const BASE_DATA_TYPES = {
    */
   find: function (name) {
     let regExpRes = null
-    
-    //Find the correct type with regular expressions
-    //We can find also STRING(xx), WSTRING(xx) and DWORD(100..2000) for example
-    let type = this.types.find(type => {
-      const re = new RegExp('^(' + type.name.join('|') + ')([\\[\\(](.*)[\\)\\]])*$', 'i')
+
+    //First, try to find easy way
+    let type = this.types.find(type => type.name.includes(name.toUpperCase()))
+
+    if (!type) {
+      //Not found, try to find the correct type with regular expressions
+      //We can find also STRING(xx), WSTRING(xx) and DWORD(100..2000) for example
+      type = this.types.find(type => {
+        const re = new RegExp('^(' + type.name.join('|') + ')([\\[\\(](.*)[\\)\\]])*$', 'i')
       
-      //Using match instead of test so we get capture groups too
-      regExpRes = name.trim().match(re)
+        //Using match instead of test so we get capture groups too
+        regExpRes = name.trim().match(re)
 
-      return (regExpRes != null)
-    })
-
+        return (regExpRes != null)
+      })
+    }
+    
     if (type == null)
       return null
     
