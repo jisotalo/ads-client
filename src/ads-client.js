@@ -5968,12 +5968,7 @@ async function _onAdsCommandReceived(packet) {
             
             //First we parse the data from received byte buffer
             try {
-
-              var hrstart = process.hrtime() //TODO POISTA
               const parsedValue = await sub.dataParser(sample.data)
-              hrend = process.hrtime(hrstart)//TODO POISTA
-              console.info('Execution time (hr): %ds %dms', hrend[0], hrend[1] / 1000000)//TODO POISTA
-
 
               parsedValue.timeStamp = stamp.timeStamp
   
