@@ -493,12 +493,18 @@ class Client extends EventEmitter {
     return new Promise(async (resolve, reject) => {
       debug(`disconnect(): Starting to close connection (force: ${forceDisconnect})`)
 
-      if (this._internals.socketConnectionLostHandler) {
-        this._internals.socket.off('close', this._internals.socketConnectionLostHandler)
-        this._internals.socket.off('end', this._internals.socketConnectionLostHandler)
-      }
-      if (this._internals.socketErrorHandler) {
-        this._internals.socket.off('error', this._internals.socketErrorHandler)
+      try {
+        if (this._internals.socketConnectionLostHandler) {
+          this._internals.socket.off('close', this._internals.socketConnectionLostHandler)
+          this._internals.socket.off('end', this._internals.socketConnectionLostHandler)
+        }
+        if (this._internals.socketErrorHandler) {
+          this._internals.socket.off('error', this._internals.socketErrorHandler)
+        }
+
+      } catch (err) {
+        //We probably have no socket anymore. Just quit.
+        forceDisconnect = true
       }
 
       //Clear system manager state poller
@@ -506,9 +512,11 @@ class Client extends EventEmitter {
 
       //If forced, then just destroy the socket
       if (forceDisconnect) {
-        this._internals.socket.removeAllListeners()
-        this._internals.socket.destroy()
 
+        if (this._internals.socket) {
+          this._internals.socket.removeAllListeners()
+          this._internals.socket.destroy()
+        }
         this.connection.connected = false
         this.connection.localAdsPort = null
         this._internals.socket = null
@@ -3529,7 +3537,12 @@ function _registerAdsPort() {
       return resolve(res)
     }
 
-    _socketWrite.call(this, packet)
+    try {
+      _socketWrite.call(this, packet)
+
+    } catch (err) {
+      return reject(new ClientException(this, '_registerAdsPort()', `Error - Writing to socket failed`, err))
+    }
   })
 }
 
@@ -3603,7 +3616,23 @@ function _unregisterAdsPort() {
       resolve()
     })
 
-    _socketWrite.call(this, buffer)
+    
+    try {
+      _socketWrite.call(this, buffer)
+
+    } catch (err) {
+
+      try {
+        debugD(`_unregisterAdsPort(): Failed to send unregister command. Closing connection anyways.`)
+
+        this._internals.socket.destroy()
+      } catch (err) {
+        debugD(`_unregisterAdsPort(): Failed to destroy socket.`)
+
+      } finally {
+        resolve()
+      }
+    }
   })
 }
 

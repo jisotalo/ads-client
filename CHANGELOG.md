@@ -4,6 +4,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.10.6] - 24.06.2021
+### Changed
+- Bug fix: Added try..catch blocks around _socketWrite calls. In some situations caused uncaught exception problems. ([See issue #63](https://github.com/jisotalo/ads-client/issues/63))
+- Bug fix: Better exception handling to `disconnect()`
+
 ## [1.10.5] - 30.05.2021
 ### Changed
 - Optimized data type parsing to be a little faster ([See issue #57](https://github.com/jisotalo/ads-client/issues/57))
