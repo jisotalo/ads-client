@@ -384,7 +384,6 @@ class Client extends EventEmitter {
         socket.setTimeout(0);
 
         this._internals.socket = socket
-        this.connection.connected = true
 
         //Try to register an ADS port
         try {
@@ -401,6 +400,8 @@ class Client extends EventEmitter {
           socket.destroy()
           //Remove all events from socket
           socket.removeAllListeners()
+          this.connection.connected = false
+
           return reject(new ClientException(this, 'connect()', `Registering ADS port from router failed`, err))
         }
 
