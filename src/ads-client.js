@@ -315,6 +315,9 @@ class Client extends EventEmitter {
         socket.removeAllListeners()
         socket = null
 
+        //Reset connection flag
+        this.connection.connected = false
+
         reject(new ClientException(this, 'connect()', `Connection to ${this.settings.routerAddress}:${this.settings.routerTcpPort} failed (socket error ${err.errno})`, err))
       })
 
@@ -328,6 +331,9 @@ class Client extends EventEmitter {
         socket.removeAllListeners()
         socket = null
 
+        //Reset connection flag
+        this.connection.connected = false
+
         reject(new ClientException(this, 'connect()', `Connection to ${this.settings.routerAddress}:${this.settings.routerTcpPort} failed - socket closed by remote (hadError = ${hadError})`))
       })
 
@@ -338,7 +344,10 @@ class Client extends EventEmitter {
  
         //Remove all events from socket
         socket.removeAllListeners()
- 
+        socket = null
+
+        //Reset connection flag
+        this.connection.connected = false
  
         if (this.settings.localAdsPort != null)
           reject(new ClientException(this, 'connect()', `Connection to ${this.settings.routerAddress}:${this.settings.routerTcpPort} failed - socket ended by remote (is the given local ADS port ${this.settings.localAdsPort} already in use?)`))
@@ -356,8 +365,10 @@ class Client extends EventEmitter {
         
         //Remove all events from socket
         socket.removeAllListeners()
-
         socket = null
+
+        //Reset connection flag
+        this.connection.connected = false
 
         reject(new ClientException(this, 'connect()', `Connection to ${this.settings.routerAddress}:${this.settings.routerTcpPort} failed (timeout) - No response from router in ${this.settings.timeoutDelay} ms`))
       })
