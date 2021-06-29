@@ -71,6 +71,7 @@ Check out the [node-red-contrib-ads-client](https://www.npmjs.com/package/node-r
   - [Calling a function block method with parameters using RPC (remote procedure call)](#calling-a-function-block-method-with-parameters-using-rpc-remote-procedure-call)
   - [Starting and stopping the PLC](#starting-and-stopping-the-plc)
   - [Starting and stopping the TwinCAT system](#starting-and-stopping-the-twincat-system)
+  - [Sending custom ADS commands](#sending-custom-ads-commands)
   - [Available ads-client events](#available-ads-client-events)
 - [Debugging](#debugging)
 - [FAQ](#faq)
@@ -1427,6 +1428,58 @@ The TwinCAT system state can always be read using `readSystemManagerState()` and
 ```js
 await client.readSystemManagerState() //{ adsState: 5, adsStateStr: 'Run', deviceState: 1 }
 ```
+
+## Sending custom ADS commands
+
+Since version 1.11.0 it's possible to send any custom ADS commands using `sendAdsCommand()`
+
+**Example:** Read device info from system manager
+```js
+//Read device info from system manager (port 10000)
+const result = await client.sendAdsCommand(
+  ads.ADS.ADS_COMMAND.ReadDeviceInfo,
+  Buffer.alloc(0),
+  10000
+)
+console.log(result)
+/*
+{
+  amsTcp: { command: 0, commandStr: 'Ads command', dataLength: 56 },
+  ams: {
+    targetAmsNetId: '192.168.5.131.1.1',
+    targetAdsPort: 37538,
+    sourceAmsNetId: '192.168.5.131.1.1',
+    sourceAdsPort: 10000,
+    adsCommand: 1,
+    adsCommandStr: 'ReadDeviceInfo',
+    stateFlags: 5,
+    stateFlagsStr: 'Response, AdsCommand, Tcp',
+    dataLength: 24,
+    errorCode: 0,
+    invokeId: 7,
+    error: false,
+    errorStr: ''
+  },
+  ads: {
+    rawData: <Buffer 00 00 00 00 03 01 b8 0f 54 77 69 6e 43 41 54 20 53 79 73 74 65 6d 00 00>,
+    errorCode: 0,
+    data: {
+      majorVersion: 3,
+      minorVersion: 1,
+      versionBuild: 4024,
+      deviceName: 'TwinCAT System'
+    },
+    error: false
+  }
+}
+*/
+```
+
+**Example:** Read all ADS routes from target system
+
+See this gist for a simple example how to read all TwinCAT routes from target system:
+
+https://gist.github.com/jisotalo/cfcc9e4935dfc6f391667cad2cdcb6c6
 
 # Available ads-client events
 
