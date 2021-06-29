@@ -4,6 +4,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.11.0] - 29.06.2021
+### Added
+- Added public access to a method `sendAdsCommand()` for sending raw ADS commands
+- Added public access to two helper methods `byteArrayToAmsNedIdStr()` and `amsNedIdStrToByteArray()`
+
 ## [1.10.7] - 27.06.2021
 ### Changed
 - Bug fix: `connection.connected` flag was staying `true` if connection failed during initial connecting. ([See pull request #67](https://github.com/jisotalo/ads-client/pull/67))
