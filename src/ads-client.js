@@ -3315,7 +3315,59 @@ class Client extends EventEmitter {
     })
   }
 
+
+
+
+
+
+
+  /**
+   * Sends an ADS command including provided data
+   * As default the command is sent to target provided in Client settings. 
+   * However, the target can also be given
+   *
+   * @param {number} adsCommand ADS command to send (See ADS.ADS_COMMAND)
+   * @param {Buffer} adsData Data to send as byte Buffer
+   * @param {number} [targetAdsPort] Target ADS port (default: same as in Client settings, this.settings.targetAdsPort)
+   * @param {string} [targetAmsNetId] Target AmsNetID (default: same as in Client settings, this.settings.targetAmsNetId)
+   *
+   * @returns {Promise<RpcMethodResult>} Returns a promise (async function)
+   * - If resolved, command was successful and result is returned
+   * - If rejected, command failed error info is returned (object)
+   */
+  sendAdsCommand(adsCommand, adsData, targetAdsPort = null, targetAmsNetId = null) {
+    return _sendAdsCommand.call(this, adsCommand, adsData, targetAdsPort, targetAmsNetId)
+  }
+
+
+
+
+  /**
+   * **Helper:** Converts byte array (Buffer) to AmsNetId string
+   * 
+   * @param {Buffer|array} byteArray Buffer/array that contains AmsNetId bytes
+   * @returns {string} AmsNetId as string
+   */
+  byteArrayToAmsNedIdStr(byteArray) {
+    return _byteArrayToAmsNedIdStr(byteArray)
+  }
+
+  /**
+   * **Helper:** Converts AmsNetId string to byte array
+   * 
+   * @param {string} byteArray String that represents an AmsNetId
+   * @returns {array} AmsNetId as array
+   */
+  amsNedIdStrToByteArray(str) {
+    return _amsNedIdStrToByteArray(str)
+  }
+
 }
+
+
+
+
+
 
 
 
@@ -6141,6 +6193,7 @@ function _parseAdsNotification(data) {
  * @param {number} adsCommand - ADS command to send (see ADS.ADS_COMMAND)
  * @param {Buffer} adsData - Buffer object that contains the data to send
  * @param {number} [targetAdsPort] - Target ADS port - default is this.settings.targetAdsPort
+ * @param {string} [targetAmsNetId] - Target AmsNetID - default is this.settings.targetAmsNetId
  * 
  * @returns {Promise<object>} Returns a promise (async function)
  * - If resolved, command was sent successfully and response was received. The received reponse is parsed and returned (object)
@@ -6148,7 +6201,7 @@ function _parseAdsNotification(data) {
  * 
  * @memberof _LibraryInternals
  */
-function _sendAdsCommand(adsCommand, adsData, targetAdsPort = null) {
+function _sendAdsCommand(adsCommand, adsData, targetAdsPort = null, targetAmsNetId = null) {
   return new Promise(async (resolve, reject) => {
     
     //Check that next free invoke ID is below 32 bit integer maximum
@@ -6162,7 +6215,7 @@ function _sendAdsCommand(adsCommand, adsData, targetAdsPort = null) {
         commandStr: ADS.AMS_HEADER_FLAG.toString(ADS.AMS_HEADER_FLAG.AMS_TCP_PORT_AMS_CMD)
       },
       ams: {
-        targetAmsNetId: this.connection.targetAmsNetId,
+        targetAmsNetId: (targetAmsNetId == null ? this.connection.targetAmsNetId : targetAmsNetId),
         targetAdsPort: (targetAdsPort == null ? this.connection.targetAdsPort : targetAdsPort),
         sourceAmsNetId: this.connection.localAmsNetId,
         sourceAdsPort: this.connection.localAdsPort,
