@@ -3331,7 +3331,7 @@ class Client extends EventEmitter {
    * @param {number} [targetAdsPort] Target ADS port (default: same as in Client settings, this.settings.targetAdsPort)
    * @param {string} [targetAmsNetId] Target AmsNetID (default: same as in Client settings, this.settings.targetAmsNetId)
    *
-   * @returns {Promise<RpcMethodResult>} Returns a promise (async function)
+   * @returns {Promise<object>} Returns a promise (async function)
    * - If resolved, command was successful and result is returned
    * - If rejected, command failed error info is returned (object)
    */
