@@ -3352,8 +3352,8 @@ class Client extends EventEmitter {
    * @param {Buffer|array} byteArray Buffer/array that contains AmsNetId bytes
    * @returns {string} AmsNetId as string
    */
-  byteArrayToAmsNedIdStr(byteArray) {
-    return _byteArrayToAmsNedIdStr(byteArray)
+  byteArrayToAmsNetIdStr(byteArray) {
+    return _byteArrayToAmsNetIdStr(byteArray)
   }
 
   /**
@@ -3362,8 +3362,8 @@ class Client extends EventEmitter {
    * @param {string} byteArray String that represents an AmsNetId
    * @returns {array} AmsNetId as array
    */
-  amsNedIdStrToByteArray(str) {
-    return _amsNedIdStrToByteArray(str)
+  amsNetIdStrToByteArray(str) {
+    return _amsNetIdStrToByteArray(str)
   }
 
 }
@@ -5709,7 +5709,7 @@ function _parseAmsHeader(data) {
   }
   
   //0..5 Target AMSNetId
-  ams.targetAmsNetId = _byteArrayToAmsNedIdStr(data.slice(pos, pos + ADS.AMS_NET_ID_LENGTH))
+  ams.targetAmsNetId = _byteArrayToAmsNetIdStr(data.slice(pos, pos + ADS.AMS_NET_ID_LENGTH))
   pos += ADS.AMS_NET_ID_LENGTH
 
   //6..8 Target ads port
@@ -5717,7 +5717,7 @@ function _parseAmsHeader(data) {
   pos += 2
 
   //8..13 Source AMSNetId
-  ams.sourceAmsNetId = _byteArrayToAmsNedIdStr(data.slice(pos, pos + ADS.AMS_NET_ID_LENGTH))
+  ams.sourceAmsNetId = _byteArrayToAmsNetIdStr(data.slice(pos, pos + ADS.AMS_NET_ID_LENGTH))
   pos += ADS.AMS_NET_ID_LENGTH
 
   //14..15 Source ads port
@@ -5999,7 +5999,7 @@ async function _onAmsTcpPacketReceived(packet) {
       //Parse data
       packet.amsTcp.data = {
         //0..5 Own AmsNetId
-        localAmsNetId: _byteArrayToAmsNedIdStr(packet.amsTcp.data.slice(0, ADS.AMS_NET_ID_LENGTH)),
+        localAmsNetId: _byteArrayToAmsNetIdStr(packet.amsTcp.data.slice(0, ADS.AMS_NET_ID_LENGTH)),
         //5..6 Own assigned ADS port
         localAdsPort: packet.amsTcp.data.readUInt16LE(ADS.AMS_NET_ID_LENGTH)
       }
@@ -6370,7 +6370,7 @@ function _createAmsHeader(packet) {
   let pos = 0
 
   //0..5 Target AMSNetId
-  Buffer.from(_amsNedIdStrToByteArray(packet.ams.targetAmsNetId)).copy(header, 0)
+  Buffer.from(_amsNetIdStrToByteArray(packet.ams.targetAmsNetId)).copy(header, 0)
   pos += ADS.AMS_NET_ID_LENGTH
   
   //6..8 Target ads port
@@ -6378,7 +6378,7 @@ function _createAmsHeader(packet) {
   pos += 2
   
   //8..13 Source ads port
-  Buffer.from(_amsNedIdStrToByteArray(packet.ams.sourceAmsNetId)).copy(header, pos)
+  Buffer.from(_amsNetIdStrToByteArray(packet.ams.sourceAmsNetId)).copy(header, pos)
   pos += ADS.AMS_NET_ID_LENGTH
 
   //14..15 Source ads port
@@ -6615,7 +6615,7 @@ function _trimPlcString(plcString) {
  * 
  * @memberof _LibraryInternals
  */
-function _byteArrayToAmsNedIdStr(byteArray) {
+function _byteArrayToAmsNetIdStr(byteArray) {
   return byteArray.join('.')
 }
 
@@ -6631,7 +6631,7 @@ function _byteArrayToAmsNedIdStr(byteArray) {
  * 
  * @memberof _LibraryInternals
  */
-function _amsNedIdStrToByteArray(str) {
+function _amsNetIdStrToByteArray(str) {
   return str.split('.').map(x => parseInt(x))
 }
 
