@@ -411,7 +411,8 @@ class Client extends EventEmitter {
         socket.removeAllListeners('end')
 
         //When socket errors from now on, we will close the connection
-        this._internals.socketErrorHandler = _onSocketError.bind(this) 
+        this._internals.socketErrorHandler = _onSocketError.bind(this)
+        socket.on('error', this._internals.socketErrorHandler)
 
         try {
           //Try to read system manager state - If it's OK, connection is successful to the target
