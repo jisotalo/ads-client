@@ -4,6 +4,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.11.1] - 10.07.2021
+### Changed
+- Tried to fix edge cases where unhandled exception was thrown ([node-red-contrib-ads-client, issue #13](https://github.com/jisotalo/node-red-contrib-ads-client/issues/13))
+  - Example: When PLC was restarted (config mode) multiple times, sometimes an exception was thrown
+- Improved operation during connection faults
+- Fixed typos ([See issue #71](https://github.com/jisotalo/ads-client/issues/71))
+  - `byteArrayToAmsNedIdStr` --> `byteArrayToAmsNetIdStr`
+  - `amsNedIdStrToByteArray `--> `amsNetIdStrToByteArray`
+
+
 ## [1.11.0] - 29.06.2021
 ### Added
 - Added public access to a method `sendAdsCommand()` for sending raw ADS commands

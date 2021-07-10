@@ -409,14 +409,9 @@ class Client extends EventEmitter {
         socket.removeAllListeners('error')
         socket.removeAllListeners('close')
         socket.removeAllListeners('end')
- 
-        //Listening connection lost events
-        this._internals.socketConnectionLostHandler = _onConnectionLost.bind(this, true)
-        socket.on('close', this._internals.socketConnectionLostHandler)
-        socket.on('end', this._internals.socketConnectionLostHandler)
 
-        //TODO: If socket error happens, should something to be done? Now probably close/end is called afterwards.
-        this._internals.socketErrorHandler = err => _console.call(this, `WARNING: Socket connection error: ${JSON.stringify(err)}`)
+        //When socket errors from now on, we will close the connection
+        this._internals.socketErrorHandler = _onSocketError.bind(this)
         socket.on('error', this._internals.socketErrorHandler)
 
         try {
@@ -430,6 +425,8 @@ class Client extends EventEmitter {
           } catch (err) {
             debug(`connect(): Reading target system manager failed -> Connection closed`)
           }
+          this.connection.connected = false
+
           return reject(new ClientException(this, 'connect()', `Connection failed: ${err.message}`, err))
         }
 
@@ -444,6 +441,8 @@ class Client extends EventEmitter {
             } catch (err) {
               debug(`connect(): Connecting to target PLC runtime failed -> Connection closed`)
             }
+            this.connection.connected = false
+
             return reject(new ClientException(this, 'connect()', `Target and system manager found but couldn't connect to the PLC runtime (see setting allowHalfOpen): ${err.message}`, err))
           }
 
@@ -453,6 +452,10 @@ class Client extends EventEmitter {
           else
             _console.call(this, `WARNING: Target is connected but connecting to runtime (ADS port ${this.settings.targetAdsPort}) failed - Check the port number and that the target system state (${this.metaData.systemManagerState.adsStateStr}) is valid.`)
         }
+
+        //Listening connection lost events
+        this._internals.socketConnectionLostHandler = _onConnectionLost.bind(this, true)
+        socket.on('close', this._internals.socketConnectionLostHandler)
 
         //We are connected to the target
         this.emit('connect', this.connection)
@@ -476,7 +479,10 @@ class Client extends EventEmitter {
           localPort: (this.settings.localTcpPort ? this.settings.localTcpPort : null),
           localAddress: (this.settings.localAddress ? this.settings.localAddress : null),
         })
+
       } catch (err) {
+        this.connection.connected = false
+
         reject(new ClientException(this, 'connect()', `Opening socket connection to ${this.settings.routerAddress}:${this.settings.routerTcpPort} failed`, err))
       }
     })
@@ -508,12 +514,8 @@ class Client extends EventEmitter {
       try {
         if (this._internals.socketConnectionLostHandler) {
           this._internals.socket.off('close', this._internals.socketConnectionLostHandler)
-          this._internals.socket.off('end', this._internals.socketConnectionLostHandler)
         }
-        if (this._internals.socketErrorHandler) {
-          this._internals.socket.off('error', this._internals.socketErrorHandler)
-        }
-
+        
       } catch (err) {
         //We probably have no socket anymore. Just quit.
         forceDisconnect = true
@@ -540,11 +542,13 @@ class Client extends EventEmitter {
 
 
       let error = null
+
       try {
         await this.unsubscribeAll()
       } catch (err) {
         error = new ClientException(this, 'disconnect()', err)
       }
+
       try {
         await _unsubscribeAllInternals.call(this)
       } catch (err) {
@@ -1472,7 +1476,7 @@ class Client extends EventEmitter {
         })
         .catch((res) => {
           debug(`unsubscribe(): Unsubscribing from notification ${notificationHandle} failed`)
-          if (this._internals.activeSubscriptions[notificationHandle].target !== undefined) {
+          if (this._internals.activeSubscriptions[notificationHandle] && this._internals.activeSubscriptions[notificationHandle].target !== undefined) {
             reject(new ClientException(this, 'unsubscribe()', `Unsubscribing from notification ${JSON.stringify(this._internals.activeSubscriptions[notificationHandle].target)} failed`, res))
           } else {
             reject(new ClientException(this, 'unsubscribe()', `Unsubscribing from notification with handle ${notificationHandle} failed`, res))
@@ -3348,8 +3352,8 @@ class Client extends EventEmitter {
    * @param {Buffer|array} byteArray Buffer/array that contains AmsNetId bytes
    * @returns {string} AmsNetId as string
    */
-  byteArrayToAmsNedIdStr(byteArray) {
-    return _byteArrayToAmsNedIdStr(byteArray)
+  byteArrayToAmsNetIdStr(byteArray) {
+    return _byteArrayToAmsNetIdStr(byteArray)
   }
 
   /**
@@ -3358,8 +3362,8 @@ class Client extends EventEmitter {
    * @param {string} byteArray String that represents an AmsNetId
    * @returns {array} AmsNetId as array
    */
-  amsNedIdStrToByteArray(str) {
-    return _amsNedIdStrToByteArray(str)
+  amsNetIdStrToByteArray(str) {
+    return _amsNetIdStrToByteArray(str)
   }
 
 }
@@ -3632,11 +3636,16 @@ function _unregisterAdsPort() {
     if (this.settings.localAdsPort) {
       debug(`_unregisterAdsPort(): Local AmsNetId and ADS port manually given so no need to unregister`)
     
-      this._internals.socket.end(() => {
-        debugD(`_unregisterAdsPort(): Socket closed`)
-        this._internals.socket.destroy()
-        debugD(`_unregisterAdsPort(): Socket destroyed`)
-      })
+      if (this._internals.socket) {
+        this._internals.socket.end(() => {
+          debugD(`_unregisterAdsPort(): Socket closed`)
+          
+          if (this._internals.socket) {
+            this._internals.socket.destroy()
+            debugD(`_unregisterAdsPort(): Socket destroyed`)
+          }
+        })
+      }
       return resolve()
     }
 
@@ -3703,6 +3712,19 @@ function _unregisterAdsPort() {
 
 
 
+/**
+ * Event listener for socket errors. Just calling the _onConnectionLost handler.
+ * 
+ * @memberof _LibraryInternals
+ */
+async function _onSocketError(err) {
+  _console.call(this, `WARNING: Socket connection had an error, closing connection: ${JSON.stringify(err)}`)
+
+  _onConnectionLost.call(this, true)
+}
+
+
+
 
 
 /**
@@ -3714,7 +3736,8 @@ function _unregisterAdsPort() {
  */
 async function _onConnectionLost(socketFailure = false) {
   debug(`_onConnectionLost(): Connection was lost. Socket failure: ${socketFailure}`)
-
+  
+  this.connection.connected = false
   this.emit('connectionLost')
   
   if (this.settings.autoReconnect !== true) {
@@ -3725,11 +3748,12 @@ async function _onConnectionLost(socketFailure = false) {
     
     return
   }
+
+  if (this._internals.socketConnectionLostHandler)
+    this._internals.socket.off('close', this._internals.socketConnectionLostHandler)
   
   _console.call(this, 'WARNING: Connection was lost. Trying to reconnect...')
   
-  this.connection.connected = false
-
   //Clear timers
   clearTimeout(this._internals.systemManagerStatePoller)
   clearTimeout(this._internals.reconnectionTimer)
@@ -5685,7 +5709,7 @@ function _parseAmsHeader(data) {
   }
   
   //0..5 Target AMSNetId
-  ams.targetAmsNetId = _byteArrayToAmsNedIdStr(data.slice(pos, pos + ADS.AMS_NET_ID_LENGTH))
+  ams.targetAmsNetId = _byteArrayToAmsNetIdStr(data.slice(pos, pos + ADS.AMS_NET_ID_LENGTH))
   pos += ADS.AMS_NET_ID_LENGTH
 
   //6..8 Target ads port
@@ -5693,7 +5717,7 @@ function _parseAmsHeader(data) {
   pos += 2
 
   //8..13 Source AMSNetId
-  ams.sourceAmsNetId = _byteArrayToAmsNedIdStr(data.slice(pos, pos + ADS.AMS_NET_ID_LENGTH))
+  ams.sourceAmsNetId = _byteArrayToAmsNetIdStr(data.slice(pos, pos + ADS.AMS_NET_ID_LENGTH))
   pos += ADS.AMS_NET_ID_LENGTH
 
   //14..15 Source ads port
@@ -5975,7 +5999,7 @@ async function _onAmsTcpPacketReceived(packet) {
       //Parse data
       packet.amsTcp.data = {
         //0..5 Own AmsNetId
-        localAmsNetId: _byteArrayToAmsNedIdStr(packet.amsTcp.data.slice(0, ADS.AMS_NET_ID_LENGTH)),
+        localAmsNetId: _byteArrayToAmsNetIdStr(packet.amsTcp.data.slice(0, ADS.AMS_NET_ID_LENGTH)),
         //5..6 Own assigned ADS port
         localAdsPort: packet.amsTcp.data.readUInt16LE(ADS.AMS_NET_ID_LENGTH)
       }
@@ -6346,7 +6370,7 @@ function _createAmsHeader(packet) {
   let pos = 0
 
   //0..5 Target AMSNetId
-  Buffer.from(_amsNedIdStrToByteArray(packet.ams.targetAmsNetId)).copy(header, 0)
+  Buffer.from(_amsNetIdStrToByteArray(packet.ams.targetAmsNetId)).copy(header, 0)
   pos += ADS.AMS_NET_ID_LENGTH
   
   //6..8 Target ads port
@@ -6354,7 +6378,7 @@ function _createAmsHeader(packet) {
   pos += 2
   
   //8..13 Source ads port
-  Buffer.from(_amsNedIdStrToByteArray(packet.ams.sourceAmsNetId)).copy(header, pos)
+  Buffer.from(_amsNetIdStrToByteArray(packet.ams.sourceAmsNetId)).copy(header, pos)
   pos += ADS.AMS_NET_ID_LENGTH
 
   //14..15 Source ads port
@@ -6591,7 +6615,7 @@ function _trimPlcString(plcString) {
  * 
  * @memberof _LibraryInternals
  */
-function _byteArrayToAmsNedIdStr(byteArray) {
+function _byteArrayToAmsNetIdStr(byteArray) {
   return byteArray.join('.')
 }
 
@@ -6607,7 +6631,7 @@ function _byteArrayToAmsNedIdStr(byteArray) {
  * 
  * @memberof _LibraryInternals
  */
-function _amsNedIdStrToByteArray(str) {
+function _amsNetIdStrToByteArray(str) {
   return str.split('.').map(x => parseInt(x))
 }
 
