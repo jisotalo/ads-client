@@ -4,6 +4,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.11.2] - 01.08.2021
+### Changed
+- Mainly minor bug fixes / adjustments that have been found during Node-RED development
+  - Updated operation during sudden disconnect (preventing multiple simultaneous reconnects)
+  - Added timeout timer to port registering and unregistering to fix some edge cases
+  - Bug fix: Sometimes unhandled exception was thrown during disconnect
+
 ## [1.11.1] - 10.07.2021
 ### Changed
 - Tried to fix edge cases where unhandled exception was thrown ([node-red-contrib-ads-client, issue #13](https://github.com/jisotalo/node-red-contrib-ads-client/issues/13))
@@ -12,7 +19,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fixed typos ([See issue #71](https://github.com/jisotalo/ads-client/issues/71))
   - `byteArrayToAmsNedIdStr` --> `byteArrayToAmsNetIdStr`
   - `amsNedIdStrToByteArray `--> `amsNetIdStrToByteArray`
-
 
 ## [1.11.0] - 29.06.2021
 ### Added
