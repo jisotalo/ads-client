@@ -3841,7 +3841,7 @@ async function _onConnectionLost(socketFailure = false) {
     return
   }
 
-  if (this._internals.socketConnectionLostHandler)
+  if (this._internals.socket && this._internals.socketConnectionLostHandler)
     this._internals.socket.off('close', this._internals.socketConnectionLostHandler)
 
   _console.call(this, 'WARNING: Connection was lost. Trying to reconnect...')
