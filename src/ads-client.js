@@ -161,12 +161,12 @@ class Client extends EventEmitter {
       activeAdsRequests: {}, //Active ADS requests that wait for answer from router
       activeSubscriptions: {}, //Active device notifications
       symbolVersionNotification: null, //Notification handle of the symbol version changed subscription (used to unsubscribe)
-      systemManagerStatePoller: null, //Timer that reads the system manager state (run/config) - This is not available through ADS notifications
+      systemManagerStatePoller: {id: 0, timer: null}, //Timer that reads the system manager state (run/config) - This is not available through ADS notifications
       firstStateReadFaultTime: null, //Date when system manager state read failed for the first time
       socketConnectionLostHandler: null, //Handler for socket connection lost event
       socketErrorHandler: null, //Handler for socket error event
       oldSubscriptions: null, //Old subscriptions that were active before connection was lost
-      reconnectionTimer: null, //Timer that tries to reconnect intervally
+      reconnectionTimer: {id: 0, timer: null}, //Timer that tries to reconnect intervally
       portRegisterTimeoutTimer: null, //Timeout timer of registerAdsPort()
     }
 
@@ -525,8 +525,10 @@ class Client extends EventEmitter {
       }
 
       //Clear system manager state poller
-      clearTimeout(this._internals.systemManagerStatePoller)
+      _systemManagerStatePollerStop.call(this)
       clearTimeout(this._internals.portRegisterTimeoutTimer)
+      //Clear reconnection timer
+      _stopReconnecting.call(this)
 
       //If forced, then just destroy the socket
       if (forceDisconnect) {
@@ -3824,8 +3826,7 @@ async function _onSocketError(err) {
  */
 async function _onConnectionLost(socketFailure = false) {
   //Clear timers
-  clearTimeout(this._internals.systemManagerStatePoller)
-  clearTimeout(this._internals.reconnectionTimer)
+  _systemManagerStatePollerStop.call(this)
 
   debug(`_onConnectionLost(): Connection was lost. Socket failure: ${socketFailure}`)
 
@@ -3862,9 +3863,13 @@ async function _onConnectionLost(socketFailure = false) {
   this._internals.activeSubscriptions = {}
 
 
-  const tryToReconnect = async (firstTime) => {
-    clearTimeout(this._internals.reconnectionTimer)
+  const tryToReconnect = async (firstTime,id) => {
+    //Destroy loop if id doesn't match anymore
+    if( this._internals.reconnectionTimer.id !== id){ 
+      return; 
+    }
 
+    //Try to reconnect
     this.reconnect(socketFailure)
       .then(res => {
 
@@ -3879,19 +3884,38 @@ async function _onConnectionLost(socketFailure = false) {
 
             debug(`_onConnectionLost(): Connection and some subscriptions reinitialized. Connection is back.`)
           })
+          _stopReconnecting.call(this);
       })
       .catch(err => {
         if (firstTime)
           _console.call(this, `WARNING: Reconnecting failed. Keeping trying in the background every ${this.settings.reconnectInterval} ms...`)
-
-        //Clear timer again just incase
-        clearTimeout(this._internals.reconnectionTimer)
-        this._internals.reconnectionTimer = setTimeout(() => tryToReconnect(false), this.settings.reconnectInterval)
-      })
+        
+        if (this._internals.reconnectionTimer.id === id){ //Id still valid
+          this._internals.reconnectionTimer.timer = setTimeout(() => tryToReconnect(false, this._internals.reconnectionTimer.id), this.settings.reconnectInterval)
+        }
+    })
   }
 
-  clearTimeout(this._internals.reconnectionTimer)
-  this._internals.reconnectionTimer = setTimeout(() => tryToReconnect(true), this.settings.reconnectInterval)
+  //Try to reconnect if not already trying
+  if(!this._internals.reconnectionTimer.timer >= 0){
+    this._internals.reconnectionTimer.timer = setTimeout(() => tryToReconnect(true, this._internals.reconnectionTimer.id), this.settings.reconnectInterval)
+  }
+  
+}
+
+/**
+ * Called to stop reconnection loop
+ * @memberof _LibraryInternals
+ */
+function _stopReconnecting(){
+  //Clear timer if still running
+  clearTimeout(this._internals.reconnectionTimer.timer)
+  //Flag timer destroyed
+  this._internals.reconnectionTimer.timer = null
+  //Increase loop id
+  this._internals.reconnectionTimer.id += 1
+  if (this._internals.reconnectionTimer.id > 100000000) //Prevent overflow
+    this._internals.reconnectionTimer.id = 0
 }
 
 
@@ -4162,10 +4186,14 @@ async function _onSymbolVersionChanged(data) {
  * @memberof _LibraryInternals
  */
 function _systemManagerStatePoller() {
-  clearTimeout(this._internals.systemManagerStatePoller)
 
-  const poller = async () => {
+  const poller = async (id) => {
     let startAgain = true, oldState = this.metaData.systemManagerState
+
+    //Destroy loop if id doesn't match anymore
+    if( id !== this._internals.systemManagerStatePoller.id ){
+      return;
+    }
 
     try {
       await this.readSystemManagerState()
@@ -4202,14 +4230,42 @@ function _systemManagerStatePoller() {
       }
     }
 
-    if (startAgain)
-      this._internals.systemManagerStatePoller = setTimeout(poller, this.settings.checkStateInterval)
+    //Check if id is still valid
+    if(id !== this._internals.systemManagerStatePoller.id)
+      return //Don't do anything, something asked to destroy this loop
+
+    if (startAgain){
+      this._internals.systemManagerStatePoller.timer = setTimeout(() => poller(id), this.settings.checkStateInterval)
+    }else{
+      this._internals.systemManagerStatePoller.timer = null
+    }
+      
   }
 
-  this._internals.systemManagerStatePoller = setTimeout(poller, this.settings.checkStateInterval)
+  //Is not busy yet => start polling
+  if(! this._internals.systemManagerStatePoller.timer >= 0){
+    this._internals.systemManagerStatePoller.timer = -1 //Just to be safe no multiple calls can happen
+    poller(this._internals.systemManagerStatePoller.id)
+  }
+    
 }
 
-
+/**
+ * Stops the poller that reads system manager state to see 
+ * if connection is ok and if the manager state has changed
+ * 
+ * @memberof _LibraryInternals
+ */
+function _systemManagerStatePollerStop() {
+  //Clear timer if still running
+  clearTimeout(this._internals.systemManagerStatePoller.timer)
+  //Flag timer destroyed
+  this._internals.systemManagerStatePoller.timer = null
+  //Increase loop id
+  this._internals.systemManagerStatePoller.id += 1
+  if (this._internals.systemManagerStatePoller.id > 100000000) //Prevent overflow
+    this._internals.systemManagerStatePoller.id = 0
+}
 
 
 
@@ -4281,7 +4337,7 @@ async function _onRouterStateChanged(data) {
   //If we have a local connection, connection needs to be reinitialized
   if (this.connection.isLocal === true) {
     //We should stop polling system manager, it will be reinitialized later
-    clearTimeout(this._internals.systemManagerStatePoller)
+    _systemManagerStatePollerStop.call(this);
 
     debug(`_onRouterStateChanged(): Local loopback connection active, monitoring router state`)
 
