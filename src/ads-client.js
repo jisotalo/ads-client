@@ -1694,6 +1694,7 @@ class Client extends EventEmitter {
    * @param {number} indexGroup - Variable index group in the PLC
    * @param {number} indexOffset - Variable index offset in the PLC
    * @param {number} size - Variable size in the PLC (bytes)
+   * @param {number} [targetAdsPort] - Target ADS port (optional) - default is this.settings.targetAdsPort
    * 
    * @returns {Promise<Buffer>} Returns a promise (async function)
    * - If resolved, reading was successful and data is returned (Buffer)
@@ -1701,7 +1702,7 @@ class Client extends EventEmitter {
    * 
   
    */
-  readRaw(indexGroup, indexOffset, size) {
+  readRaw(indexGroup, indexOffset, size, targetAdsPort = null) {
     return new Promise(async (resolve, reject) => {
 
       if (!this.connection.connected)
@@ -1729,7 +1730,7 @@ class Client extends EventEmitter {
       data.writeUInt32LE(size, pos)
       pos += 4
 
-      _sendAdsCommand.call(this, ADS.ADS_COMMAND.Read, data)
+      _sendAdsCommand.call(this, ADS.ADS_COMMAND.Read, data, targetAdsPort)
         .then((res) => {
           debug(`readRaw(): Data read - ${res.ads.data.byteLength} bytes from ${JSON.stringify({ indexGroup, indexOffset })}`)
 
@@ -1791,12 +1792,13 @@ class Client extends EventEmitter {
    * All required parameters can be read for example with getSymbolInfo() method, **see also readRawBySymbol()**
    * 
    * @param {ReadRawMultiParam[]} targetArray - Targets to read from
+   * @param {number} [targetAdsPort] - Target ADS port (optional) - default is this.settings.targetAdsPort
    * 
    * @returns {Promise<Array.<ReadRawMultiResult>>} Returns a promise (async function)
    * - If resolved, reading was successful and data is returned (object)
    * - If rejected, reading failed and error info is returned (object)
    */
-  readRawMulti(targetArray) {
+  readRawMulti(targetArray, targetAdsPort = null) {
     return new Promise(async (resolve, reject) => {
 
       if (!this.connection.connected)
@@ -1851,7 +1853,7 @@ class Client extends EventEmitter {
         pos += 4
       })
 
-      _sendAdsCommand.call(this, ADS.ADS_COMMAND.ReadWrite, data)
+      _sendAdsCommand.call(this, ADS.ADS_COMMAND.ReadWrite, data, targetAdsPort)
         .then(res => {
           debug(`readRawMulti(): Data read - ${res.ads.data.byteLength} bytes received`)
 
@@ -1912,13 +1914,14 @@ class Client extends EventEmitter {
    * @param {number} indexOffset - Index offset in the PLC
    * @param {number} readLength - Read data length in the PLC (bytes)
    * @param {Buffer} dataBuffer - Data to write
-   * 
+   * @param {number} [targetAdsPort] - Target ADS port (optional) - default is this.settings.targetAdsPort
+   *  
    * @returns {Promise<Buffer>} Returns a promise (async function)
    * - If resolved, writing and reading was successful and data is returned (Buffer)
    * - If rejected, command failed and error info is returned (object)
    * 
    */
-  readWriteRaw(indexGroup, indexOffset, readLength, dataBuffer) {
+  readWriteRaw(indexGroup, indexOffset, readLength, dataBuffer, targetAdsPort = null) {
     return new Promise(async (resolve, reject) => {
 
       if (!this.connection.connected)
@@ -1956,7 +1959,7 @@ class Client extends EventEmitter {
       dataBuffer.copy(data, pos)
 
 
-      _sendAdsCommand.call(this, ADS.ADS_COMMAND.ReadWrite, data)
+      _sendAdsCommand.call(this, ADS.ADS_COMMAND.ReadWrite, data, targetAdsPort)
         .then(res => {
           debug(`readWriteRaw(): Data written and ${res.ads.data.byteLength} bytes response received`)
 
@@ -2049,12 +2052,13 @@ class Client extends EventEmitter {
    * @param {number} indexGroup - Variable index group in the PLC
    * @param {number} indexOffset - Variable index offset in the PLC
    * @param {Buffer} dataBuffer - Buffer object that contains the data (and byteLength is acceptable)
+   * @param {number} [targetAdsPort] - Target ADS port (optional) - default is this.settings.targetAdsPort
    * 
    * @returns {Promise<object>} Returns a promise (async function)
    * - If resolved, writing was successful
    * - If rejected, writing failed and error info is returned (object)
    */
-  writeRaw(indexGroup, indexOffset, dataBuffer) {
+  writeRaw(indexGroup, indexOffset, dataBuffer, targetAdsPort = null) {
     return new Promise(async (resolve, reject) => {
 
       if (!this.connection.connected)
@@ -2089,7 +2093,7 @@ class Client extends EventEmitter {
       dataBuffer.copy(data, pos)
 
 
-      _sendAdsCommand.call(this, ADS.ADS_COMMAND.Write, data)
+      _sendAdsCommand.call(this, ADS.ADS_COMMAND.Write, data, targetAdsPort)
         .then((res) => {
           debug(`writeRaw(): Data written: ${dataBuffer.byteLength} bytes of data to ${JSON.stringify({ indexGroup, indexOffset })}`)
 
@@ -2131,12 +2135,13 @@ class Client extends EventEmitter {
    * All required parameters can be read for example with getSymbolInfo() method, **see also readRawBySymbol()**
    * 
    * @param {WriteRawMultiParam[]} targetArray - Targets to write to
+   * @param {number} [targetAdsPort] - Target ADS port (optional) - default is this.settings.targetAdsPort
    * 
    * @returns {Promise<Array.<WriteRawMultiResult>>} Returns a promise (async function)
    * - If resolved, writing was successful and data is returned (Buffer)
    * - If rejected, reading failed and error info is returned (object)
    */
-  writeRawMulti(targetArray) {
+  writeRawMulti(targetArray, targetAdsPort = null) {
     return new Promise(async (resolve, reject) => {
 
       if (!this.connection.connected)
@@ -2197,7 +2202,7 @@ class Client extends EventEmitter {
         pos += target.data.byteLength
       })
 
-      _sendAdsCommand.call(this, ADS.ADS_COMMAND.ReadWrite, data)
+      _sendAdsCommand.call(this, ADS.ADS_COMMAND.ReadWrite, data, targetAdsPort)
         .then(res => {
           debug(`writeRawMulti(): Data written - ${res.ads.data.byteLength} bytes received`)
 
@@ -6310,8 +6315,8 @@ function _parseAdsNotification(data) {
  * 
  * @param {number} adsCommand - ADS command to send (see ADS.ADS_COMMAND)
  * @param {Buffer} adsData - Buffer object that contains the data to send
- * @param {number} [targetAdsPort] - Target ADS port - default is this.settings.targetAdsPort
- * @param {string} [targetAmsNetId] - Target AmsNetID - default is this.settings.targetAmsNetId
+ * @param {number} [targetAdsPort] - Target ADS port (optional) - default is this.settings.targetAdsPort
+ * @param {string} [targetAmsNetId] - Target AmsNetID (optional) - default is this.settings.targetAmsNetId
  * 
  * @returns {Promise<object>} Returns a promise (async function)
  * - If resolved, command was sent successfully and response was received. The received reponse is parsed and returned (object)

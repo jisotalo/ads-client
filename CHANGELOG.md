@@ -4,6 +4,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.11.4] - 17.10.2021
+### Added
+- Added optional `targetAdsPort` parameter to basic raw read and write methods. ([Pull request #79](https://github.com/jisotalo/ads-client/pull/79))
+  - Thank you [Hopperpop](https://github.com/Hopperpop) for contribution!
+
 ## [1.11.3] - 08.08.2021
 ### Changed
 - Minor bug fix for unhandled exception ([node-red-contrib-ads-client, issue #12](https://github.com/jisotalo/node-red-contrib-ads-client/issues/12#issuecomment-894711952))
