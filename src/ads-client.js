@@ -1694,7 +1694,7 @@ class Client extends EventEmitter {
    * @param {number} indexGroup - Variable index group in the PLC
    * @param {number} indexOffset - Variable index offset in the PLC
    * @param {number} size - Variable size in the PLC (bytes)
-   * @param {number} [targetAdsPort] - Target ADS port - default is this.settings.targetAdsPort
+   * @param {number} [targetAdsPort] - Target ADS port (optional) - default is this.settings.targetAdsPort
    * 
    * @returns {Promise<Buffer>} Returns a promise (async function)
    * - If resolved, reading was successful and data is returned (Buffer)
@@ -1792,7 +1792,7 @@ class Client extends EventEmitter {
    * All required parameters can be read for example with getSymbolInfo() method, **see also readRawBySymbol()**
    * 
    * @param {ReadRawMultiParam[]} targetArray - Targets to read from
-   * @param {number} [targetAdsPort] - Target ADS port - default is this.settings.targetAdsPort
+   * @param {number} [targetAdsPort] - Target ADS port (optional) - default is this.settings.targetAdsPort
    * 
    * @returns {Promise<Array.<ReadRawMultiResult>>} Returns a promise (async function)
    * - If resolved, reading was successful and data is returned (object)
@@ -1914,7 +1914,7 @@ class Client extends EventEmitter {
    * @param {number} indexOffset - Index offset in the PLC
    * @param {number} readLength - Read data length in the PLC (bytes)
    * @param {Buffer} dataBuffer - Data to write
-   * @param {number} [targetAdsPort] - Target ADS port - default is this.settings.targetAdsPort
+   * @param {number} [targetAdsPort] - Target ADS port (optional) - default is this.settings.targetAdsPort
    *  
    * @returns {Promise<Buffer>} Returns a promise (async function)
    * - If resolved, writing and reading was successful and data is returned (Buffer)
@@ -2052,7 +2052,7 @@ class Client extends EventEmitter {
    * @param {number} indexGroup - Variable index group in the PLC
    * @param {number} indexOffset - Variable index offset in the PLC
    * @param {Buffer} dataBuffer - Buffer object that contains the data (and byteLength is acceptable)
-   * @param {number} [targetAdsPort] - Target ADS port - default is this.settings.targetAdsPort
+   * @param {number} [targetAdsPort] - Target ADS port (optional) - default is this.settings.targetAdsPort
    * 
    * @returns {Promise<object>} Returns a promise (async function)
    * - If resolved, writing was successful
@@ -2135,7 +2135,7 @@ class Client extends EventEmitter {
    * All required parameters can be read for example with getSymbolInfo() method, **see also readRawBySymbol()**
    * 
    * @param {WriteRawMultiParam[]} targetArray - Targets to write to
-   * @param {number} [targetAdsPort] - Target ADS port - default is this.settings.targetAdsPort
+   * @param {number} [targetAdsPort] - Target ADS port (optional) - default is this.settings.targetAdsPort
    * 
    * @returns {Promise<Array.<WriteRawMultiResult>>} Returns a promise (async function)
    * - If resolved, writing was successful and data is returned (Buffer)
@@ -6315,8 +6315,8 @@ function _parseAdsNotification(data) {
  * 
  * @param {number} adsCommand - ADS command to send (see ADS.ADS_COMMAND)
  * @param {Buffer} adsData - Buffer object that contains the data to send
- * @param {number} [targetAdsPort] - Target ADS port - default is this.settings.targetAdsPort
- * @param {string} [targetAmsNetId] - Target AmsNetID - default is this.settings.targetAmsNetId
+ * @param {number} [targetAdsPort] - Target ADS port (optional) - default is this.settings.targetAdsPort
+ * @param {string} [targetAmsNetId] - Target AmsNetID (optional) - default is this.settings.targetAmsNetId
  * 
  * @returns {Promise<object>} Returns a promise (async function)
  * - If resolved, command was sent successfully and response was received. The received reponse is parsed and returned (object)
