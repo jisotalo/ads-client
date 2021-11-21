@@ -290,205 +290,7 @@ class Client extends EventEmitter {
    * - If rejected, something went wrong and error info is returned (object)
    */
   connect() {
-
-    return new Promise(async (resolve, reject) => {
-
-      if (this._internals.socket !== null) {
-        debug(`connect(): Socket already assigned`)
-        return reject(new ClientException(this, 'connect()', 'Connection is already opened. Close the connection first using disconnect()'))
-      }
-
-      debug(`connect(): Starting to connect ${this.settings.routerAddress}:${this.settings.routerTcpPort}`)
-
-      //Creating a socket and setting it up
-      let socket = new net.Socket()
-      socket.setNoDelay(true) //Sends data without delay
-
-
-
-      //----- Connecting error events -----
-
-      //Listening error event during connection
-      socket.once('error', err => {
-        debug('connect(): Socket connect failed: %O', err)
-
-        //Remove all events from socket
-        socket.removeAllListeners()
-        socket = null
-
-        //Reset connection flag
-        this.connection.connected = false
-
-        reject(new ClientException(this, 'connect()', `Connection to ${this.settings.routerAddress}:${this.settings.routerTcpPort} failed (socket error ${err.errno})`, err))
-      })
-
-
-
-      //Listening close event during connection
-      socket.once('close', hadError => {
-        debug(`connect(): Socket closed by remote, connection failed`)
-
-        //Remove all events from socket
-        socket.removeAllListeners()
-        socket = null
-
-        //Reset connection flag
-        this.connection.connected = false
-
-        reject(new ClientException(this, 'connect()', `Connection to ${this.settings.routerAddress}:${this.settings.routerTcpPort} failed - socket closed by remote (hadError = ${hadError})`))
-      })
-
-
-      //Listening end event during connection
-      socket.once('end', () => {
-        debug(`connect(): Socket connection ended by remote, connection failed.`)
-
-        //Remove all events from socket
-        socket.removeAllListeners()
-        socket = null
-
-        //Reset connection flag
-        this.connection.connected = false
-
-        if (this.settings.localAdsPort != null)
-          reject(new ClientException(this, 'connect()', `Connection to ${this.settings.routerAddress}:${this.settings.routerTcpPort} failed - socket ended by remote (is the given local ADS port ${this.settings.localAdsPort} already in use?)`))
-        else
-          reject(new ClientException(this, 'connect()', `Connection to ${this.settings.routerAddress}:${this.settings.routerTcpPort} failed - socket ended by remote`))
-      })
-
-      //Listening timeout event during connection
-      socket.once('timeout', () => {
-        debug(`connect(): Socket timeout`)
-
-        //No more timeout needed
-        socket.setTimeout(0);
-        socket.destroy()
-
-        //Remove all events from socket
-        socket.removeAllListeners()
-        socket = null
-
-        //Reset connection flag
-        this.connection.connected = false
-
-        reject(new ClientException(this, 'connect()', `Connection to ${this.settings.routerAddress}:${this.settings.routerTcpPort} failed (timeout) - No response from router in ${this.settings.timeoutDelay} ms`))
-      })
-
-      //----- Connecting error events end -----
-
-
-      //Listening for connect event
-      socket.once('connect', async () => {
-        debug(`connect(): Socket connection established to ${this.settings.routerAddress}:${this.settings.routerTcpPort}`)
-
-        //No more timeout needed
-        socket.setTimeout(0);
-
-        this._internals.socket = socket
-
-        //Try to register an ADS port
-        try {
-          let res = await _registerAdsPort.call(this)
-
-          this.connection.connected = true
-          this.connection.localAmsNetId = res.amsTcp.data.localAmsNetId
-          this.connection.localAdsPort = res.amsTcp.data.localAdsPort
-          this.connection.isLocal = this.settings.targetAmsNetId === '127.0.0.1.1.1' || this.settings.targetAmsNetId === this.connection.localAmsNetId
-
-          debug(`connect(): ADS port registered from router. We are ${this.connection.localAmsNetId}:${this.connection.localAdsPort}`)
-        } catch (err) {
-
-          if (socket) {
-            socket.destroy()
-            //Remove all events from socket
-            socket.removeAllListeners()
-          }
-          this.connection.connected = false
-
-          return reject(new ClientException(this, 'connect()', `Registering ADS port from router failed`, err))
-        }
-
-        //Remove the socket events that were used only during connect()
-        socket.removeAllListeners('error')
-        socket.removeAllListeners('close')
-        socket.removeAllListeners('end')
-
-        //When socket errors from now on, we will close the connection
-        this._internals.socketErrorHandler = _onSocketError.bind(this)
-        socket.on('error', this._internals.socketErrorHandler)
-
-        try {
-          //Try to read system manager state - If it's OK, connection is successful to the target
-          await this.readSystemManagerState()
-          _systemManagerStatePoller.call(this)
-
-        } catch (err) {
-          try {
-            await this.disconnect()
-          } catch (err) {
-            debug(`connect(): Reading target system manager failed -> Connection closed`)
-          }
-          this.connection.connected = false
-
-          return reject(new ClientException(this, 'connect()', `Connection failed: ${err.message}`, err))
-        }
-
-
-        try {
-          await _reInitializeInternals.call(this)
-
-        } catch (err) {
-          if (this.settings.allowHalfOpen !== true) {
-            try {
-              await this.disconnect()
-            } catch (err) {
-              debug(`connect(): Connecting to target PLC runtime failed -> Connection closed`)
-            }
-            this.connection.connected = false
-
-            return reject(new ClientException(this, 'connect()', `Target and system manager found but couldn't connect to the PLC runtime (see setting allowHalfOpen): ${err.message}`, err))
-          }
-
-          //Todo: Redesign this
-          if (this.metaData.systemManagerState.adsState !== ADS.ADS_STATE.Run)
-            _console.call(this, `WARNING: Target is connected but not in RUN mode (mode: ${this.metaData.systemManagerState.adsStateStr}) - connecting to runtime (ADS port ${this.settings.targetAdsPort}) failed`)
-          else
-            _console.call(this, `WARNING: Target is connected but connecting to runtime (ADS port ${this.settings.targetAdsPort}) failed - Check the port number and that the target system state (${this.metaData.systemManagerState.adsStateStr}) is valid.`)
-        }
-
-        //Listening connection lost events
-        this._internals.socketConnectionLostHandler = _onConnectionLost.bind(this, true)
-        socket.on('close', this._internals.socketConnectionLostHandler)
-
-        //We are connected to the target
-        this.emit('connect', this.connection)
-
-        resolve(this.connection)
-      })
-
-      //Listening data event
-      socket.on('data', data => {
-        _socketReceive.call(this, data)
-      })
-
-      //Timeout only during connecting, other timeouts are handled elsewhere
-      socket.setTimeout(this.settings.timeoutDelay);
-
-      //Finally, connect
-      try {
-        socket.connect({
-          port: this.settings.routerTcpPort,
-          host: this.settings.routerAddress,
-          localPort: (this.settings.localTcpPort ? this.settings.localTcpPort : null),
-          localAddress: (this.settings.localAddress ? this.settings.localAddress : null),
-        })
-
-      } catch (err) {
-        this.connection.connected = false
-
-        reject(new ClientException(this, 'connect()', `Opening socket connection to ${this.settings.routerAddress}:${this.settings.routerTcpPort} failed`, err))
-      }
-    })
+    return _connect.call(this)
   }
 
 
@@ -511,97 +313,7 @@ class Client extends EventEmitter {
    * - If rejected, connection is still closed but something went wrong during disconnecting and error info is returned
    */
   disconnect(forceDisconnect = false) {
-    return new Promise(async (resolve, reject) => {
-      debug(`disconnect(): Starting to close connection (force: ${forceDisconnect})`)
-
-      try {
-        if (this._internals.socketConnectionLostHandler) {
-          this._internals.socket.off('close', this._internals.socketConnectionLostHandler)
-        }
-
-      } catch (err) {
-        //We probably have no socket anymore. Just quit.
-        forceDisconnect = true
-      }
-
-      //Clear timers
-      _clearTimer(this._internals.systemManagerStatePoller)
-      _clearTimer(this._internals.reconnectionTimer)
-      clearTimeout(this._internals.portRegisterTimeoutTimer)
-
-      //If forced, then just destroy the socket
-      if (forceDisconnect) {
-
-        if (this._internals.socket) {
-          this._internals.socket.removeAllListeners()
-          this._internals.socket.destroy()
-        }
-        this.connection.connected = false
-        this.connection.localAdsPort = null
-        this._internals.socket = null
-
-        this.emit('disconnect')
-
-        return resolve()
-      }
-
-
-      let error = null
-
-      try {
-        await this.unsubscribeAll()
-      } catch (err) {
-        error = new ClientException(this, 'disconnect()', err)
-      }
-
-      try {
-        await _unsubscribeAllInternals.call(this)
-      } catch (err) {
-        error = new ClientException(this, 'disconnect()', err)
-      }
-
-      try {
-        await _unregisterAdsPort.call(this)
-
-        //Done
-        this.connection.connected = false
-        this.connection.localAdsPort = null
-
-        //Socket should be null but check it anyways
-        if (this._internals.socket != null) {
-          this._internals.socket.removeAllListeners()
-          this._internals.socket.destroy() //Just incase
-          this._internals.socket = null
-        }
-
-        debug(`disconnect(): Connection closed successfully`)
-
-      } catch (err) {
-        //Force socket close
-        if (this._internals.socket) {
-          this._internals.socket.removeAllListeners()
-          this._internals.socket.destroy()
-        }
-
-        this.connection.connected = false
-        this.connection.localAdsPort = null
-        this._internals.socket = null
-
-        error = new ClientException(this, 'disconnect()', err)
-
-        debug(`disconnect(): Connection closing failed, connection forced to close`)
-      }
-
-      if (error !== null) {
-        error.message = `Disconnected but something failed: ${error.message}`
-        this.emit('disconnect')
-
-        return reject(error)
-      }
-
-      this.emit('disconnect')
-      resolve()
-    })
+    return _disconnect.call(this, forceDisconnect)
   }
 
 
@@ -612,42 +324,18 @@ class Client extends EventEmitter {
 
 
   /**
-   * Disconnects and reconnects again. At the moment does NOT reinitialize subscriptions, everything is lost
+   * Disconnects and reconnects again. Subscribes again to all active subscriptions.
+   * To prevent subscribing, call unsubscribeAll() before reconnecting.
    * 
    * @param {boolean} [forceDisconnect] - If true, the connection is dropped immediately (default = false)  
    * 
    * @returns {Promise} Returns a promise (async function)
-   * - If resolved, connection to PLC runtime is successful
-   * - If rejected, connection to PLC runtime failed
+   * - If resolved, reconnecting was successful
+   * - If rejected, reconnecting failed and error info is returned
    */
   reconnect(forceDisconnect = false) {
-    return new Promise(async (resolve, reject) => {
-
-      if (this._internals.socket != null) {
-        try {
-          debug(`reconnect(): Trying to disconnect`)
-
-          await this.disconnect(forceDisconnect)
-
-        } catch (err) {
-          debug(`reconnect(): Disconnecting failed: %o`, err)
-        }
-      }
-
-      debug(`reconnect(): Trying to connect`)
-
-      return this.connect()
-        .then(res => {
-          debug(`reconnect(): Connected!`)
-          this.emit('reconnect')
-
-          resolve(res)
-        })
-        .catch(err => {
-          debug(`reconnect(): Connecting failed`)
-          reject(err)
-        })
-    })
+    debug(`reconnect(): Reconnecting...`)
+    return _reconnect.call(this, forceDisconnect)
   }
 
 
@@ -3562,6 +3250,408 @@ class ClientException extends Error {
 
 
 
+
+
+
+/**
+ * Connects to the target system using pre-defined Client::settings (at constructor or manually given)
+ *
+   * @param {boolean} [isReconnecting] - If true, the _connect() call is made during reconnection (-> affects disconnect() calls if connecting fails)
+ * 
+ * @returns {Promise<object>} Returns a promise (async function)
+   * - If resolved, client is connected successfully and connection info is returned (object)
+   * - If rejected, something went wrong and error info is returned (object)
+ * 
+ * @memberof _LibraryInternals
+ */
+function _connect(isReconnecting = false) {
+  return new Promise(async (resolve, reject) => {
+
+    if (this._internals.socket !== null) {
+      debug(`_connect(): Socket already assigned`)
+      return reject(new ClientException(this, '_connect()', 'Connection is already opened. Close the connection first using disconnect()'))
+    }
+
+    debug(`_connect(): Starting to connect ${this.settings.routerAddress}:${this.settings.routerTcpPort}`)
+
+    //Creating a socket and setting it up
+    let socket = new net.Socket()
+    socket.setNoDelay(true) //Sends data without delay
+
+
+
+    //----- Connecting error events -----
+
+    //Listening error event during connection
+    socket.once('error', err => {
+      debug('_connect(): Socket connect failed: %O', err)
+
+      //Remove all events from socket
+      socket.removeAllListeners()
+      socket = null
+
+      //Reset connection flag
+      this.connection.connected = false
+
+      reject(new ClientException(this, '_connect()', `Connection to ${this.settings.routerAddress}:${this.settings.routerTcpPort} failed (socket error ${err.errno})`, err))
+    })
+
+
+
+    //Listening close event during connection
+    socket.once('close', hadError => {
+      debug(`_connect(): Socket closed by remote, connection failed`)
+
+      //Remove all events from socket
+      socket.removeAllListeners()
+      socket = null
+
+      //Reset connection flag
+      this.connection.connected = false
+
+      reject(new ClientException(this, '_connect()', `Connection to ${this.settings.routerAddress}:${this.settings.routerTcpPort} failed - socket closed by remote (hadError = ${hadError})`))
+    })
+
+
+    //Listening end event during connection
+    socket.once('end', () => {
+      debug(`_connect(): Socket connection ended by remote, connection failed.`)
+
+      //Remove all events from socket
+      socket.removeAllListeners()
+      socket = null
+
+      //Reset connection flag
+      this.connection.connected = false
+
+      if (this.settings.localAdsPort != null)
+        reject(new ClientException(this, '_connect()', `Connection to ${this.settings.routerAddress}:${this.settings.routerTcpPort} failed - socket ended by remote (is the given local ADS port ${this.settings.localAdsPort} already in use?)`))
+      else
+        reject(new ClientException(this, '_connect()', `Connection to ${this.settings.routerAddress}:${this.settings.routerTcpPort} failed - socket ended by remote`))
+    })
+
+    //Listening timeout event during connection
+    socket.once('timeout', () => {
+      debug(`_connect(): Socket timeout`)
+
+      //No more timeout needed
+      socket.setTimeout(0);
+      socket.destroy()
+
+      //Remove all events from socket
+      socket.removeAllListeners()
+      socket = null
+
+      //Reset connection flag
+      this.connection.connected = false
+
+      reject(new ClientException(this, '_connect()', `Connection to ${this.settings.routerAddress}:${this.settings.routerTcpPort} failed (timeout) - No response from router in ${this.settings.timeoutDelay} ms`))
+    })
+
+    //----- Connecting error events end -----
+
+
+    //Listening for connect event
+    socket.once('connect', async () => {
+      debug(`_connect(): Socket connection established to ${this.settings.routerAddress}:${this.settings.routerTcpPort}`)
+
+      //No more timeout needed
+      socket.setTimeout(0);
+
+      this._internals.socket = socket
+
+      //Try to register an ADS port
+      try {
+        let res = await _registerAdsPort.call(this)
+
+        this.connection.connected = true
+        this.connection.localAmsNetId = res.amsTcp.data.localAmsNetId
+        this.connection.localAdsPort = res.amsTcp.data.localAdsPort
+        this.connection.isLocal = this.settings.targetAmsNetId === '127.0.0.1.1.1' || this.settings.targetAmsNetId === this.connection.localAmsNetId
+
+        debug(`_connect(): ADS port registered from router. We are ${this.connection.localAmsNetId}:${this.connection.localAdsPort}`)
+      } catch (err) {
+
+        if (socket) {
+          socket.destroy()
+          //Remove all events from socket
+          socket.removeAllListeners()
+        }
+        this.connection.connected = false
+
+        return reject(new ClientException(this, '_connect()', `Registering ADS port from router failed`, err))
+      }
+
+      //Remove the socket events that were used only during _connect()
+      socket.removeAllListeners('error')
+      socket.removeAllListeners('close')
+      socket.removeAllListeners('end')
+
+      //When socket errors from now on, we will close the connection
+      this._internals.socketErrorHandler = _onSocketError.bind(this)
+      socket.on('error', this._internals.socketErrorHandler)
+
+      try {
+        //Try to read system manager state - If it's OK, connection is successful to the target
+        await this.readSystemManagerState()
+        _systemManagerStatePoller.call(this)
+
+      } catch (err) {
+        try {
+          await this.disconnect(isReconnecting)
+        } catch (err) {
+          debug(`_connect(): Reading target system manager failed -> Connection closed`)
+        }
+        this.connection.connected = false
+
+        return reject(new ClientException(this, '_connect()', `Connection failed: ${err.message}`, err))
+      }
+
+
+      try {
+        await _reInitializeInternals.call(this)
+
+      } catch (err) {
+        if (this.settings.allowHalfOpen !== true) {
+          try {
+            await _disconnect.call(this, false, true)
+          } catch (err) {
+            debug(`_connect(): Connecting to target PLC runtime failed -> Connection closed`)
+          }
+          this.connection.connected = false
+
+          return reject(new ClientException(this, '_connect()', `Target and system manager found but couldn't connect to the PLC runtime (see setting allowHalfOpen): ${err.message}`, err))
+        }
+
+        //Todo: Redesign this
+        if (this.metaData.systemManagerState.adsState !== ADS.ADS_STATE.Run)
+          _console.call(this, `WARNING: Target is connected but not in RUN mode (mode: ${this.metaData.systemManagerState.adsStateStr}) - connecting to runtime (ADS port ${this.settings.targetAdsPort}) failed`)
+        else
+          _console.call(this, `WARNING: Target is connected but connecting to runtime (ADS port ${this.settings.targetAdsPort}) failed - Check the port number and that the target system state (${this.metaData.systemManagerState.adsStateStr}) is valid.`)
+      }
+
+      //Listening connection lost events
+      this._internals.socketConnectionLostHandler = _onConnectionLost.bind(this, true)
+      socket.on('close', this._internals.socketConnectionLostHandler)
+
+      //We are connected to the target
+      this.emit('connect', this.connection)
+
+      resolve(this.connection)
+    })
+
+    //Listening data event
+    socket.on('data', data => {
+      _socketReceive.call(this, data)
+    })
+
+    //Timeout only during connecting, other timeouts are handled elsewhere
+    socket.setTimeout(this.settings.timeoutDelay);
+
+    //Finally, connect
+    try {
+      socket.connect({
+        port: this.settings.routerTcpPort,
+        host: this.settings.routerAddress,
+        localPort: (this.settings.localTcpPort ? this.settings.localTcpPort : null),
+        localAddress: (this.settings.localAddress ? this.settings.localAddress : null),
+      })
+
+    } catch (err) {
+      this.connection.connected = false
+
+      reject(new ClientException(this, '_connect()', `Opening socket connection to ${this.settings.routerAddress}:${this.settings.routerTcpPort} failed`, err))
+    }
+  })
+}
+
+
+/**
+ * Unsubscribes all notifications, unregisters ADS port from router (if it was registered)
+ * and disconnects target system and ADS router
+ *
+ * @param {boolean} [forceDisconnect] - If true, the connection is dropped immediately (default = false)
+ * @param {boolean} [isReconnecting] - If true, _disconnect() call is made during reconnecting
+ *
+ * @returns {Promise<object>} Returns a promise (async function)
+ * - If resolved, disconnect was successful 
+ * - If rejected, connection is still closed but something went wrong during disconnecting and error info is returned
+ *
+ * @memberof _LibraryInternals
+ */
+function _disconnect(forceDisconnect = false, isReconnecting = false) {
+  return new Promise(async (resolve, reject) => {
+
+    debug(`_disconnect(): Starting to close connection (force: ${forceDisconnect})`)
+
+    try {
+      if (this._internals.socketConnectionLostHandler) {
+        this._internals.socket.off('close', this._internals.socketConnectionLostHandler)
+      }
+
+    } catch (err) {
+      //We probably have no socket anymore. Just quit.
+      forceDisconnect = true
+    }
+
+    //Clear reconnection timer only when not reconnecting
+    if (!isReconnecting) {
+      _clearTimer(this._internals.reconnectionTimer)
+    }
+
+    //Clear other timers
+    _clearTimer(this._internals.systemManagerStatePoller)
+    clearTimeout(this._internals.portRegisterTimeoutTimer)
+
+    //If forced, then just destroy the socket
+    if (forceDisconnect) {
+
+      if (this._internals.socket) {
+        this._internals.socket.removeAllListeners()
+        this._internals.socket.destroy()
+      }
+      this.connection.connected = false
+      this.connection.localAdsPort = null
+      this._internals.socket = null
+
+      this.emit('disconnect')
+
+      return resolve()
+    }
+
+
+    let error = null
+
+    try {
+      await this.unsubscribeAll()
+    } catch (err) {
+      error = new ClientException(this, 'disconnect()', err)
+    }
+
+    try {
+      await _unsubscribeAllInternals.call(this)
+    } catch (err) {
+      error = new ClientException(this, 'disconnect()', err)
+    }
+
+    try {
+      await _unregisterAdsPort.call(this)
+
+      //Done
+      this.connection.connected = false
+      this.connection.localAdsPort = null
+
+      //Socket should be null but check it anyways
+      if (this._internals.socket != null) {
+        this._internals.socket.removeAllListeners()
+        this._internals.socket.destroy() //Just incase
+        this._internals.socket = null
+      }
+
+      debug(`_disconnect(): Connection closed successfully`)
+
+    } catch (err) {
+      //Force socket close
+      if (this._internals.socket) {
+        this._internals.socket.removeAllListeners()
+        this._internals.socket.destroy()
+      }
+
+      this.connection.connected = false
+      this.connection.localAdsPort = null
+      this._internals.socket = null
+
+      error = new ClientException(this, 'disconnect()', err)
+
+      debug(`_disconnect(): Connection closing failed, connection forced to close`)
+    }
+
+    if (error !== null) {
+      error.message = `Disconnected but something failed: ${error.message}`
+      this.emit('disconnect')
+
+      return reject(error)
+    }
+
+    this.emit('disconnect')
+    resolve()
+  })
+}
+
+
+
+/**
+ * Disconnects and reconnects again. Subscribes again to all active subscriptions.
+ * To prevent subscribing, call unsubscribeAll() before reconnecting.
+ *
+ * @param {boolean} [forceDisconnect] - If true, the connection is dropped immediately (default = false)
+ * @param {boolean} [isReconnecting] - If true, _reconnect() call is made during reconnecting
+ *
+ * @returns {Promise<object>} Returns a promise (async function)
+ * - If resolved, reconnecting was successful
+ * - If rejected, reconnecting failed and error info is returned
+ *
+ * @memberof _LibraryInternals
+ */
+function _reconnect(forceDisconnect = false, isReconnecting = false) {
+  return new Promise(async (resolve, reject) => {
+
+    //Clear all cached symbols and data types (might be incorrect)
+    this.metaData.symbols = {}
+    this.metaData.dataTypes = {}
+
+    //Save active subscriptions to memory and delete olds
+    if (this._internals.oldSubscriptions == null) {
+      this._internals.oldSubscriptions = {}
+      Object.assign(this._internals.oldSubscriptions, this._internals.activeSubscriptions)
+
+      debug(`_reconnect(): Total of ${Object.keys(this._internals.activeSubscriptions).length} subcriptions saved for reinitializing`)
+    }
+
+    this._internals.activeSubscriptions = {}
+
+    if (this._internals.socket != null) {
+      try {
+        debug(`_reconnect(): Trying to disconnect`)
+
+        await _disconnect.call(this, forceDisconnect, isReconnecting)
+
+      } catch (err) {
+        //debug(`_reconnect(): Disconnecting failed: %o`, err)
+      }
+    }
+
+    debug(`_reconnect(): Trying to connect`)
+
+    return _connect.call(this, true)
+      .then(res => {
+        debug(`_reconnect(): Connected!`)
+
+        //Reconnected, try to subscribe again 
+        _reInitializeSubscriptions.call(this, this._internals.oldSubscriptions)
+          .then(() => {
+            _console.call(this, `PLC runtime reconnected successfully and all subscriptions were restored!`)
+
+            debug(`_reconnect(): Connection and subscriptions reinitialized. Connection is back.`)
+          })
+          .catch(err => {
+            _console.call(this, `PLC runtime reconnected successfully but not all subscriptions were restored. Error info: ${err}`)
+
+            debug(`_reconnect(): Connection and some subscriptions reinitialized. Connection is back.`)
+          })
+        
+        this.emit('reconnect')
+
+        resolve(res)
+      })
+      .catch(err => {
+        debug(`_reconnect(): Connecting failed`)
+        reject(err)
+      })
+  })
+}
+
+
 /**
  * Registers a new ADS port from used AMS router
  * 
@@ -3846,23 +3936,6 @@ async function _onConnectionLost(socketFailure = false) {
 
   _console.call(this, 'WARNING: Connection was lost. Trying to reconnect...')
 
-
-  //Clear all cached symbols and data types (might be incorrect)
-  this.metaData.symbols = {}
-  this.metaData.dataTypes = {}
-
-  //Save active subscriptions to memory and delete olds
-  if (this._internals.oldSubscriptions == null) {
-    this._internals.oldSubscriptions = {}
-    Object.assign(this._internals.oldSubscriptions, this._internals.activeSubscriptions)
-
-    debugD(`_onConnectionLost(): Total of ${Object.keys(this._internals.activeSubscriptions).length} subcriptions saved for reinitializing`)
-  }
-
-  this._internals.activeSubscriptions = {}
-
-
-  
   const tryToReconnect = async (firstTime, timerId) => {
 
     //If the timer has changed, quit here
@@ -3871,20 +3944,8 @@ async function _onConnectionLost(socketFailure = false) {
     }
 
     //Try to reconnect
-    this.reconnect(socketFailure)
+    _reconnect.call(this, socketFailure, true)
       .then(res => {
-        //Reconnected, try to subscribe again 
-        _reInitializeSubscriptions.call(this, this._internals.oldSubscriptions)
-          .then(() => {
-            _console.call(this, `PLC runtime reconnected successfully and all subscriptions were restored!`)
-
-            debug(`_onConnectionLost(): Connection and subscriptions reinitialized. Connection is back.`)
-          })
-          .catch(err => {
-            _console.call(this, `PLC runtime reconnected successfully but not all subscriptions were restored. Error info: ${err}`)
-
-            debug(`_onConnectionLost(): Connection and some subscriptions reinitialized. Connection is back.`)
-          })
         
         //Success -> remove timer
         _clearTimer(this._internals.reconnectionTimer)
