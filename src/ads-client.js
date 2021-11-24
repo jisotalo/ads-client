@@ -3398,7 +3398,7 @@ function _connect(isReconnecting = false) {
 
       } catch (err) {
         try {
-          await this.disconnect(isReconnecting)
+          await _disconnect.call(this, false, isReconnecting)
         } catch (err) {
           debug(`_connect(): Reading target system manager failed -> Connection closed`)
         }
@@ -3763,8 +3763,8 @@ function _unregisterAdsPort() {
   return new Promise(async (resolve, reject) => {
     debugD(`_unregisterAdsPort(): Unregister ads port ${this.connection.localAdsPort} from ${this.settings.routerAddress}:${this.settings.routerTcpPort}`)
 
-    //If we have manually given ADS port, we only need to close the connection manually
-    if (this.settings.localAdsPort) {
+    //If we have manually given AmsNetId and ADS port, we only need to close the connection manually
+    if (this.settings.localAmsNetId && this.settings.localAdsPort) {
       debug(`_unregisterAdsPort(): Local AmsNetId and ADS port manually given so no need to unregister`)
 
 
@@ -3963,6 +3963,8 @@ async function _onConnectionLost(socketFailure = false) {
             () => tryToReconnect(false, timerId),
             this.settings.reconnectInterval
           )
+        } else {
+          debugD(`_onConnectionLost(): Timer is no more valid, quiting here`)
         }
       })
   }
