@@ -73,44 +73,44 @@
 <h1 id="table-of-contents">Table of contents</h1>
 <ul>
 <li><a href="#installation">Installation</a></li>
-<li><a href="#installation">Features</a></li>
+<li><a href="#features">Features</a></li>
 <li><a href="#supported-and-tested-platforms">Supported and tested platforms</a></li>
 <li><a href="#connection-setups-and-possibilities">Connection setups and possibilities</a></li>
-<li><a href="#enabling-localhost-support">Enabling localhost support</a></li>
+<li><a href="#enabling-localhost-support-on-twincat-3">Enabling localhost support on TwinCAT 3</a></li>
 <li><a href="#important-writing-struct-variables">IMPORTANT: Writing STRUCT variables</a></li>
 <li><a href="#important-things-to-know-when-using-with-twincat-2">IMPORTANT: Things to know when using with TwinCAT 2</a></li>
 <li><a href="#getting-started">Getting started</a>
 <ul>
-<li><a href="data-types-used-in-getting-started">Data types used in getting started</a></li>
+<li><a href="#data-types-used-in-getting-started">Data types used in getting started</a></li>
 <li><a href="#creating-a-new-client-instance">Creating a new Client instance</a></li>
 <li><a href="#connecting-and-disconnecting">Connecting and disconnecting</a></li>
 <li><a href="#reading-any-type-plc-variable">Reading any type PLC variable</a>
 <ul>
-<li><a href="#example-reading-int-type-variable">Example: Reading INT type variable</a></li>
-<li><a href="#example-reading-string-type-variable">Example: Reading STRING type variable</a></li>
-<li><a href="#example-reading-enum-type-variable">Example: Reading ENUM type variable</a></li>
-<li><a href="#example-reading-struct-type-variable">Example: Reading STRUCT type variable</a></li>
-<li><a href="#example-reading-array-of-int-type-variable">Example: Reading ARRAY OF INT type variable</a></li>
-<li><a href="#example-reading-array-of-struct-type-variable">Example: Reading ARRAY OF STRUCT type variable</a></li>
-<li><a href="#example-reading-function-block-type-variable">Example: Reading FUNCTION BLOCK type variable</a></li>
+<li><a href="#example-reading-int-type-variable">Example: Reading <code>INT</code> type variable</a></li>
+<li><a href="#example-reading-string-type-variable">Example: Reading <code>STRING</code> type variable</a></li>
+<li><a href="#example-reading-enum-type-variable">Example: Reading <code>ENUM</code> type variable</a></li>
+<li><a href="#example-reading-struct-type-variable">Example: Reading <code>STRUCT</code> type variable</a></li>
+<li><a href="#example-reading-array-of-int-type-variable">Example: Reading <code>ARRAY OF INT</code> type variable</a></li>
+<li><a href="#example-reading-array-of-struct-type-variable">Example: Reading <code>ARRAY OF STRUCT</code> type variable</a></li>
+<li><a href="#example-reading-function-block-type-variable">Example: Reading <code>FUNCTION BLOCK</code> type variable</a></li>
 </ul>
 </li>
 <li><a href="#writing-any-type-plc-variable">Writing any type PLC variable</a>
 <ul>
-<li><a href="#example-writing-int-type-variable">Example: Writing INT type variable</a></li>
-<li><a href="#example-writing-string-type-variable">Example: Writing STRING type variable</a></li>
-<li><a href="#example-writing-enum-type-variable">Example: Writing ENUM type variable</a></li>
-<li><a href="#example-writing-struct-type-variable">Example: Writing STRUCT type variable</a></li>
-<li><a href="#example-writing-struct-type-variable-with-autofill-parameter">Example: Writing STRUCT type variable (with autoFill parameter)</a></li>
-<li><a href="#example-writing-array-of-int-type-variable">Example: Writing ARRAY OF INT type variable</a></li>
-<li><a href="#example-writing-array-of-struct-type-variable">Example: Writing ARRAY of STRUCT type variable</a></li>
-<li><a href="#example-writing-function-block-type-variable">Example: Writing FUNCTION BLOCK type variable</a></li>
+<li><a href="#example-writing-int-type-variable">Example: Writing <code>INT</code> type variable</a></li>
+<li><a href="#example-writing-string-type-variable">Example: Writing <code>STRING</code> type variable</a></li>
+<li><a href="#example-writing-enum-type-variable">Example: Writing <code>ENUM</code> type variable</a></li>
+<li><a href="#example-writing-struct-type-variable">Example: Writing <code>STRUCT</code> type variable</a></li>
+<li><a href="#example-writing-struct-type-variable-with-autofill-parameter-">Example: Writing <code>STRUCT</code> type variable (with autoFill parameter)</a></li>
+<li><a href="#example-writing-array-of-int-type-variable">Example: Writing <code>ARRAY OF INT</code> type variable</a></li>
+<li><a href="#example-writing-array-of-struct-type-variable">Example: Writing <code>ARRAY of STRUCT</code> type variable</a></li>
+<li><a href="#example-writing-function-block-type-variable">Example: Writing <code>FUNCTION BLOCK</code> type variable</a></li>
 </ul>
 </li>
-<li><a href="#subscribing-to-plc-variables-device-notifications">Subscribing to PLC variables (device notifications)</a>
+<li><a href="#subscribing-to-plc-variables-device-notifications-">Subscribing to PLC variables (device notifications)</a>
 <ul>
-<li><a href="#subcribe-to-variable-value-on-change">Subcribe to variable value (on-change)</a></li>
-<li><a href="#subcribe-to-variable-value-cyclic">Subcribe to variable value (cyclic)</a></li>
+<li><a href="#subcribe-to-variable-value-on-change-">Subcribe to variable value (on-change)</a></li>
+<li><a href="#subcribe-to-variable-value-cyclic-">Subcribe to variable value (cyclic)</a></li>
 </ul>
 </li>
 <li><a href="#reading-and-writing-raw-data">Reading and writing raw data</a>
@@ -127,22 +127,37 @@
 <li><a href="#converting-a-javascript-object-to-raw-value">Converting a Javascript object to raw value</a></li>
 </ul>
 </li>
-<li><a href="#reading-and-writing-pointer-to-and-reference-to-variables">Reading and writing POINTER TO and REFERENCE TO variables</a>
+<li><a href="#reading-and-writing-pointer-to-and-reference-to-variables">Reading and writing <code>POINTER TO</code> and <code>REFERENCE TO</code> variables</a>
 <ul>
-<li><a href="#reading-a-reference-to-value">Reading a REFERENCE TO value</a></li>
-<li><a href="#writing-a-reference-to-value">Writing a REFERENCE TO value</a></li>
-<li><a href="#reading-a-pointer-to-value">Reading a POINTER TO value</a></li>
-<li><a href="#writing-a-pointer-to-value">Writing a POINTER TO value</a></li>
+<li><a href="#reading-a-reference-to-value">Reading a <code>REFERENCE TO</code> value</a></li>
+<li><a href="#writing-a-reference-to-value">Writing a <code>REFERENCE TO</code> value</a></li>
+<li><a href="#reading-a-pointer-to-value">Reading a <code>POINTER TO</code> value</a></li>
+<li><a href="#writing-a-pointer-to-value">Writing a <code>POINTER TO</code> value</a></li>
 </ul>
 </li>
-<li><a href="#calling-a-function-block-method-with-parameters-using-rpc-remote-procedure-call">Calling a function block method with parameters using RPC (remote procedure call)</a></li>
+<li><a href="#calling-a-function-block-method-with-parameters-using-rpc-remote-procedure-call-">Calling a function block method with parameters using RPC (remote procedure call)</a>
+<ul>
+<li><a href="#calling-a-simple-rpc-method">Calling a simple RPC method</a></li>
+<li><a href="#using-structs-with-rpc-methods">Using structs with RPC methods</a></li>
+</ul>
+</li>
 <li><a href="#starting-and-stopping-the-plc">Starting and stopping the PLC</a></li>
 <li><a href="#starting-and-stopping-the-twincat-system">Starting and stopping the TwinCAT system</a></li>
 <li><a href="#sending-custom-ads-commands">Sending custom ADS commands</a></li>
-<li><a href="#available-ads-client-events">Available ads-client events</a></li>
 </ul>
 </li>
-<li><a href="#debugging">Debugging</a></li>
+<li><a href="#available-ads-client-events">Available ads-client events</a>
+<ul>
+<li><a href="#example-printing-to-console-when-plc-runtime-state-changes-">Example: Printing to console when PLC runtime state changes:</a></li>
+<li><a href="#example-catching-an-error-that-is-not-directly-from-a-method-call">Example: Catching an error that is not directly from a method call</a></li>
+</ul>
+</li>
+<li><a href="#debugging">Debugging</a>
+<ul>
+<li><a href="#enabling-debug-from-code">Enabling debug from code</a></li>
+<li><a href="#enabling-debugging-from-terminal">Enabling debugging from terminal</a></li>
+</ul>
+</li>
 <li><a href="#faq">FAQ</a></li>
 <li><a href="#documentation">Documentation</a></li>
 <li><a href="#license">License</a></li>
@@ -1468,7 +1483,7 @@ SOFTWARE.</p></article>
 <br class="clear">
 
 <footer>
-    Documentation generated by <a href="https://github.com/jsdoc3/jsdoc">JSDoc 3.6.7</a> on Tue Dec 28 2021 10:43:03 GMT+0200 (Itä-Euroopan normaaliaika) using the <a href="https://github.com/clenemt/docdash">docdash</a> theme.
+    Documentation generated by <a href="https://github.com/jsdoc3/jsdoc">JSDoc 3.6.7</a> on Tue Dec 28 2021 10:48:16 GMT+0200 (Itä-Euroopan normaaliaika) using the <a href="https://github.com/clenemt/docdash">docdash</a> theme.
 </footer>
 
 <script>prettyPrint();</script>
