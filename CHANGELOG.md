@@ -4,7 +4,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.12.0] - 21.11.2021
+## [1.12.0] - 28.12.2021
 ### Changed
 - Improving handling of connection losses ([See pull request #78](https://github.com/jisotalo/ads-client/pull/78))
   - Thank you [Hopperpop](https://github.com/Hopperpop) for contribution!
