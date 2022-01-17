@@ -1,6 +1,6 @@
 {
   "name": "ads-client",
-  "version": "1.12.0",
+  "version": "1.12.1",
   "description": "Beckhoff TwinCAT ADS client library for Node.js (unofficial). Connects to Beckhoff TwinCAT automation systems using ADS protocol.",
   "main": "./src/ads-client.js",
   "scripts": {
@@ -33,9 +33,9 @@
     "url": "https://github.com/jisotalo/ads-client.git"
   },
   "dependencies": {
-    "debug": "^4.3.1",
-    "iconv-lite": "^0.5.2",
-    "long": "^4.0.0"
+    "debug": "^4.3.3",
+    "iconv-lite": "^0.6.3",
+    "long": "^5.2.0"
   },
   "devDependencies": {
     "docdash": "^1.2.0",

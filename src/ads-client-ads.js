@@ -255,9 +255,9 @@ const ADS_COMMAND = {
   Notification: 8,
   //ReadWrite Command
   ReadWrite: 9,
-  
+
   toString: function (value) {
-    return ((ret = Object.keys(this).find(key => this[key] == value)) != null ? ret : 'UNKNOWN')
+    return (Object.keys(this).find(key => this[key] == value)) || 'UNKNOWN';
   }
 }
 exports.ADS_COMMAND = ADS_COMMAND
@@ -489,7 +489,7 @@ const ADS_STATE = {
   Exception: 19,
 
   toString: function (value) {
-    return ((ret = Object.keys(this).find(key => this[key] == value)) != null ? ret : 'UNKNOWN')
+    return (Object.keys(this).find(key => this[key] == value)) || 'UNKNOWN';
   }
 }
 exports.ADS_STATE = ADS_STATE
@@ -602,9 +602,8 @@ const ADS_RESERVED_INDEX_GROUPS = {
   //DeviceData (0xF100,61696)
   DeviceData: 61696, // 0x0000F100
 
-
   toString: function (value) {
-    return ((ret = Object.keys(this).find(key => this[key] == value)) != null ? ret : 'UNKNOWN')
+    return (Object.keys(this).find(key => this[key] == value)) || 'UNKNOWN'
   }
 }
 exports.ADS_RESERVED_INDEX_GROUPS = ADS_RESERVED_INDEX_GROUPS
@@ -795,7 +794,7 @@ const ADS_DATA_TYPES = {
   ADST_BIGTYPE: 65, // 0x00000041
 
   toString: function (value) {
-    return ((ret = Object.keys(this).find(key => this[key] == value)) != null ? ret : 'UNKNOWN')
+    return (Object.keys(this).find(key => this[key] == value)) || 'UNKNOWN'
   }
 }
 exports.ADS_DATA_TYPES = ADS_DATA_TYPES
@@ -847,7 +846,7 @@ const AMS_ROUTER_STATE = {
   REMOVED: 2,
 
   toString: function (value) {
-    return ((ret = Object.keys(this).find(key => this[key] == value)) != null ? ret : 'UNKNOWN')
+    return (Object.keys(this).find(key => this[key] == value)) || 'UNKNOWN'
   }
 }
 exports.AMS_ROUTER_STATE = AMS_ROUTER_STATE
