@@ -2,5 +2,10 @@
   "plugins": ["plugins/markdown"],
   "markdown": {
     "idInHeadings": true
+  },
+  "docdash": {
+    "meta": { 
+      "title": "ads-client.js | Beckhoff TwinCAT ADS client library for Node.js (unofficial)"
+    }
   }
 }
