@@ -1011,7 +1011,7 @@ const BASE_DATA_TYPES = {
       fromBuffer: buffer => buffer.readInt32LE(0)
     },
     {
-      name: ['UDINT', 'DWORD', 'TIME', 'TIME_OF_DAY', 'BITARR32', 'UINT32'],
+      name: ['UDINT', 'DWORD', 'TIME', 'TIME_OF_DAY', 'TOD', 'BITARR32', 'UINT32'],
       adsDataType: ADS_DATA_TYPES.ADST_UINT32,
       size: 4,
       toBuffer: (value, buffer) => buffer.writeUInt32LE(value),
