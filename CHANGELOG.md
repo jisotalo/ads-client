@@ -4,6 +4,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.12.2] - 12.02.2022
+### Changed
+- Bug fix: `TOD` data type was not regonized on TwinCAT 2 and TwinCAT 3 (TC3 builds <= 4020)
+  - [See issue #83](https://github.com/jisotalo/ads-client/issues/83)
+
 ## [1.12.1] - 17.01.2022
 ### Changed
 - Updated dependecies to latest versions 
