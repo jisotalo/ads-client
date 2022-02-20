@@ -74,6 +74,7 @@ class Client extends EventEmitter {
    * @property {number} [connectionDownDelay=5000] - Time (milliseconds) after no successful reading of the system manager state the connection is determined to be lost - Optional (**default**: 5000 ms)
    * @property {boolean} [allowHalfOpen=false] - If true, connect() is successful even if no PLC runtime is found (but target and system manager are available) - Can be useful if it's ok that after connect() the PLC runtime is not immediately available (example: connecting before uploading PLC code and reading data later) - WARNING: If true, reinitializing subscriptions might fail after connection loss.
    * @property {boolean} [disableBigInt=false] - If true, 64 bit integer PLC variables are kept as Buffer objects instead of converting to Javascript BigInt variables (JSON.strigify and libraries that use it have no BigInt support)
+   * @property {boolean} [bareClient=false] - If true, only direct ads connection is established (no system manager etc) - Can be used to connect to systems without PLC runtimes etc.
    */
 
 
@@ -102,7 +103,8 @@ class Client extends EventEmitter {
       checkStateInterval: 1000,
       connectionDownDelay: 5000,
       allowHalfOpen: false,
-      disableBigInt: false
+      disableBigInt: false,
+      bareClient: false
     }
   }
 
