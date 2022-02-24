@@ -3398,43 +3398,45 @@ function _connect(isReconnecting = false) {
       this._internals.socketErrorHandler = _onSocketError.bind(this)
       socket.on('error', this._internals.socketErrorHandler)
 
-      try {
-        //Try to read system manager state - If it's OK, connection is successful to the target
-        await this.readSystemManagerState()
-        _systemManagerStatePoller.call(this)
-
-      } catch (err) {
+      if (this.settings.bareClient !== true) {
         try {
-          await _disconnect.call(this, false, isReconnecting)
+          //Try to read system manager state - If it's OK, connection is successful to the target
+          await this.readSystemManagerState()
+          _systemManagerStatePoller.call(this)
+
         } catch (err) {
-          debug(`_connect(): Reading target system manager failed -> Connection closed`)
-        }
-        this.connection.connected = false
-
-        return reject(new ClientException(this, '_connect()', `Connection failed: ${err.message}`, err))
-      }
-
-
-      try {
-        await _reInitializeInternals.call(this)
-
-      } catch (err) {
-        if (this.settings.allowHalfOpen !== true) {
           try {
-            await _disconnect.call(this, false, true)
+            await _disconnect.call(this, false, isReconnecting)
           } catch (err) {
-            debug(`_connect(): Connecting to target PLC runtime failed -> Connection closed`)
+            debug(`_connect(): Reading target system manager failed -> Connection closed`)
           }
           this.connection.connected = false
 
-          return reject(new ClientException(this, '_connect()', `Target and system manager found but couldn't connect to the PLC runtime (see setting allowHalfOpen): ${err.message}`, err))
+          return reject(new ClientException(this, '_connect()', `Connection failed: ${err.message}`, err))
         }
 
-        //Todo: Redesign this
-        if (this.metaData.systemManagerState.adsState !== ADS.ADS_STATE.Run)
-          _console.call(this, `WARNING: Target is connected but not in RUN mode (mode: ${this.metaData.systemManagerState.adsStateStr}) - connecting to runtime (ADS port ${this.settings.targetAdsPort}) failed`)
-        else
-          _console.call(this, `WARNING: Target is connected but connecting to runtime (ADS port ${this.settings.targetAdsPort}) failed - Check the port number and that the target system state (${this.metaData.systemManagerState.adsStateStr}) is valid.`)
+
+        try {
+          await _reInitializeInternals.call(this)
+
+        } catch (err) {
+          if (this.settings.allowHalfOpen !== true) {
+            try {
+              await _disconnect.call(this, false, true)
+            } catch (err) {
+              debug(`_connect(): Connecting to target PLC runtime failed -> Connection closed`)
+            }
+            this.connection.connected = false
+
+            return reject(new ClientException(this, '_connect()', `Target and system manager found but couldn't connect to the PLC runtime (see settings allowHalfOpen and bareClient): ${err.message}`, err))
+          }
+
+          //Todo: Redesign this
+          if (this.metaData.systemManagerState.adsState !== ADS.ADS_STATE.Run)
+            _console.call(this, `WARNING: Target is connected but not in RUN mode (mode: ${this.metaData.systemManagerState.adsStateStr}) - connecting to runtime (ADS port ${this.settings.targetAdsPort}) failed`)
+          else
+            _console.call(this, `WARNING: Target is connected but connecting to runtime (ADS port ${this.settings.targetAdsPort}) failed - Check the port number and that the target system state (${this.metaData.systemManagerState.adsStateStr}) is valid.`)
+        }
       }
 
       //Listening connection lost events
