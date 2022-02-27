@@ -29,6 +29,7 @@ Check out the [node-red-contrib-ads-client](https://www.npmjs.com/package/node-r
 - [Enabling localhost support on TwinCAT 3](#enabling-localhost-support-on-twincat-3)
 - [IMPORTANT: Writing STRUCT variables](#important-writing-struct-variables)
 - [IMPORTANT: Things to know when using with TwinCAT 2](#important-things-to-know-when-using-with-twincat-2)
+- [Connecting to systems without PLC runtime](#connecting-to-systems-without-plc-runtime)
 - [Getting started](#getting-started)
   * [Data types used in getting started](#data-types-used-in-getting-started)
   * [Creating a new Client instance](#creating-a-new-client-instance)
@@ -335,6 +336,26 @@ await client.readSymbol('.ExampleSTRUCT') //TwinCAT 2
 ## InvokeRpcMethod is not possible on TC2
 This is the only one non-working feature as there are no methods in TC2.
 
+
+# Connecting to systems without PLC runtime
+
+Since version 1.13.0 it's possible to connect to systems without PLC runtime and/or system manager using `ads-client`.
+
+In previous versions, the client always checked the system state (RUN, CONFIG). However when connecting to different systems (non-PLC systems), there might be no system manager service. With default configuration this causes an error:
+```
+ClientException: Connection failed: Device system manager state read failed
+```
+
+By providing `bareClient` setting, the client connects to the router or target and nothing else. After that, the client can be used to read/write data. However, connection losses etc. need to be handled by the user.
+
+
+```js
+const client = new ads.Client({
+  targetAmsNetId: '192.168.5.131.3.1', 
+  targetAdsPort: 1002,
+  bareClient: true //NOTE
+})
+```
 
 # Getting started
 
@@ -1623,6 +1644,23 @@ For example, when copying a variable name from TwinCAT online view using CTRL+C,
 
 If you have problems, try to read the variable information using `readSymbolInfo()`. The final solution is to read all data types using `readAndCacheDataTypes()` and manually finding the correct type.
 
+### ClientException: Connection failed: Device system manager state read failed
+
+This error indicates that the given AmsnetId didn't contain system manager service (port 10000). If you connect to the PLC system, there is always system manager and PLC runtime(s). However, when connecting to other systems than PLC, it might be that there is no system manager service.
+
+Solution:
+- Double check AmsNetId settings (if connecting directly to PLC)
+- [Set `bareClient` setting to skip all system manager and PLC runtime checks](#connecting-to-systems-without-plc-runtime) (version 1.13.0 ->)
+
+### Connection failed (error EADDRNOTAVAIL)
+This could happen if you have manually provided `localAddress` or `localTcpPort` that don't exist.
+For example, setting localAddress to 192.168.10.1 when the computer has only ethernet interface with IP 192.168.1.1.
+
+See https://github.com/jisotalo/ads-client/issues/82
+
+### Problems running ads-client with docker
+
+- EADDRNOTAVAIL: See above and https://github.com/jisotalo/ads-client/issues/82
 
 # Documentation
 
