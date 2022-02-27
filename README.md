@@ -336,6 +336,26 @@ await client.readSymbol('.ExampleSTRUCT') //TwinCAT 2
 This is the only one non-working feature as there are no methods in TC2.
 
 
+# Connecting to systems without PLC runtime
+
+Since version 1.13.0 it's possible to connect to systems without PLC runtime and/or system manager using `ads-client`.
+
+In previous versions, the client always checked the system state (RUN, CONFIG). However when connecting to different systems, the AmsNetId doesn't contain system manager service which caused the connection to fail.
+```
+ERROR: ClientException: Connection failed: Device system manager state read failed
+```
+
+Now by using `bareClient` setting, the client connects to the router or target and nothing else. After that, the client can be used to read/write data. However, connection losses etc. are handled by the user.
+
+
+```js
+const client = new ads.Client({
+  targetAmsNetId: '192.168.5.131.3.1', 
+  targetAdsPort: 1002,
+  bareClient: true //NOTE
+})
+```
+
 # Getting started
 
 This chapter includes some short getting started examples. See the JSDoc [documentation](#documentation) for detailed description of library classes and methods.
@@ -1622,6 +1642,14 @@ For example, when copying a variable name from TwinCAT online view using CTRL+C,
 - The real data type name that needs to be used is `ARRAY [0..1,0..1] OF ST_Example` (note no whitespace between array dimensions)
 
 If you have problems, try to read the variable information using `readSymbolInfo()`. The final solution is to read all data types using `readAndCacheDataTypes()` and manually finding the correct type.
+
+### ClientException: Connection failed: Device system manager state read failed
+
+This error indicates that the given AmsnetId didn't contain system manager service (port 10000). If you connect to the PLC system, there is always system manager and PLC runtime(s). However, when connecting to other systems than PLC, it might be that there is no system manager service.
+
+Solution:
+- Double check AmsNetId settings (if connecting directly to PLC)
+- [Set `bareClient` setting to skip all system manager and PLC runtime checks]() (version 1.13.0 ->)
 
 
 # Documentation
