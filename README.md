@@ -2,7 +2,7 @@
 
 
 [![npm version](https://img.shields.io/npm/v/ads-client)](https://www.npmjs.org/package/ads-client) 
-[![GitHub milestone](https://img.shields.io/github/milestones/progress-percent/jisotalo/ads-client/1)](https://github.com/jisotalo/ads-client/milestone/1)
+[![Donate](https://img.shields.io/badge/Donate-PayPal-yellow)](https://www.paypal.com/donate/?business=KUWBXXCVGZZME&no_recurring=0&currency_code=EUR)
 [![GitHub](https://img.shields.io/badge/View%20on-GitHub-brightgreen)](https://github.com/jisotalo/ads-client)
 [![License](https://img.shields.io/github/license/jisotalo/ads-client)](https://choosealicense.com/licenses/mit/)
 
@@ -13,9 +13,14 @@ Coded from scratch using [TwinCAT ADS specification](https://infosys.beckhoff.co
 There is automatically created documentation available at https://jisotalo.github.io/ads-client/
 
 # Project status
-This project is currently "ready". It's maintained actively and used in projects by the author and others.
+This project is currently "ready". It's maintained actively and used in projects by the author and others (also lot's of commercial projects)
 
 Bugs are fixed if found and new features can be added. Please let me know if you have any ideas!
+
+And if you want you can buy me a beer using PayPal :)
+
+[![Donate](https://img.shields.io/badge/Donate%20a%20beer!-PayPal-yellow)](https://www.paypal.com/donate/?business=KUWBXXCVGZZME&no_recurring=0&currency_code=EUR)
+
 
 # Using Node-RED?
 Check out the [node-red-contrib-ads-client](https://www.npmjs.com/package/node-red-contrib-ads-client) package. It's an `ads-client` wrapper for Node-RED to get the same functionality.
@@ -1661,6 +1666,17 @@ See https://github.com/jisotalo/ads-client/issues/82
 ### Problems running ads-client with docker
 
 - EADDRNOTAVAIL: See above and https://github.com/jisotalo/ads-client/issues/82
+
+### How to connect to PLC that is in CONFIG mode?
+As default, the ads-client checks if the target has PLC runtime at given port. However, when target system manager is at config mode, there is none. The client will throw an error during connecting.
+
+You can disable the check by providing setting `allowHalfOpen: true`. After that, it's possible to start the PLC by `setSystemManagerToRun()`. However, when using this setting internal subscription like symbol version etc. might not work properly.
+
+Another option is to use setting `bareClient: true` (since v.1.13.0). However, when using this option, the ads-client does not handle anything automatically - it's just a bare client (duh).
+
+I would suggest to use ads-client normally without any special settings. If the target is at config mode, use separate client instance to start it, and the again the n ormal instance to connect to a running system. This way the client works the best.
+
+
 
 # Documentation
 
