@@ -1670,11 +1670,13 @@ See https://github.com/jisotalo/ads-client/issues/82
 ### How to connect to PLC that is in CONFIG mode?
 As default, the ads-client checks if the target has PLC runtime at given port. However, when target system manager is at config mode, there is none. The client will throw an error during connecting.
 
+`Target and system manager found but couldn't connect to the PLC runtime (see settings allowHalfOpen and bareClient)`
+
 You can disable the check by providing setting `allowHalfOpen: true`. After that, it's possible to start the PLC by `setSystemManagerToRun()`. However, when using this setting internal subscription like symbol version etc. might not work properly.
 
 Another option is to use setting `bareClient: true` (since v.1.13.0). However, when using this option, the ads-client does not handle anything automatically - it's just a bare client (duh).
 
-I would suggest to use ads-client normally without any special settings. If the target is at config mode, use separate client instance to start it, and the again the n ormal instance to connect to a running system. This way the client works the best.
+I would suggest to use ads-client normally without any special settings. If the target is at config mode, use separate client instance to start it, and the again the normal instance to connect to a running system. This way the client works the best.
 
 
 
