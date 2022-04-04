@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.13.1] - 04.04.2022
+### Changed
+- Bug fix: Undefined variable `message` [See issue #89](https://github.com/jisotalo/ads-client/issues/89)
+- Updated ADS error codes with new ones [See issue #88](https://github.com/jisotalo/ads-client/issues/88)
+- Updated README
+
 ## [1.13.0] - 27.02.2022
 ### Added
 - Added new setting `bareClient`. If it's set, the client will only connect to the target, nothing else
