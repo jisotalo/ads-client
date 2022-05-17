@@ -38,6 +38,7 @@ Check out the [node-red-contrib-ads-client](https://www.npmjs.com/package/node-r
 - [Getting started](#getting-started)
   * [Data types used in getting started](#data-types-used-in-getting-started)
   * [Creating a new Client instance](#creating-a-new-client-instance)
+    * [Available settings](#available-settings)
   * [Connecting and disconnecting](#connecting-and-disconnecting)
   * [Reading any type PLC variable](#reading-any-type-plc-variable)
     + [Example: Reading `INT` type variable](#example-reading-int-type-variable)
@@ -411,8 +412,6 @@ END_TYPE
 
 The constructor takes settings as its parameter. Two settings are mandatory: `targetAmsNetId` and `targetAdsPort`. The first is the target PLC system AmsNetId (like *127.0.0.1.1.1* or *192.168.1.10.1.1*) and the latter is target system ADS port (*like 851 for TwinCAT 3 runtime 1*).
 
-See all settings from the [Settings documentation](https://jisotalo.github.io/ads-client/global.html#Settings)
-
 ```js
 const ads = require('ads-client')
 
@@ -422,6 +421,84 @@ const client = new ads.Client({
   targetAdsPort: 851,
 })
 ```
+### Available settings
+**REQUIRED:**
+* `targetAmsNetId`
+  * Target system AmsNetId
+  * Use `127.0.0.1.1.1` or `localhost` if connecting to a local system
+* `targetAdsPort`
+  * Target system ADS port.
+  * TwinCAT 3: 851 (1st runtime), 852 (2nd runtime) and so on
+  * TwinCAT 2: 801 (1st runtime)
+
+**Optional:**
+* `objectifyEnumerations`
+  * Default value: `true`
+  * If true, read ENUM data types are converted to objects instead of numbers, e.g. `{name: 'enumValue', value: 5}` instead of 5
+* `convertDatesToJavascript`
+  * Default value: `true`
+  * If true, PLC DT (DATE_AND_TIME) and DATE types are converted to Javascript dates
+* `readAndCacheSymbols`
+  * Default value: `false`
+  * If true, **all** PLC symbols are cached during connecting. Otherwise they are read and cached only when needed
+* `readAndCacheDataTypes`
+  * Default value: `false`
+  * If true, **all** PLC data types are cached during connecting. Otherwise they are read and cached only when needed
+* `disableSymbolVersionMonitoring`
+  * Default value: `false`
+  * If true, PLC symbol version changes aren't monitored and cached symbols and datatypes won't be updated after PLC program download
+* `routerTcpPort`
+  * Default value: `48898`
+  * Target ADS router TCP port
+* `routerAddress`
+  * Default value: `localhost`
+  * Target ADS router IP address/hostname
+* `localAddress`
+  * Default value: `system default`
+  * Local IP address to use, use this to change used network interface if required
+* `localTcpPort`
+  * Default value: `system default`
+  * Local TCP port to use for outgoing connections
+* `localAmsNetId`
+  * Default value: `AMS router provides`
+  * Local AmsNetId to use
+  * Used especially when connecting from systems without own AMS router, like Raspberry Pi
+    * See: [Connecting from any Node.js supported system to the PLC](#setup-3---connecting-from-any-nodejs-supported-system-to-the-plc)
+* `localAdsPort`
+  * Default value: `AMS router provides`
+  * Local ADS port to use 
+  * Used especially when connecting from systems without own AMS router, like Raspberry Pi
+    * See: [Connecting from any Node.js supported system to the PLC](#setup-3---connecting-from-any-nodejs-supported-system-to-the-plc)
+* `timeoutDelay`
+  * Default value: `2000`
+  * Time (milliseconds) after connecting to the router or waiting for command response is canceled to a timeout
+* `hideConsoleWarnings`
+  * Default value: `false`
+  * If true, no warnings are written to console (=nothing is **ever** written to console)
+* `autoReconnect`
+  * Default value: `true`
+  * If true and connection is lost, the client tries to reconnect automatically
+* `reconnectInterval`
+  * Default value: `2000`
+  * Time (milliseconds) how often the lost connection is tried to re-establish
+* `checkStateInterval`
+  * Default value: `1000`
+  * Time (milliseconds) how often the system manager state is read to see if connection is OK
+* `connectionDownDelay`
+  * Default value: `5000`
+  * Time (milliseconds) after no successful reading of the system manager state the connection is determined to be lost
+* `allowHalfOpen`
+  * Default value: `false`
+  * If true, connect() is successful even if no PLC runtime is found (but target and system manager are available) - Can be useful if it's ok that after connecting the PLC runtime is not immediately available (example: connecting before uploading PLC code and reading data later) - 
+  * WARNING: If true, reinitializing subscriptions might fail after connection loss.
+* `disableBigInt`
+  * Default value: `false`
+  * If true, 64-bit integer PLC variables are kept as `Buffer` objects instead of converting to Javascript `BigInt` variables (JSON.strigify and libraries that use it have no BigInt support)
+* `bareClient`
+  * Default value: `false`
+  * If true, only direct ads connection is established (no system manager)
+  * Can be used to connect to systems without PLC runtime
+  * See [Connecting to systems without PLC runtime](#connecting-to-systems-without-plc-runtime)
 
 
 ## Connecting and disconnecting

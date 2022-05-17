@@ -888,7 +888,7 @@ class Client extends EventEmitter {
       } catch (err) {
         return reject(new ClientException(this, 'readSymbol()', `Reading symbol ${variableName} failed: Reading data type failed`, err))
       }
-
+      
       //4. Parse the data to javascript object
       let data = {}
       try {
@@ -5684,8 +5684,8 @@ function _getDataTypeRecursive(dataTypeName, firstLevel = true, size = null) {
       const arrayType = await _getDataTypeRecursive.call(this, dataType.type, false)
 
       parsedDataType = arrayType
-      parsedDataType.arrayData = dataType.arrayData
-
+      //Combining array information (for ARRAY OF ARRAY support)
+      parsedDataType.arrayData = dataType.arrayData.concat(parsedDataType.arrayData)
 
       //If the data type has flag "DataType" and it's enum
     } else if (dataType.flagsStr.includes('DataType') && dataType.flagsStr.includes('EnumInfos')) {
