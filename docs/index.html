@@ -88,7 +88,11 @@
 <li><a href="#getting-started">Getting started</a>
 <ul>
 <li><a href="#data-types-used-in-getting-started">Data types used in getting started</a></li>
-<li><a href="#creating-a-new-client-instance">Creating a new Client instance</a></li>
+<li><a href="#creating-a-new-client-instance">Creating a new Client instance</a>
+<ul>
+<li><a href="#available-settings">Available settings</a></li>
+</ul>
+</li>
 <li><a href="#connecting-and-disconnecting">Connecting and disconnecting</a></li>
 <li><a href="#reading-any-type-plc-variable">Reading any type PLC variable</a>
 <ul>
@@ -443,7 +447,6 @@ END_TYPE
 </code></pre>
 <h2 id="creating-a-new-client-instance">Creating a new Client instance</h2>
 <p>The constructor takes settings as its parameter. Two settings are mandatory: <code>targetAmsNetId</code> and <code>targetAdsPort</code>. The first is the target PLC system AmsNetId (like <em>127.0.0.1.1.1</em> or <em>192.168.1.10.1.1</em>) and the latter is target system ADS port (<em>like 851 for TwinCAT 3 runtime 1</em>).</p>
-<p>See all settings from the <a href="https://jisotalo.github.io/ads-client/global.html#Settings">Settings documentation</a></p>
 <pre class="prettyprint source lang-js"><code>const ads = require('ads-client')
 
 //Creates a new Client instance and sets the local system and TC3 runtime 1 as target
@@ -452,6 +455,149 @@ const client = new ads.Client({
   targetAdsPort: 851,
 })
 </code></pre>
+<h3 id="available-settings">Available settings</h3>
+<p><strong>REQUIRED:</strong></p>
+<ul>
+<li><code>targetAmsNetId</code>
+<ul>
+<li>Target system AmsNetId</li>
+<li>Use <code>127.0.0.1.1.1</code> or <code>localhost</code> if connecting to a local system</li>
+</ul>
+</li>
+<li><code>targetAdsPort</code>
+<ul>
+<li>Target system ADS port.</li>
+<li>TwinCAT 3: 851 (1st runtime), 852 (2nd runtime) and so on</li>
+<li>TwinCAT 3: 801 (1st runtime)</li>
+</ul>
+</li>
+</ul>
+<p><strong>Optional:</strong></p>
+<ul>
+<li><code>objectifyEnumerations</code>
+<ul>
+<li>Default value: <code>true</code></li>
+<li>If true, read ENUM data types are converted to objects instead of numbers, e.g. <code>{name: 'enumValue', value: 5}</code> instead of 5</li>
+</ul>
+</li>
+<li><code>convertDatesToJavascript</code>
+<ul>
+<li>Default value: <code>true</code></li>
+<li>If true, PLC DT (DATE_AND_TIME) and DATE types are converted to Javascript dates*</li>
+</ul>
+</li>
+<li><code>readAndCacheSymbols</code>
+<ul>
+<li>Default value: <code>false</code></li>
+<li>If true, <strong>all</strong> PLC symbols are cached during connecting. Otherwise they are read and cached only when needed</li>
+</ul>
+</li>
+<li><code>readAndCacheDataTypes</code>
+<ul>
+<li>Default value: <code>false</code></li>
+<li>If true, all PLC data types are cached during connecting. Otherwise they are read and cached only when needed</li>
+</ul>
+</li>
+<li><code>disableSymbolVersionMonitoring</code>
+<ul>
+<li>Default value: <code>false</code></li>
+<li>If true, PLC symbol version changes aren't monitored and cached symbols and datatypes won't be updated after PLC program download</li>
+</ul>
+</li>
+<li><code>routerTcpPort</code>
+<ul>
+<li>Default value: <code>48898</code></li>
+<li>Target ADS router TCP port</li>
+</ul>
+</li>
+<li><code>routerAddress</code>
+<ul>
+<li>Default value: <code>localhost</code></li>
+<li>Target ADS router IP address/hostname</li>
+</ul>
+</li>
+<li><code>localAddress</code>
+<ul>
+<li>Default value: <code>system default</code></li>
+<li>Local IP address to use, use this to change used network interface if required</li>
+</ul>
+</li>
+<li><code>localTcpPort</code>
+<ul>
+<li>Default value: <code>system default</code></li>
+<li>Local TCP port to use for outgoing connections</li>
+</ul>
+</li>
+<li><code>localAmsNetId</code>
+<ul>
+<li>Default value: <code>AMS router provides</code></li>
+<li>Local AmsNetId to use</li>
+</ul>
+</li>
+<li><code>localAdsPort</code>
+<ul>
+<li>Default value: <code>AMS router provides</code></li>
+<li>Local ADS port to use</li>
+</ul>
+</li>
+<li><code>timeoutDelay</code>
+<ul>
+<li>Default value: <code>2000</code></li>
+<li>Time (milliseconds) after connecting to the router or waiting for command response is canceled to a timeout</li>
+</ul>
+</li>
+<li><code>hideConsoleWarnings</code>
+<ul>
+<li>Default value: <code>false</code></li>
+<li>If true, no warnings are written to console (=nothing is <strong>ever</strong> written to console)</li>
+</ul>
+</li>
+<li><code>autoReconnect</code>
+<ul>
+<li>Default value: <code>true</code></li>
+<li>If true and connection is lost, the client tries to reconnect automatically</li>
+</ul>
+</li>
+<li><code>reconnectInterval</code>
+<ul>
+<li>Default value: <code>2000</code></li>
+<li>Time (milliseconds) how often the lost connection is tried to re-establish</li>
+</ul>
+</li>
+<li><code>checkStateInterval</code>
+<ul>
+<li>Default value: <code>1000</code></li>
+<li>Time (milliseconds) how often the system manager state is read to see if connection is OK</li>
+</ul>
+</li>
+<li><code>connectionDownDelay</code>
+<ul>
+<li>Default value: <code>5000</code></li>
+<li>Time (milliseconds) after no successful reading of the system manager state the connection is determined to be lost</li>
+</ul>
+</li>
+<li><code>allowHalfOpen</code>
+<ul>
+<li>Default value: <code>false</code></li>
+<li>If true, connect() is successful even if no PLC runtime is found (but target and system manager are available) - Can be useful if it's ok that after connecting the PLC runtime is not immediately available (example: connecting before uploading PLC code and reading data later) -</li>
+<li>WARNING: If true, reinitializing subscriptions might fail after connection loss.</li>
+</ul>
+</li>
+<li><code>disableBigInt</code>
+<ul>
+<li>Default value: <code>false</code></li>
+<li>If true, 64-bit integer PLC variables are kept as <code>Buffer</code> objects instead of converting to Javascript <code>BigInt</code> variables (JSON.strigify and libraries that use it have no BigInt support)</li>
+</ul>
+</li>
+<li><code>bareClient</code>
+<ul>
+<li>Default value: <code>false</code></li>
+<li>If true, only direct ads connection is established (no system manager)</li>
+<li>Can be used to connect to systems without PLC runtime</li>
+<li>See <a href="#connecting-to-systems-without-plc-runtime">Connecting to systems without PLC runtime</a></li>
+</ul>
+</li>
+</ul>
 <h2 id="connecting-and-disconnecting">Connecting and disconnecting</h2>
 <p>Connecting to the local TwinCAT 3 runtime 1 (port is 851) using local ADS router (= you have TwinCAT ADS router installed).</p>
 <pre class="prettyprint source lang-js"><code>const ads = require('ads-client')
@@ -1522,7 +1668,7 @@ SOFTWARE.</p></article>
 <br class="clear">
 
 <footer>
-    Documentation generated by <a href="https://github.com/jsdoc3/jsdoc">JSDoc 3.6.7</a> on Mon Apr 04 2022 21:34:39 GMT+0300 (Itä-Euroopan kesäaika) using the <a href="https://github.com/clenemt/docdash">docdash</a> theme.
+    Documentation generated by <a href="https://github.com/jsdoc3/jsdoc">JSDoc 3.6.7</a> on Tue May 17 2022 22:09:38 GMT+0300 (Itä-Euroopan kesäaika) using the <a href="https://github.com/clenemt/docdash">docdash</a> theme.
 </footer>
 
 <script>prettyPrint();</script>
