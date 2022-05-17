@@ -429,7 +429,7 @@ const client = new ads.Client({
 * `targetAdsPort`
   * Target system ADS port.
   * TwinCAT 3: 851 (1st runtime), 852 (2nd runtime) and so on
-  * TwinCAT 3: 801 (1st runtime)
+  * TwinCAT 2: 801 (1st runtime)
 
 **Optional:**
 * `objectifyEnumerations`
@@ -437,13 +437,13 @@ const client = new ads.Client({
   * If true, read ENUM data types are converted to objects instead of numbers, e.g. `{name: 'enumValue', value: 5}` instead of 5
 * `convertDatesToJavascript`
   * Default value: `true`
-  * If true, PLC DT (DATE_AND_TIME) and DATE types are converted to Javascript dates* 
+  * If true, PLC DT (DATE_AND_TIME) and DATE types are converted to Javascript dates
 * `readAndCacheSymbols`
   * Default value: `false`
   * If true, **all** PLC symbols are cached during connecting. Otherwise they are read and cached only when needed
 * `readAndCacheDataTypes`
   * Default value: `false`
-  * If true, all PLC data types are cached during connecting. Otherwise they are read and cached only when needed
+  * If true, **all** PLC data types are cached during connecting. Otherwise they are read and cached only when needed
 * `disableSymbolVersionMonitoring`
   * Default value: `false`
   * If true, PLC symbol version changes aren't monitored and cached symbols and datatypes won't be updated after PLC program download
@@ -462,9 +462,13 @@ const client = new ads.Client({
 * `localAmsNetId`
   * Default value: `AMS router provides`
   * Local AmsNetId to use
+  * Used especially when connecting from systems without own AMS router, like Raspberry Pi
+    * See: [Connecting from any Node.js supported system to the PLC](#setup-3---connecting-from-any-nodejs-supported-system-to-the-plc)
 * `localAdsPort`
   * Default value: `AMS router provides`
   * Local ADS port to use 
+  * Used especially when connecting from systems without own AMS router, like Raspberry Pi
+    * See: [Connecting from any Node.js supported system to the PLC](#setup-3---connecting-from-any-nodejs-supported-system-to-the-plc)
 * `timeoutDelay`
   * Default value: `2000`
   * Time (milliseconds) after connecting to the router or waiting for command response is canceled to a timeout
