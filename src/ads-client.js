@@ -5230,8 +5230,8 @@ function _parseJsObjectToBuffer(value, dataType, objectPathStr = '', isArraySubI
 
   //Struct or array subitem - Go through each subitem 
   if ((dataType.arrayData.length === 0 || isArraySubItem) && dataType.subItems.length > 0) {
-    buffer = Buffer.alloc(dataType.offset + dataType.size)
-
+    buffer = Buffer.alloc(dataType.size)
+    
     for (const subItem of dataType.subItems) {
       //Try the find the subitem from javascript object
       let key = null

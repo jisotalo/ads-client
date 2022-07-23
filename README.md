@@ -89,6 +89,7 @@ Check out the [node-red-contrib-ads-client](https://www.npmjs.com/package/node-r
   * [Enabling debug from code](#enabling-debug-from-code)
   * [Enabling debugging from terminal](#enabling-debugging-from-terminal)
 - [FAQ](#faq)
+- [Automatic testing](#automatic-testing)
 - [Documentation](#documentation)
 - [License](#license)
 
@@ -1755,7 +1756,12 @@ Another option is to use setting `bareClient: true` (since v.1.13.0). However, w
 
 I would suggest to use ads-client normally without any special settings. If the target is at config mode, use separate client instance to start it, and the again the normal instance to connect to a running system. This way the client works the best.
 
+# Automatic testing
+Since version 1.14.0 the library has automatic testing using Jest. Idea is to run the tests before updates to make sure everything works OK (this should have been done much earlier...)
 
+Separate PLC project is required for testing, see https://github.com/jisotalo/ads-client-test-plc-project for more project and more info.
+
+Tests are run with command `npm test` (not in npm version, please clone this repository).
 
 # Documentation
 

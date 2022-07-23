@@ -4,6 +4,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.14.0] - 23.07.2022
+### Added
+- Created end-to-end testing for the library using Jest
+  - Separate PLC project required for testing: https://github.com/jisotalo/ads-client-test-plc-project
+  - Test is started using command `npm test`
+  - First version tests
+    - Connecting
+    - Reading
+    - Writing
+    - RPC methods
+
+### Changed
+- Bug fix: Value converted to Javascript variable incorrectly in some edge cases [See issue #94](https://github.com/jisotalo/ads-client/issues/94)
+
 ## [1.13.2] - 17.05.2022
 ### Changed
 - Bug fix: Incorrect parsing of ARRAY OF ARRAY, now works as should [See issue #91](https://github.com/jisotalo/ads-client/issues/91)
