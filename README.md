@@ -1713,8 +1713,6 @@ Solution:
 Solution:
 - See [this issue comment](https://github.com/jisotalo/ads-client/issues/51#issuecomment-758016428) by hansipete how to do it.
 
-
-
 ### A data type is not found even when it should be
 
 If you use methods like `convertFromRaw()` and `getDataType()` but receive an error similar to `ClientException: Finding data type *data type* failed`, make sure you have really written the data type correctly.
@@ -1755,6 +1753,16 @@ You can disable the check by providing setting `allowHalfOpen: true`. After that
 Another option is to use setting `bareClient: true` (since v.1.13.0). However, when using this option, the ads-client does not handle anything automatically - it's just a bare client (duh).
 
 I would suggest to use ads-client normally without any special settings. If the target is at config mode, use separate client instance to start it, and the again the normal instance to connect to a running system. This way the client works the best.
+
+### Getting a message `Ads notification received but it has unknown notificationHandle (**). Use unsubscribe() to save resources.`
+
+Possible reasons:
+* You have created notifications (subscriptions) using `subscribe()` and then closed the Node.js application without unsubscribing them first (TwinCAT still sends the data)
+* You are connecting without router (providing directly the target IP as router address) and you have other connections too like TwinCAT XAE running. See issue: https://github.com/jisotalo/ads-client/issues/85
+
+Solution:
+* When closing application, first unsubscribe from all notifications using `unsubscribeAll()`
+* Use router instead of direct connection, see https://github.com/jisotalo/ads-client/issues/85#issuecomment-1193098519
 
 # Automatic testing
 Since version 1.14.0 the library has automatic testing using Jest. Idea is to run the tests before updates to make sure everything works OK (this should have been done much earlier...)
