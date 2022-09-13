@@ -61,7 +61,7 @@ class Client extends EventEmitter {
    * @property {boolean} [readAndCacheDataTypes=false] - If true, all PLC data types are cached during connecting. Otherwise they are read and cached only when needed - Optional (**default**: false)
    * @property {boolean} [disableSymbolVersionMonitoring=false] - If true, PLC symbol version changes aren't monitored and cached symbols and datatypes won't be updated after PLC program download - Optional - Optional (**default**: false)
    * @property {number} [routerTcpPort=48898] - Target ADS router TCP port - Optional (**default**: 48898)
-   * @property {string} [routerAddress=localhost] - Target ADS router IP address/hostname - Optional (**default**: localhost)
+   * @property {string} [routerAddress=127.0.0.1] - Target ADS router IP address/hostname - Optional (**default**: 127.0.0.1)
    * @property {string} [localAddress='(system default)'] - Local IP address to use, use this to change used network interface if required - Optional (**default**: System default)
    * @property {number} [localTcpPort='(system default)'] - Local TCP port to use for outgoing connections - Optional (**default**: System default)
    * @property {string} [localAmsNetId='(from AMS router)'] - Local AmsNetId to use - Optional (**default**: From AMS router)
@@ -91,7 +91,7 @@ class Client extends EventEmitter {
       readAndCacheDataTypes: false,
       disableSymbolVersionMonitoring: false,
       routerTcpPort: 48898,
-      routerAddress: 'localhost',
+      routerAddress: '127.0.0.1',
       localAddress: null,
       localTcpPort: null,
       localAmsNetId: null,
@@ -143,6 +143,12 @@ class Client extends EventEmitter {
     //Loopback address
     if (this.settings.targetAmsNetId.toLowerCase() === 'localhost') {
       this.settings.targetAmsNetId = '127.0.0.1.1.1'
+    }
+
+    //Checking that router address is 127.0.0.1 instead of localhost
+    //to prevent problem like https://github.com/nodejs/node/issues/40702
+    if (this.settings.routerAddress.toLowerCase() === 'localhost') {
+      this.settings.routerAddress = '127.0.0.1'
     }
 
     /**
