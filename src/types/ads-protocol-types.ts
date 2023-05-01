@@ -120,3 +120,137 @@ export interface AmsRouterState {
   /** Router state as string */
   stateStr: string
 }
+
+/** ADS response type (any of these) */
+export type AdsResponse =
+  | EmptyResponse
+  | UnknownAdsRequest
+  | AdsReadResponse
+  | AdsReadWriteResponse
+  | AdsWriteResponse
+  | AdsReadDeviceInfoResponse
+  | AddNotificationReq
+  | DeleteNotificationReq
+  | WriteControlReq;
+
+/**
+ * Empty ADS response (no payload)
+ */
+export type EmptyResponse = {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  [K in any]: never //allow only empty object
+};
+
+/**
+ * ADS read response
+ */
+export interface AdsReadResponse {
+  /** ADS error code (0 = no error) */
+  errorCode: number,
+  /** Data length */
+  dataLength: number,
+  /** Response data */
+  data: Buffer
+};
+
+/**
+ * ADS ReadWrite response
+ */
+export interface AdsReadWriteResponse {
+  /** ADS error code (0 = no error) */
+  errorCode: number,
+  /** Data length */
+  dataLength: number,
+  /** Response data */
+  data: Buffer
+};
+
+/**
+ * ADS Write response
+ */
+export interface AdsWriteResponse {
+  /** ADS error code (0 = no error) */
+  errorCode: number
+};
+
+/**
+ * ADS ReadDeviceInfo response
+ */
+export interface AdsReadDeviceInfoResponse {
+  /** ADS error code (0 = no error) */
+  errorCode: number,
+  /** Device info */
+  data: AdsDeviceInfo
+};
+
+/**
+ * ADS ReadState response
+ */
+export interface AdsReadStateResponse {
+  /** ADS error code (0 = no error) */
+  errorCode: number,
+  /** ADS state */
+  data: AdsState
+};
+
+/**
+ * ADS AddNotification response
+ */
+export interface AdsAddNotificationResponse {
+  /** ADS error code (0 = no error) */
+  errorCode: number,
+  /** ADS state */
+  data: AdsNotificationHandle
+};
+
+/**
+ * ADS DeleteNotification response
+ */
+export interface AdsDeleteNotificationResponse {
+  /** ADS error code (0 = no error) */
+  errorCode: number
+};
+
+/**
+ * ADS notification response
+ */
+export interface AdsNotificationResponse {
+  /** ADS error code (0 = no error) */
+  errorCode: number,
+  /** Notification data */
+  data: todo
+};
+
+/**
+ * ADS device info
+ */
+export interface AdsDeviceInfo {
+  /** Major version number */
+  majorVersion: number,
+  /** Minor version number */
+  minorVersion: number,
+  /** Build version */
+  versionBuild: number,
+  /** Device name */
+  deviceName: string
+}
+
+/**
+ * ADS state
+ */
+export interface AdsState {
+  /** ADS state */
+  adsState: number,
+  /** ADS state as string (if available) */
+  adsStateStr?: string,
+  /** Device state */
+  deviceState: number
+}
+
+/**
+ * ADS notification handle
+ */
+export interface AdsNotificationHandle {
+  /** Notification handle */
+  notificationHandle: number
+}

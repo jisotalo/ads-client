@@ -1,10 +1,8 @@
 /// <reference types="node" />
 /// <reference types="node" />
-/// <reference types="node" />
 import EventEmitter from "events";
 import type { AdsClientConnection, AdsClientSettings } from "./types/ads-client-types";
-import { AmsRouterState, AmsTcpPacket } from "./types/ads-types";
-import { Socket } from "net";
+import { AdsResponse, AmsHeader, AmsRouterState, AmsTcpHeader, AmsTcpPacket } from "./types/ads-protocol-types";
 import Debug from "debug";
 export declare class AdsClient extends EventEmitter {
     protected debug: Debug.Debugger;
@@ -132,6 +130,33 @@ export declare class AdsClient extends EventEmitter {
      */
     protected parseAmsTcpPacket(data: Buffer): void;
     /**
+     * Parses an AMS/TCP header from given buffer
+     *
+     * @param data Buffer that contains data for a single full AMS/TCP packet
+     * @returns Object `{amsTcp, data}`, where amsTcp is the parsed header and data is rest of the data
+     */
+    protected parseAmsTcpHeader(data: Buffer): {
+        amsTcp: AmsTcpHeader;
+        data: Buffer;
+    };
+    /**
+     * Parses an AMS header from given buffer
+     *
+     * @param data Buffer that contains data for a single AMS packet (without AMS/TCP header)
+     * @returns Object `{ams, data}`, where ams is the parsed AMS header and data is rest of the data
+     */
+    protected parseAmsHeader(data: Buffer): {
+        ams: AmsHeader;
+        data: Buffer;
+    };
+    /**
+   * Parses ADS data from given buffer. Uses `packet.ams` to determine the ADS command.
+   *
+   * @param data Buffer that contains data for a single ADS packet (without AMS/TCP header and AMS header)
+   * @returns Object that contains the parsed ADS data
+   */
+    protected parseAdsResponse(packet: AmsTcpPacket, data: Buffer): AdsResponse;
+    /**
      * Handles the parsed AMS/TCP packet and actions/callbacks etc. related to it.
      *
      * @param packet Fully parsed AMS/TCP packet, includes AMS/TCP header and if available, also AMS header and ADS data
@@ -143,5 +168,12 @@ export declare class AdsClient extends EventEmitter {
      * @param packet Fully parsed AMS/TCP packet, includes AMS/TCP header, AMS header and ADS data
      * @param socket Socket connection to use for responding
      */
-    protected onAdsCommandReceived(packet: AmsTcpPacket, socket: Socket): void;
+    protected onAdsCommandReceived(packet: AmsTcpPacket): void;
+    /**
+     * Called when local AMS router status has changed (Router notification received)
+     * For example router state changes when local TwinCAT switches from Config to Run state and vice-versa
+     *
+     * @param state New router state
+     */
+    private onRouterStateChanged;
 }

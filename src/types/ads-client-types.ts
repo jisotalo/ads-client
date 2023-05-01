@@ -56,6 +56,8 @@ export interface TimerObject {
 export interface AdsClientConnection {
   /** Connection status of the client */
   connected: boolean,
+  /** True if connected to local TwinCAT router (loopback)*/
+  isLocal: boolean,
   /** Local AmsNetId of the client */
   localAmsNetId?: string,
   /** Local ADS port of the client */

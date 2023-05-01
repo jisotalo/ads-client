@@ -600,9 +600,208 @@ class AdsClient extends events_1.default {
         packet.ams = parsedAmsHeader.ams;
         data = parsedAmsHeader.data;
         //3. Parse ADS data (if exists)
-        packet.ads = packet.ams.error ? { rawData: Buffer.alloc(0) } : this.parseAdsData(packet, data);
+        packet.ads = packet.ams.error ? { rawData: Buffer.alloc(0) } : this.parseAdsResponse(packet, data);
         //4. Handle the parsed packet
         this.onAmsTcpPacketReceived(packet);
+    }
+    /**
+     * Parses an AMS/TCP header from given buffer
+     *
+     * @param data Buffer that contains data for a single full AMS/TCP packet
+     * @returns Object `{amsTcp, data}`, where amsTcp is the parsed header and data is rest of the data
+     */
+    parseAmsTcpHeader(data) {
+        this.debugD(`parseAmsTcpHeader(): Starting to parse AMS/TCP header`);
+        let pos = 0;
+        const amsTcp = {};
+        //0..1 AMS command (header flag)
+        amsTcp.command = data.readUInt16LE(pos);
+        amsTcp.commandStr = ADS.AMS_HEADER_FLAG.toString(amsTcp.command);
+        pos += 2;
+        //2..5 Data length
+        amsTcp.dataLength = data.readUInt32LE(pos);
+        pos += 4;
+        //Remove AMS/TCP header from data  
+        data = data.subarray(ADS.AMS_TCP_HEADER_LENGTH);
+        //If data length is less than AMS_HEADER_LENGTH,
+        //we know that this packet has no AMS headers -> it's only a AMS/TCP command
+        if (data.byteLength < ADS.AMS_HEADER_LENGTH) {
+            amsTcp.data = data;
+            //Remove data (basically creates an empty buffer..)
+            data = data.subarray(data.byteLength);
+        }
+        this.debugD(`parseAmsTcpHeader(): AMS/TCP header parsed: %o`, amsTcp);
+        return { amsTcp, data };
+    }
+    /**
+     * Parses an AMS header from given buffer
+     *
+     * @param data Buffer that contains data for a single AMS packet (without AMS/TCP header)
+     * @returns Object `{ams, data}`, where ams is the parsed AMS header and data is rest of the data
+     */
+    parseAmsHeader(data) {
+        this.debugD("parseAmsHeader(): Starting to parse AMS header");
+        let pos = 0;
+        const ams = {};
+        if (data.byteLength < ADS.AMS_HEADER_LENGTH) {
+            this.debugD("parseAmsHeader(): No AMS header found");
+            return { ams, data };
+        }
+        //0..5 Target AMSNetId
+        ams.targetAmsNetId = ADS.byteArrayToAmsNetIdStr(data.subarray(pos, pos + ADS.AMS_NET_ID_LENGTH));
+        pos += ADS.AMS_NET_ID_LENGTH;
+        //6..8 Target ads port
+        ams.targetAdsPort = data.readUInt16LE(pos);
+        pos += 2;
+        //8..13 Source AMSNetId
+        ams.sourceAmsNetId = ADS.byteArrayToAmsNetIdStr(data.subarray(pos, pos + ADS.AMS_NET_ID_LENGTH));
+        pos += ADS.AMS_NET_ID_LENGTH;
+        //14..15 Source ads port
+        ams.sourceAdsPort = data.readUInt16LE(pos);
+        pos += 2;
+        //16..17 ADS command
+        ams.adsCommand = data.readUInt16LE(pos);
+        ams.adsCommandStr = ADS.ADS_COMMAND.toString(ams.adsCommand);
+        pos += 2;
+        //18..19 State flags
+        ams.stateFlags = data.readUInt16LE(pos);
+        ams.stateFlagsStr = ADS.ADS_STATE_FLAGS.toString(ams.stateFlags);
+        pos += 2;
+        //20..23 Data length
+        ams.dataLength = data.readUInt32LE(pos);
+        pos += 4;
+        //24..27 Error code
+        ams.errorCode = data.readUInt32LE(pos);
+        pos += 4;
+        //28..31 Invoke ID
+        ams.invokeId = data.readUInt32LE(pos);
+        pos += 4;
+        //Remove AMS header from data  
+        data = data.subarray(ADS.AMS_HEADER_LENGTH);
+        //ADS error
+        ams.error = (ams.errorCode !== null ? ams.errorCode > 0 : false);
+        ams.errorStr = "";
+        if (ams.error) {
+            ams.errorStr = ADS.ADS_ERROR[ams.errorCode];
+        }
+        this.debugD("parseAmsHeader(): AMS header parsed: %o", ams);
+        return { ams, data };
+    }
+    /**
+   * Parses ADS data from given buffer. Uses `packet.ams` to determine the ADS command.
+   *
+   * @param data Buffer that contains data for a single ADS packet (without AMS/TCP header and AMS header)
+   * @returns Object that contains the parsed ADS data
+   */
+    parseAdsResponse(packet, data) {
+        this.debugD("parseAdsResponse(): Starting to parse ADS data");
+        if (data.byteLength === 0) {
+            this.debugD("parseAdsData(): Packet has no ADS data");
+            return {};
+        }
+        let ads = undefined;
+        let pos = 0;
+        switch (packet.ams.adsCommand) {
+            case ADS.ADS_COMMAND.ReadWrite:
+                ads = {};
+                //0..3 Ads error number
+                ads.errorCode = data.readUInt32LE(pos);
+                pos += 4;
+                //4..7 Data length (bytes)
+                ads.dataLength = data.readUInt32LE(pos);
+                pos += 4;
+                //8..n Data
+                ads.data = Buffer.alloc(ads.dataLength);
+                data.copy(ads.data, 0, pos);
+                break;
+            case ADS.ADS_COMMAND.Read:
+                ads = {};
+                //0..3 Ads error number
+                ads.errorCode = data.readUInt32LE(pos);
+                pos += 4;
+                //4..7 Data length (bytes)
+                ads.dataLength = data.readUInt32LE(pos);
+                pos += 4;
+                //8..n Data
+                ads.data = Buffer.alloc(ads.dataLength);
+                data.copy(ads.data, 0, pos);
+                break;
+            case ADS.ADS_COMMAND.Write:
+                ads = {};
+                //0..3 Ads error number
+                ads.errorCode = data.readUInt32LE(pos);
+                pos += 4;
+                break;
+            case ADS.ADS_COMMAND.ReadDeviceInfo:
+                ads = {};
+                //0..3 Ads error number
+                ads.errorCode = data.readUInt32LE(pos);
+                pos += 4;
+                ads.data = {};
+                //4 Major version
+                ads.data.majorVersion = data.readUInt8(pos);
+                pos += 1;
+                //5 Minor version
+                ads.data.minorVersion = data.readUInt8(pos);
+                pos += 1;
+                //6..7 Version build
+                ads.data.versionBuild = data.readUInt16LE(pos);
+                pos += 2;
+                //8..24 Device name
+                ads.data.deviceName = ADS.convertBufferToString(data.subarray(pos, pos + 16));
+                ;
+                break;
+            case ADS.ADS_COMMAND.ReadState:
+                ads = {};
+                //0..3 Ads error number
+                ads.errorCode = data.readUInt32LE(pos);
+                pos += 4;
+                ads.data = {};
+                //4..5 ADS state
+                ads.data.adsState = data.readUInt16LE(pos);
+                ads.data.adsStateStr = ADS.ADS_STATE.toString(ads.data.adsState);
+                pos += 2;
+                //6..7 Device state
+                ads.data.deviceState = data.readUInt16LE(pos);
+                pos += 2;
+                break;
+            case ADS.ADS_COMMAND.AddNotification:
+                ads = {};
+                //0..3 Ads error number
+                ads.errorCode = data.readUInt32LE(pos);
+                pos += 4;
+                ads.data = {};
+                //4..7 Notification handle
+                ads.data.notificationHandle = data.readUInt32LE(pos);
+                pos += 4;
+                break;
+            case ADS.ADS_COMMAND.DeleteNotification:
+                ads = {};
+                //0..3 Ads error number
+                ads.errorCode = data.readUInt32LE(pos);
+                pos += 4;
+                break;
+            case ADS.ADS_COMMAND.Notification:
+                ads = {};
+                ads.data = _parseAdsNotification.call(this, data);
+                break;
+            case ADS.ADS_COMMAND.WriteControl:
+                ads = {};
+                //0..3 Ads error number
+                ads.errorCode = data.readUInt32LE(pos);
+                pos += 4;
+                break;
+        }
+        this.debugD(`parseAdsResponse(): ADS data parsed: %o`, ads);
+        if (ads === undefined) {
+            this.debug(`parseAdsData(): Unknown ads command received: ${packet.ams.adsCommand}`);
+            return {
+                error: true,
+                errorStr: `Unknown ADS command for parser: ${packet.ams.adsCommand} (${packet.ams.adsCommandStr})`,
+                errorCode: -1
+            };
+        }
+        return ads;
     }
     /**
      * Handles the parsed AMS/TCP packet and actions/callbacks etc. related to it.
@@ -656,12 +855,10 @@ class AdsClient extends events_1.default {
                 packet.amsTcp.commandStr = 'Router note';
                 //Parse data
                 if (packet.amsTcp.data instanceof Buffer) {
-                    const data = packet.amsTcp.data;
-                    packet.amsTcp.data = {
-                        //0..3 Router state
-                        routerState: data.readUInt32LE(0)
-                    };
-                    this.routerStateChangedCallback && this.routerStateChangedCallback(packet);
+                    const data = {};
+                    //0..3 Router state
+                    data.routerState = packet.amsTcp.data.readUInt32LE(0);
+                    onRouterStateChanged(data);
                 }
                 else {
                     this.debugD("onAmsTcpPacketReceived(): Received amsTcp data of unknown type");
@@ -684,7 +881,7 @@ class AdsClient extends events_1.default {
      * @param packet Fully parsed AMS/TCP packet, includes AMS/TCP header, AMS header and ADS data
      * @param socket Socket connection to use for responding
      */
-    onAdsCommandReceived(packet, socket) {
+    onAdsCommandReceived(packet) {
         this.debugD(`onAdsCommandReceived(): ADS command received (command: ${packet.ams.adsCommand})`);
         switch (packet.ams.adsCommand) {
             //ADS notification
@@ -725,6 +922,34 @@ class AdsClient extends events_1.default {
                     this.emit('ads-client-error', new client_exception_1.ClientException(this, `onAdsCommandReceived`, `Ads command received with unknown invokeId "${packet.ams.invokeId}"`, packet));
                 }
                 break;
+        }
+    }
+    /**
+     * Called when local AMS router status has changed (Router notification received)
+     * For example router state changes when local TwinCAT switches from Config to Run state and vice-versa
+     *
+     * @param state New router state
+     */
+    onRouterStateChanged(state) {
+        this.debug(`onRouterStateChanged(): Local AMS router state has changed${(this.metaData.routerState.stateStr ? ` from ${this.metaData.routerState.stateStr}` : '')} to ${ADS.AMS_ROUTER_STATE.toString(state.routerState)} (${state.routerState})`);
+        this.metaData.routerState = {
+            state: state.routerState,
+            stateStr: ADS.AMS_ROUTER_STATE.toString(state.routerState)
+        };
+        this.emit('routerStateChange', this.metaData.routerState);
+        //If we have a local connection, connection needs to be reinitialized
+        if (this.connection.isLocal === true) {
+            //We should stop polling system manager, it will be reinitialized later
+            _clearTimer(this._internals.systemManagerStatePoller);
+            debug(`_onRouterStateChanged(): Local loopback connection active, monitoring router state`);
+            if (this.metaData.routerState.state === ADS.AMS_ROUTER_STATE.START) {
+                _console.call(this, `WARNING: Local AMS router state has changed to ${ADS.AMS_ROUTER_STATE.toString(state)}. Reconnecting...`);
+                _onConnectionLost.call(this);
+            }
+            else {
+                //Nothing to do, just wait until router has started again..
+                _console.call(this, `WARNING: Local AMS router state has changed to ${ADS.AMS_ROUTER_STATE.toString(state)}. Connection and active subscriptions might have been lost.`);
+            }
         }
     }
 }

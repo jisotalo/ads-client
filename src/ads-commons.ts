@@ -19,7 +19,7 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
-
+import iconv from "iconv-lite";
 
 /**
  * AMS/TCP header length
@@ -876,3 +876,13 @@ export const byteArrayToAmsNetIdStr = (byteArray: Buffer | number[]): string => 
 export const amsNetIdStrToByteArray = (str: string): number[] => {
   return str.split('.').map(x => parseInt(x));
 }
+
+/**
+ * Trims the given PLC string until end mark (\0) is found (removes empty bytes from the end)
+ * 
+ * @param plcString String to trim
+ * @returns Trimmed string
+ */
+export const trimPlcString = (plcStr: string) => plcStr.substring(0, plcStr.indexOf("\0"));
+
+export const decodeSTRING = (data: Buffer) => trimPlcString(iconv.decode(data, "cp1252"));

@@ -1,4 +1,9 @@
 "use strict";
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.decodeSTRING = exports.trimPlcString = exports.amsNetIdStrToByteArray = exports.byteArrayToAmsNetIdStr = exports.AMS_ROUTER_STATE = exports.RCP_METHOD_PARAM_FLAGS = exports.ADS_DATA_TYPES = exports.ADS_DATA_TYPE_FLAGS = exports.ADS_SYMBOL_FLAGS = exports.ADS_RESERVED_INDEX_GROUPS = exports.ADS_STATE = exports.ADS_TRANS_MODE = exports.ADS_ERROR = exports.ADS_STATE_FLAGS = exports.ADS_COMMAND = exports.ADS_RESERVED_PORTS = exports.AMS_HEADER_FLAG = exports.LOOPBACK_AMS_NET_ID = exports.ADS_DEFAULT_TCP_PORT = exports.ADS_INVOKE_ID_MAX_VALUE = exports.ADS_INDEX_GROUP_LENGTH = exports.ADS_INDEX_OFFSET_LENGTH = exports.AMS_NET_ID_LENGTH = exports.AMS_HEADER_LENGTH = exports.AMS_TCP_HEADER_LENGTH = void 0;
 /*
 Copyright (c) Jussi Isotalo <j.isotalo91@gmail.com>
 
@@ -20,8 +25,7 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.amsNetIdStrToByteArray = exports.byteArrayToAmsNetIdStr = exports.AMS_ROUTER_STATE = exports.RCP_METHOD_PARAM_FLAGS = exports.ADS_DATA_TYPES = exports.ADS_DATA_TYPE_FLAGS = exports.ADS_SYMBOL_FLAGS = exports.ADS_RESERVED_INDEX_GROUPS = exports.ADS_STATE = exports.ADS_TRANS_MODE = exports.ADS_ERROR = exports.ADS_STATE_FLAGS = exports.ADS_COMMAND = exports.ADS_RESERVED_PORTS = exports.AMS_HEADER_FLAG = exports.LOOPBACK_AMS_NET_ID = exports.ADS_DEFAULT_TCP_PORT = exports.ADS_INVOKE_ID_MAX_VALUE = exports.ADS_INDEX_GROUP_LENGTH = exports.ADS_INDEX_OFFSET_LENGTH = exports.AMS_NET_ID_LENGTH = exports.AMS_HEADER_LENGTH = exports.AMS_TCP_HEADER_LENGTH = void 0;
+const iconv_lite_1 = __importDefault(require("iconv-lite"));
 /**
  * AMS/TCP header length
  */
@@ -803,3 +807,13 @@ const amsNetIdStrToByteArray = (str) => {
     return str.split('.').map(x => parseInt(x));
 };
 exports.amsNetIdStrToByteArray = amsNetIdStrToByteArray;
+/**
+ * Trims the given PLC string until end mark (\0) is found (removes empty bytes from the end)
+ *
+ * @param plcString String to trim
+ * @returns Trimmed string
+ */
+const trimPlcString = (plcStr) => plcStr.substring(0, plcStr.indexOf("\0"));
+exports.trimPlcString = trimPlcString;
+const decodeSTRING = (data) => (0, exports.trimPlcString)(iconv_lite_1.default.decode(data, "cp1252"));
+exports.decodeSTRING = decodeSTRING;

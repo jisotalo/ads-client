@@ -696,3 +696,11 @@ export declare const byteArrayToAmsNetIdStr: (byteArray: Buffer | number[]) => s
  * @param str AmsNetId as string
  */
 export declare const amsNetIdStrToByteArray: (str: string) => number[];
+/**
+ * Trims the given PLC string until end mark (\0) is found (removes empty bytes from the end)
+ *
+ * @param plcString String to trim
+ * @returns Trimmed string
+ */
+export declare const trimPlcString: (plcStr: string) => string;
+export declare const decodeSTRING: (data: Buffer) => string;

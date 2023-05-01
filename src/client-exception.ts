@@ -1,5 +1,5 @@
 import { AdsClient } from "./ads-client";
-import { AmsTcpPacket } from "./types/ads-types";
+import { AmsTcpPacket } from "./types/ads-protocol-types";
 
 /**
  * Own exception class used for client errors
