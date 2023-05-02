@@ -4,12 +4,27 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.14.2] - 02.05.2023
+### Changed
+- Bug fix: `ADS_DATA_TYPE_FLAGS` (`dataType.flags`) were parsed incorrectly. 
+  - See [issue #109](https://github.com/jisotalo/ads-client/issues/109)
+  - Thank you [Michael Croes](https://github.com/mycroes) for contribution!
+- Bug fix: If calling `unsubcribeAll()` when client is already unsubcribing and disconnecting, an error might be thrown
+  - See [issue #103](https://github.com/jisotalo/ads-client/issues/103#issuecomment-1450640160)
+- Bug fix: Check that subscription callback exists before calling it
+  - Fixes unecessary error if receiving notification data (for subscription) but it's being unsubscribed at the same time
+- Bump json5 from 2.2.1 to 2.2.3
+  - See [pull request 101](https://github.com/jisotalo/ads-client/pull/101)
+  - Not used in production code, only when running tests
+
+### Added
+- New test for [issue #103](https://github.com/jisotalo/ads-client/issues/103)
+
 ## [1.14.1] - 13.09.2022
 ### Changed
 - Bug fix: Connecting to local router failed with ECONNREFUSED error on Node.js version 17 and newer
   - See [https://github.com/nodejs/node/issues/40702](https://github.com/nodejs/node/issues/40702)
   - Fixed by using `127.0.0.1` instead of `localhost`
-
 
 ## [1.14.0] - 23.07.2022
 ### Added

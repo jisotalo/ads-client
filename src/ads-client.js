@@ -1224,7 +1224,11 @@ class Client extends EventEmitter {
           unSubCount++
 
         } catch (err) {
-          debug(`unsubscribeAll(): Unsubscribing from notification ${JSON.stringify(this._internals.activeSubscriptions[sub].target)} failed`)
+          if (this._internals.activeSubscriptions[sub] && this._internals.activeSubscriptions[sub].target !== undefined) {
+            debug(`unsubscribeAll(): Unsubscribing from notification ${JSON.stringify(this._internals.activeSubscriptions[sub].target)} failed`)
+          } else {
+            debug(`unsubscribeAll(): Unsubscribing from notification with handle ${sub} failed`)
+          }
 
           firstError = new ClientException(this, 'unsubscribeAll()', err)
         }
@@ -6327,7 +6331,7 @@ async function _onAdsCommandReceived(packet) {
               parsedValue.timeStamp = stamp.timeStamp
 
               //Then lets call the users callback
-              sub.callback(
+              sub.callback && sub.callback(
                 parsedValue,
                 sub
               )

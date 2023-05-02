@@ -33,7 +33,7 @@ const client = new ads.Client({
   targetAdsPort: 851
 })
 
-test('IMPORTANT NOTE: This test requires running a specific PLC project locally (https://github.com/jisotalo/ads-client-test-plc-project)', () => {})
+test('IMPORTANT NOTE: This test requires running a specific PLC project locally (https://github.com/jisotalo/ads-client-test-plc-project)', () => { })
 
 describe('connection', () => {
 
@@ -833,6 +833,31 @@ describe('issue specific tests', () => {
           ]
         }
       )
+    })
+  })
+
+  describe('issue 103 (https://github.com/jisotalo/ads-client/issues/103)', () => {
+    test('calling unsubscribeAll() multiple times (should not crash to unhandled exception)', async () => {
+      await client.subscribe('GVL_ReadingAndWriting.IntValue');
+      await client.subscribe('GVL_ReadingAndWriting.IntValue');
+      await client.subscribe('GVL_ReadingAndWriting.IntValue');
+      await client.subscribe('GVL_ReadingAndWriting.IntValue');
+      await client.subscribe('GVL_ReadingAndWriting.IntValue');
+
+      //calling multiple times
+      const promises = [
+        client.unsubscribeAll(),
+        client.unsubscribeAll(),
+        client.unsubscribeAll(),
+        client.unsubscribeAll()
+      ]
+
+      try {
+        await Promise.all(promises)
+      } catch { }
+      
+      //If we are here, there was no unhandled exception -> issue OK
+      expect(true).toBe(true)     
     })
   })
 })
