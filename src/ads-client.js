@@ -4722,32 +4722,32 @@ async function _parseDataType(data) {
   dataType.adsDataTypeStr = ADS.ADS_DATA_TYPES.toString(dataType.adsDataType)
   pos += 4
 
-  //27..30 Flags (AdsDataTypeFlags)
-  dataType.flags = data.readUInt16LE(pos)
+  //28..31 Flags (AdsDataTypeFlags)
+  dataType.flags = data.readUInt32LE(pos)
   dataType.flagsStr = ADS.ADS_DATA_TYPE_FLAGS.toStringArray(dataType.flags)
   pos += 4
 
-  //31..32 Name length
+  //32..33 Name length
   dataType.nameLength = data.readUInt16LE(pos)
   pos += 2
 
-  //33..34 Type length
+  //34..35 Type length
   dataType.typeLength = data.readUInt16LE(pos)
   pos += 2
 
-  //35..36 Comment length
+  //36..37 Comment length
   dataType.commentLength = data.readUInt16LE(pos)
   pos += 2
 
-  //37..40 Array dimension
+  //38..39 Array dimension
   dataType.arrayDimension = data.readUInt16LE(pos)
   pos += 2
 
-  //41..42 Subitem count
+  //40..41 Subitem count
   dataType.subItemCount = data.readUInt16LE(pos)
   pos += 2
 
-  //43.... Name
+  //42.... Name
   dataType.name = _trimPlcString(iconv.decode(data.slice(pos, pos + dataType.nameLength + 1), 'cp1252'))
   pos += dataType.nameLength + 1
 
