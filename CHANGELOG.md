@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - `disableBigInt` setting removed as library now targets Node.js version 16 and newer
 
+### Breaking changes
+- Subscription data `timeStamp`->`timestamp`
+- Removed nameLength, typeLength, commentLength and attributeCount from symbol info object
+- Removed nameLength, typeLength, commentLength, subItemCount and attributeCount from data type object
+
+
 ## [1.14.1] - 13.09.2022
 ### Changed
 - Bug fix: Connecting to local router failed with ECONNREFUSED error on Node.js version 17 and newer

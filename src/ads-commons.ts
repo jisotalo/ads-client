@@ -334,7 +334,7 @@ export const ADS_STATE_FLAGS = {
  * 
  * Source: Beckhoff InfoSys
  */
-export const ADS_ERROR = {
+export const ADS_ERROR: Record<number, string> = {
   0: 'No error',
   1: 'Internal error',
   2: 'No Rtime',
@@ -673,6 +673,10 @@ export const ADS_SYMBOL_FLAGS = {
     }
 
     return flagsArr
+  },
+  toString: function (flag: number): string {
+    const index = Object.values(this).findIndex(val => val === flag);
+    return index >= 0 ? Object.keys(this)[index] : "unknown";
   }
 }
 
@@ -885,4 +889,17 @@ export const amsNetIdStrToByteArray = (str: string): number[] => {
  */
 export const trimPlcString = (plcStr: string) => plcStr.substring(0, plcStr.indexOf("\0"));
 
-export const decodeSTRING = (data: Buffer) => trimPlcString(iconv.decode(data, "cp1252"));
+/**
+ * Decodes provided Buffer object to plc STRING using cp1252 encoding.
+ * Also removes empty bytes from the end.
+ * @param data Buffer data that contains plc STRING
+ * @returns 
+ */
+export const decodePlcStringBuffer = (data: Buffer) => trimPlcString(iconv.decode(data, "cp1252"));
+
+/**
+ * Encodes provided string to a Buffer object as plc STRING using cp1252 encoding
+ * @param str String to encode 
+ * @returns 
+ */
+export const encodeStringToPlcStringBuffer = (str: string) => iconv.encode(str, "cp1252");

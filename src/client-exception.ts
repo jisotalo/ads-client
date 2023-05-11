@@ -1,5 +1,5 @@
-import { AdsClient } from "./ads-client";
-import { AmsTcpPacket } from "./types/ads-protocol-types";
+import { Client } from "./ads-client";
+import { AdsResponse, AmsTcpPacket } from "./types/ads-protocol-types";
 
 /**
  * Own exception class used for client errors
@@ -14,7 +14,7 @@ export class ClientException extends Error {
   getInnerException: () => (Error | ClientException | null);
   stack: string | undefined;
 
-  constructor(client: AdsClient, sender: string, messageOrError: string | Error | ClientException, ...errData: unknown[]) {
+  constructor(client: Client, sender: string, messageOrError: string | Error | ClientException, ...errData: unknown[]) {
 
     //The 2nd parameter can be either message or another Error or ServerException
     super((messageOrError as Error).message ? (messageOrError as Error).message : messageOrError as string);
@@ -85,13 +85,13 @@ export class ClientException extends Error {
           adsErrorStr: (data as AmsTcpPacket).ams.errorStr
         };
 
-      } else if ((data as AmsTcpPacket).ads && (data as AmsTcpPacket).ads.error) {
+      } else if ((data as AmsTcpPacket).ads && (data as AmsTcpPacket<AdsResponse>).ads.error) {
         //ADS response with error code
         this.adsError = true;
         this.adsErrorInfo = {
           adsErrorType: "ADS error",
-          adsErrorCode: (data as AmsTcpPacket).ads.errorCode,
-          adsErrorStr: (data as AmsTcpPacket).ads.errorStr
+          adsErrorCode: (data as AmsTcpPacket<AdsResponse>).ads.errorCode,
+          adsErrorStr: (data as AmsTcpPacket<AdsResponse>).ads.errorStr
         };
 
       } else if (this.metaData == null) {
