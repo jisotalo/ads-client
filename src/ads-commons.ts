@@ -20,6 +20,8 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
 import iconv from "iconv-lite";
+import { AdsClientSettings, PlcPrimitiveType } from "./types/ads-client-types";
+import { AmsAddress } from "./types/ads-protocol-types";
 
 /**
  * AMS/TCP header length
@@ -864,6 +866,325 @@ export const AMS_ROUTER_STATE = {
 }
 
 /**
+ * Base data types
+ * 
+ * Object that handles PLC base data types
+ */
+export const BASE_DATA_TYPES = {
+  /**
+   * Returns true if given data type is found and known
+   * 
+   * @param name Data type name
+   */
+  isKnownType: function (name: string) {
+    return this.find(name.trim()) !== null;
+  },
+
+  /**
+   * Finds the given data type from array
+   * 
+   * @param name Data type name
+   */
+  find: function (name: string) {
+    let regExpRes = null;
+
+    //First, try to find easy way
+    let type = this.types.find(type => type.name.includes(name.toUpperCase()));
+
+    if (!type) {
+      //Not found, try to find the correct type with regular expressions
+      //We can find also STRING(xx), WSTRING(xx) and DWORD(100..2000) for example
+      type = this.types.find(type => {
+        const re = new RegExp('^(' + type.name.join('|') + ')([\\[\\(](.*)[\\)\\]])*$', 'i');
+
+        //Using match instead of test so we get capture groups too
+        regExpRes = name.trim().match(re);
+
+        return (regExpRes != null);
+      });
+    }
+
+    if (!type) {
+      return null;
+    }
+
+    //We are here -> type is found
+    //If string/wstring, regExpRes[3] is the string length -> use it
+    if (type.adsDataType === ADS_DATA_TYPES.ADST_STRING) {
+      if (regExpRes === null) {
+        return null;
+      }
+      type.size = (regExpRes[3] != null ? (parseInt(regExpRes[3]) + 1) : type.size);
+
+    } else if (type.adsDataType === ADS_DATA_TYPES.ADST_WSTRING) {
+      if (regExpRes === null) {
+        return null;
+      }
+      type.size = (regExpRes[3] != null ? (parseInt(regExpRes[3]) * 2 + 2) : type.size);
+    }
+
+    return type;
+  },
+
+  /**
+   * Writes given value to given or new buffer
+   * 
+   * @param {object} settings Reference to AdsClient settings
+   * @param {string} name Data type name
+   * @param {any} value Value to write
+   * @param {Buffer} [buffer] Optional - Buffer to write to. If not given, new Buffer is allocated
+   */
+  toBuffer: function (name: string, value: PlcPrimitiveType | Date, buffer?: Buffer) {
+    const type = this.find(name);
+
+    if (!type) {
+      throw new Error(`Error: Base type ${name} not found from BaseDataTypes - If this should be found, report an issue`)
+    }
+
+    //If buffer not given, allocate new
+    if (buffer === undefined) {
+      buffer = Buffer.allocUnsafe(type.size);
+    }
+
+    type.toBuffer(value as never, buffer);
+    return buffer
+  },
+
+  /**
+   * Reads given data type from given buffer
+   * 
+   * @param {string} name Data type name
+   * @param {Buffer} buffer Buffer to read from
+   */
+  fromBuffer: function (name: string, buffer: Buffer, convertDates: boolean) {
+    const type = this.find(name);
+
+    if (!type) {
+      throw new Error(`Error: Base type ${name} not found from BaseDataTypes - If this should be found, report an issue`);
+    }
+
+    return type.fromBuffer(buffer, convertDates)
+  },
+
+  /**
+   * All base data types and properties
+   */
+  types: [
+    {
+      name: ['STRING'],
+      adsDataType: ADS_DATA_TYPES.ADST_STRING,
+      size: 81, //Just default size
+      toBuffer: (value: string, buffer: Buffer) => encodeStringToPlcStringBuffer(value).copy(buffer),
+      fromBuffer: (buffer: Buffer) => decodePlcStringBuffer(buffer)
+    },
+    {
+      name: ['WSTRING'],
+      adsDataType: ADS_DATA_TYPES.ADST_WSTRING,
+      size: 162, //Just default size
+      toBuffer: (value: string, buffer: Buffer) => encodeStringToPlcWstringBuffer(value).copy(buffer),
+      fromBuffer: (buffer: Buffer) => decodePlcWstringBuffer(buffer)
+    },
+    {
+      name: ['BOOL', 'BIT', 'BIT8'],
+      adsDataType: ADS_DATA_TYPES.ADST_BIT,
+      size: 1,
+      toBuffer: (value: boolean | number, buffer: Buffer) => buffer.writeUInt8(value === true || value === 1 ? 1 : 0),
+      fromBuffer: (buffer: Buffer) => buffer.readUInt8(0) === 1
+    },
+    {
+      name: ['BYTE', 'USINT', 'BITARR8', 'UINT8'],
+      adsDataType: ADS_DATA_TYPES.ADST_UINT8,
+      size: 1,
+      toBuffer: (value: number, buffer: Buffer) => buffer.writeUInt8(value),
+      fromBuffer: (buffer: Buffer) => buffer.readUInt8(0)
+    },
+    {
+      name: ['SINT', 'INT8'],
+      adsDataType: ADS_DATA_TYPES.ADST_INT8,
+      size: 1,
+      toBuffer: (value: number, buffer: Buffer) => buffer.writeInt8(value),
+      fromBuffer: (buffer: Buffer) => buffer.readInt8(0)
+    },
+    {
+      name: ['UINT', 'WORD', 'BITARR16', 'UINT16'],
+      adsDataType: ADS_DATA_TYPES.ADST_UINT16,
+      size: 2,
+      toBuffer: (value: number, buffer: Buffer) => buffer.writeUInt16LE(value),
+      fromBuffer: (buffer: Buffer) => buffer.readUInt16LE(0)
+    },
+    {
+      name: ['INT', 'INT16'],
+      adsDataType: ADS_DATA_TYPES.ADST_INT16,
+      size: 2,
+      toBuffer: (value: number, buffer: Buffer) => buffer.writeInt16LE(value),
+      fromBuffer: (buffer: Buffer) => buffer.readInt16LE(0)
+    },
+    {
+      name: ['DINT', 'INT32'],
+      adsDataType: ADS_DATA_TYPES.ADST_INT32,
+      size: 4,
+      toBuffer: (value: number, buffer: Buffer) => buffer.writeInt32LE(value),
+      fromBuffer: (buffer: Buffer) => buffer.readInt32LE(0)
+    },
+    {
+      name: ['UDINT', 'DWORD', 'TIME', 'TIME_OF_DAY', 'TOD', 'BITARR32', 'UINT32'],
+      adsDataType: ADS_DATA_TYPES.ADST_UINT32,
+      size: 4,
+      toBuffer: (value: number, buffer: Buffer) => buffer.writeUInt32LE(value),
+      fromBuffer: (buffer: Buffer) => buffer.readUInt32LE(0)
+    },
+    {
+      name: ['DATE_AND_TIME', 'DT', 'DATE'],
+      adsDataType: ADS_DATA_TYPES.ADST_UINT32,
+      size: 4,
+      toBuffer: (value: number | Date, buffer: Buffer) => {
+        if (typeof value === 'object' && value.getTime !== undefined) {
+          buffer.writeUInt32LE(value.getTime() / 1000);
+        } else {
+          buffer.writeUInt32LE(value as number);
+        }
+      },
+      fromBuffer: (buffer: Buffer, convertDates: boolean) => {
+        if (convertDates) {
+          return new Date(buffer.readUInt32LE(0) * 1000);
+        } else {
+          return buffer.readUInt32LE(0);
+        }
+      }
+    },
+    {
+      name: ['REAL', 'FLOAT'],
+      adsDataType: ADS_DATA_TYPES.ADST_REAL32,
+      size: 4,
+      toBuffer: (value: number, buffer: Buffer) => buffer.writeFloatLE(value),
+      fromBuffer: (buffer: Buffer) => buffer.readFloatLE(0)
+    },
+    {
+      name: ['LREAL', 'DOUBLE'],
+      adsDataType: ADS_DATA_TYPES.ADST_REAL64,
+      size: 8,
+      toBuffer: (value: number, buffer: Buffer) => buffer.writeDoubleLE(value),
+      fromBuffer: (buffer: Buffer) => buffer.readDoubleLE(0)
+    },
+    {
+      name: ['LWORD', 'ULINT', 'LTIME', 'UINT64'],
+      adsDataType: ADS_DATA_TYPES.ADST_UINT64,
+      size: 8,
+      toBuffer: (value: number | BigInt | Buffer, buffer: Buffer) => {
+        //64 bit integers are missing from older Node.js Buffer, so use buffer instead if so
+        if (typeof value === 'bigint' && buffer.writeBigUInt64LE) {
+          buffer.writeBigUInt64LE(value);
+
+        } else if (typeof value === 'number' && buffer.writeBigUInt64LE) {
+          buffer.writeBigUInt64LE(BigInt(value));
+          
+        } else if (typeof value === 'object' && Buffer.isBuffer(value)) {
+          (value as Buffer).copy(buffer);
+
+        } else {
+          throw new Error(`Could not convert ${value} to LWORD/ULINT/LTIME - BigInt is not supported`);
+        }
+      },
+      fromBuffer: (buffer: Buffer) => {
+        if (buffer.readBigUInt64LE !== undefined) {
+          return buffer.readBigUInt64LE(0);
+
+        } else {
+          return buffer;
+        }
+      }
+    },
+    {
+      name: ['LINT', 'INT64'],
+      adsDataType: ADS_DATA_TYPES.ADST_INT64,
+      size: 8,
+      toBuffer: (value: number | BigInt | Buffer, buffer: Buffer) => {
+        //64 bit integers are missing from older Node.js Buffer, so use buffer instead if so
+        if (typeof value === 'bigint' && buffer.writeBigInt64LE) {
+          buffer.writeBigInt64LE(value);
+          
+        } else if (typeof value === 'number' && buffer.writeBigInt64LE) {
+          buffer.writeBigInt64LE(BigInt(value));
+          
+        } else if (typeof value === 'object' && Buffer.isBuffer(value)) {
+          (value as Buffer).copy(buffer);
+
+        } else {
+          throw new Error(`Could not convert ${value} to LINT - BigInt is not supported`);
+        }
+      },
+      fromBuffer: (buffer: Buffer) => {
+        if (buffer.readBigInt64LE !== undefined) {
+          return buffer.readBigInt64LE(0);
+        } else {
+          return buffer;
+        }
+      }
+    },
+  ],
+
+  /**
+   * Returns true if given data type is found and known
+   * 
+   * @param {string} name Data type name
+   */
+  isPseudoType: function (name: string) {
+    return this.findPseudoType(name) !== undefined;
+  },
+
+  /**
+   * Finds the given pseudo data type from array using regular expressions
+   * 
+   * @param {string} name Pseudo data type name
+   */
+  findPseudoType: function (name: string) {
+    return this.pseudoTypes.find(type => {
+      const regexName = type.name.map(t => `^${t}`);
+      const re = new RegExp(regexName.join('|'), 'i');
+
+      return re.test(name.trim());
+    });
+  },
+
+  /**
+   * Finds the given pseudo data type from array using regular expressions
+   * 
+   * @param name Pseudo data type name (like PVOID)
+   */
+  getTypeByPseudoType: function (name: string, byteSize: number) {
+    return this.findPseudoType(name)?.actualTypesBySize[byteSize];
+  },
+
+  /**
+   * All pseudo data types and their actual types depending on size
+   * Example: XINT is 4 bytes @ 32 bit platform -> DINT
+   */
+  pseudoTypes: [
+    {
+      name: ['XINT', '__XINT'],
+      actualTypesBySize: {
+        4: 'DINT',
+        8: 'LINT'
+      } as { [k: number]: string }
+    },
+    {
+      name: ['UXINT', '__UXINT', 'POINTER TO', 'REFERENCE TO', 'PVOID'],
+      actualTypesBySize: {
+        4: 'UDINT',
+        8: 'ULINT'
+      }
+    },
+    {
+      name: ['XWORD', '__XWORD'],
+      actualTypesBySize: {
+        4: 'DWORD',
+        8: 'LWORD'
+      }
+    },
+  ]
+}
+
+/**
  * Converts array of bytes (or Buffer) to AmsNetId string, such as 192.168.1.10.1.1
  * 
  * @param byteArray Array of bytes or Buffer object
@@ -903,3 +1224,25 @@ export const decodePlcStringBuffer = (data: Buffer) => trimPlcString(iconv.decod
  * @returns 
  */
 export const encodeStringToPlcStringBuffer = (str: string) => iconv.encode(str, "cp1252");
+
+/**
+ * Decodes provided Buffer object to plc WSTRING using ucs2 encoding.
+ * Also removes empty bytes from the end.
+ * @param data Buffer data that contains plc WSTRING
+ * @returns 
+ */
+export const decodePlcWstringBuffer = (data: Buffer) => trimPlcString(iconv.decode(data, "ucs2"));
+
+/**
+ * Encodes provided string to a Buffer object as plc WSTRING using ucs2 encoding
+ * @param str String to encode 
+ * @returns 
+ */
+export const encodeStringToPlcWstringBuffer = (str: string) => iconv.encode(str, "ucs2");
+
+/**
+ * Converts given AmsAddress as string of type `amsNetId:port`
+ * @param address 
+ * @returns 
+ */
+export const amsAddressToString = (address: AmsAddress) => `${address.amsNetId}:${address.adsPort}`;

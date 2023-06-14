@@ -20,6 +20,15 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
 import * as ADS from '../ads-commons';
+import { PlcPrimitiveType } from "./ads-client-types";
+
+/** AMS address */
+export interface AmsAddress {
+  /** AmsNetId */
+  amsNetId: string,
+  /** ADS port */
+  adsPort: number,
+}
 
 /** AMS packet */
 export interface AmsTcpPacket<T = AdsData> {
@@ -45,14 +54,10 @@ export interface AmsTcpHeader {
 
 /** AMS header */
 export interface AmsHeader {
-  /** Target AmsNetId (receiver) */
-  targetAmsNetId: string,
-  /** Target ADS port (receiver) */
-  targetAdsPort: number,
-  /** Source AmsNetId (sender) */
-  sourceAmsNetId: string,
-  /** Source ADS port (sender) */
-  sourceAdsPort: number,
+  /** Target AmsNetId and port (receiver) */
+  targetAmsAddress: AmsAddress,
+  /** Source AmsNetId and port (sender) */
+  sourceAmsAddress: AmsAddress,
   /** ADS command as number */
   adsCommand: number,
   /** ADS command as enumerated string */
@@ -83,12 +88,7 @@ export interface AmsRouterStateData {
 }
 
 /** Data that is received when AMS port is registered to router */
-export interface AmsPortRegisteredData {
-  /** Local registered AmsNetId */
-  localAmsNetId: string,
-  /** Local registered ADS port */
-  localAdsPort: number,
-}
+export type AmsPortRegisteredData = AmsAddress;
 
 /** Local AMS router state (if available) */
 export interface AmsRouterState {
@@ -100,7 +100,7 @@ export interface AmsRouterState {
 
 /** ADS response type (any of these) */
 export type AdsResponse =
-  | EmptyAdsResponse
+  EmptyAdsResponse
   | UnknownAdsResponse
   | AdsReadResponse
   | AdsReadWriteResponse
@@ -114,6 +114,13 @@ export type AdsResponse =
 export interface AdsRequest {
   payload?: Buffer
 };
+
+export interface AdsError {
+  /** ADS error code (0 = no error, -1 = other than ADS error) */
+  errorCode: number,
+  /** ADS error string */
+  errorStr?: string
+}
 
 export interface BaseAdsResponse {
   /** True if response has error (ADS or our own customer error) */
@@ -179,7 +186,7 @@ export interface AdsReadStateResponse extends BaseAdsResponse {
  */
 export interface AdsAddNotificationResponse extends BaseAdsResponse {
   /** Device notification handle */
-  payload: AddNotificationResponseData
+  payload: AdsAddNotificationResponseData
 };
 
 /**
@@ -237,7 +244,7 @@ export interface AdsState {
 /**
  * ADS add notification response data
  */
-export interface AddNotificationResponseData {
+export interface AdsAddNotificationResponseData {
   /** Notification handle */
   notificationHandle: number
 }
@@ -302,25 +309,25 @@ export interface AdsSymbolInfo {
   /** Symbol comment (variable comment in the PLC code) */
   comment: string,
   /** If symbol is an array, information of each array dimension */
-  arrayData: Array<AdsArrayDataEntry>,
+  arrayInfo: Array<AdsArrayInfoEntry>,
   /** GUID of the symbol */
   typeGuid: string,
   /** Symbol attributes, such as pragmas */
-  attributes: Array<AdsSymbolInfoAttributeEntry>
+  attributes: Array<AdsAttributeEntry>
   /* Extended flags (meaning unknown at this point) */
   extendedFlags: number,
   /** Rest bytes in the end of data that have no meaning yet */
   reserved: Buffer
 }
 
-export interface AdsArrayDataEntry {
+export interface AdsArrayInfoEntry {
   /** Array start/first index */
   startIndex: number,
   /** Array length */
   length: number,
 }
 
-export interface AdsSymbolInfoAttributeEntry {
+export interface AdsAttributeEntry {
   /** Attribute name */
   name: string,
   /** Attribute value */
@@ -344,12 +351,89 @@ export interface AdsDataType {
   flagsStr: string[],
   /** If data type is an array, its array dimension */
   arrayDimension: number,
-  /** TODO name */
+  /** TODO Data type (variable) name (if struct member -> its variable name)*/
   name: string,
-  /** TODO type */
+  /** TODO Data type name */
   type: string,
   /** Data type comment (comment in the PLC code) */
   comment: string,
   /** If data type is an array, information of each array dimension */
-  arrayData: Array<AdsArrayDataEntry>,
+  arrayInfos: Array<AdsArrayInfoEntry>,
+  /** Subitems (children data types) of this data type (e.g. struct members)*/
+  subItems: Array<AdsDataType>,
+  /** GUID of data type */
+  typeGuid: string,
+  /** RPC methods */
+  rpcMethods: Array<AdsRpcMethodEntry>,
+  /** */
+  attributes: Array<AdsAttributeEntry>,
+  /** */
+  enumInfos: Array<AdsEnumInfo>,
+  /** */
+  reserved: Buffer
+}
+
+export interface AdsRpcMethodEntry {
+  version: number,
+  vTableIndex: number,
+  /** Byte size of the return type */
+  returnTypeSize: number,
+  /** Size of the biggest element in bytes for alignment */
+  returnAlignSize: number,
+  reserved: number,
+  returnTypeGuid: string,
+  /** Return value ADS data type as number (see ADS.ADS_DATA_TYPES) */
+  returnAdsDataType: number,
+  /** Return value ADS data type as string (see ADS.ADS_DATA_TYPES) */
+  returnAdsDataTypeStr: string,
+  /** Data type flags as bit-notation (see ADS.ADS_DATA_TYPE_FLAGS) */
+  flags: number,
+  /** Data type flags as string array (see ADS.ADS_DATA_TYPE_FLAGS) */
+  flagsStr: string[],
+  /** RPC method name*/
+  name: string,
+  /** RPC method return data type */
+  retunDataType: string,
+  /** RPC method comment (comment in the PLC code) */
+  comment: string,
+  /**  */
+  parameters: Array<AdsRpcMethodParameterEntry>
+}
+
+export interface AdsRpcMethodParameterEntry {
+  size: number,
+  alignSize: number,
+  /** ADS data type as number (see ADS.ADS_DATA_TYPES) */
+  adsDataType: number,
+  /** ADS data type as string (see ADS.ADS_DATA_TYPES) */
+  adsDataTypeStr: string,
+  /** Data type flags as bit-notation (see ADS.RCP_METHOD_PARAM_FLAGS) */
+  flags: number,
+  /** Data type flags as string array (see ADS.RCP_METHOD_PARAM_FLAGS) */
+  flagsStr: string[],
+  reserved: number,
+  /** GUID of data type */
+  typeGuid: string,
+  /** 
+    This field references to the Parameter that defines the length for this
+    generic one. Equally to the marshalling attributes of COM (sizeof, length)
+    this enables to transport parameter of type (PVOID)
+    --> RPC method parameter with index `LengthIsParameterIndex` tells the length??
+  */
+  lengthIsParameterIndex: number,
+  /** Parameter name*/
+  name: string,
+  /** Parameter data type */
+  type: string,
+  /** Parameter comment (comment in the PLC code) */
+  comment: string,
+  /** Reserved data in the end of entry (if any) */
+  reserved2: Buffer
+}
+
+export interface AdsEnumInfo {
+  /** Enumeration name*/
+  name: string,
+  /** Enumeration value */
+  value: PlcPrimitiveType
 }

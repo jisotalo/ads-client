@@ -1,22 +1,28 @@
 import EventEmitter from "events";
-import type { ActiveAdsRequestContainer, ActiveSubscription, ActiveSubscriptionContainer, AdsClientConnection, AdsClientSettings, AdsCommandToSend, ConnectionMetaData, SubscriptionCallback, SubscriptionData, SubscriptionSettings, SubscriptionTarget, SymbolInfo, TargetOptions, TimerObject } from "./types/ads-client-types";
-import { AdsAddNotificationResponse, AdsArrayDataEntry, AdsData, AdsDataType, AdsDeleteNotificationResponse, AdsDeviceInfo, AdsNotification, AdsNotificationResponse, AdsNotificationSample, AdsNotificationStamp, AdsRawInfo, AdsReadDeviceInfoResponse, AdsReadResponse, AdsReadStateResponse, AdsReadWriteResponse, AdsRequest, AdsResponse, AdsState, AdsSymbolInfo, AdsSymbolInfoArrayDataEntry, AdsSymbolInfoAttributeEntry, AdsWriteControlResponse, AdsWriteResponse, AmsHeader, AmsPortRegisteredData, AmsRouterState, AmsRouterStateData, AmsTcpHeader, AmsTcpPacket, BaseAdsResponse, EmptyAdsResponse, UnknownAdsResponse } from "./types/ads-protocol-types";
+import type { ActiveAdsRequestContainer, ActiveSubscription, ActiveSubscriptionContainer, AdsClientConnection, AdsClientSettings, AdsCommandToSend, AdsDataTypesContainer, AdsSymbolsContainer, AdsUploadInfo, ConnectionMetaData, PlcPrimitiveType, SubscriptionCallback, SubscriptionData, SubscriptionOptions, TargetOptions, TimerObject } from "./types/ads-client-types";
+import { AdsAddNotificationResponse, AdsAddNotificationResponseData, AdsArrayInfoEntry, AdsAttributeEntry, AdsDataType, AdsDeleteNotificationResponse, AdsDeviceInfo, AdsEnumInfo, AdsNotification, AdsNotificationResponse, AdsNotificationSample, AdsNotificationStamp, AdsRawInfo, AdsReadDeviceInfoResponse, AdsReadResponse, AdsReadStateResponse, AdsReadWriteResponse, AdsRequest, AdsResponse, AdsRpcMethodEntry, AdsRpcMethodParameterEntry, AdsState, AdsSymbolInfo, AdsWriteControlResponse, AdsWriteResponse, AmsAddress, AmsHeader, AmsPortRegisteredData, AmsRouterState, AmsRouterStateData, AmsTcpHeader, AmsTcpPacket, BaseAdsResponse, EmptyAdsResponse, UnknownAdsResponse } from "./types/ads-protocol-types";
 
 import {
   Socket,
   SocketConnectOpts
-} from "net"
-import Debug from "debug"
-import { ClientException } from "./client-exception";
-import * as ADS from './ads-commons'
+} from "net";
+import Debug from "debug";
+import * as ADS from './ads-commons';
 import Long from "long";
+import { ClientError } from "./client-error";
 export * as ADS from './ads-commons';
 
-export class Client extends EventEmitter {
-  protected debug = Debug("ads-client");
-  protected debugD = Debug(`ads-client:details`);
-  protected debugIO = Debug(`ads-client:raw-data`);
+const die = (...args: any) => {
 
+  const util = require("util");
+  console.log(util.inspect(args, false, 999, true));
+  process.exit();
+}
+
+export class Client extends EventEmitter {
+  private debug = Debug("ads-client");
+  private debugD = Debug(`ads-client:details`);
+  private debugIO = Debug(`ads-client:raw-data`);
 
   /**
    * Active debug level
@@ -25,11 +31,13 @@ export class Client extends EventEmitter {
 
   /** Active debug level (read-only)
    * 
-   *  - 0 = no debugging
-   *  - 1 = Extended exception stack trace
-   *  - 2 = basic debugging (same as $env:DEBUG='ads-server')
-   *  - 3 = detailed debugging (same as $env:DEBUG='ads-server,ads-server:details')
-   *  - 4 = full debugging (same as $env:DEBUG='ads-server,ads-server:details,ads-server:raw-data')
+   *  - 0 = no debugging (default)
+   *  - 1 = basic debugging 
+   *    - same as $env:DEBUG='ads-client'
+   *  - 2 = detailed debugging
+   *    - same as $env:DEBUG='ads-client,ads-client:details'
+   *  - 3 = full debugging with raw I/O data
+   *    - same as $env:DEBUG='ads-client,ads-client:details,ads-client:raw-data'
   */
   public get debugLevel(): Readonly<number> {
     return this.debugLevel_;
@@ -58,7 +66,8 @@ export class Client extends EventEmitter {
     checkStateInterval: 1000,
     connectionDownDelay: 5000,
     allowHalfOpen: false,
-    bareClient: false
+    bareClient: false,
+    disableCaching: false
   } as Required<AdsClientSettings>;
 
   /**
@@ -70,19 +79,19 @@ export class Client extends EventEmitter {
   };
 
   /**
-   * Callback used for AMS/TCp commands (like port register)
-   */
-  protected amsTcpCallback?: ((packet: AmsTcpPacket) => void);
-
-  /**
    * Local router state (if available and known)
    */
   public routerState?: AmsRouterState = undefined;
 
   /**
+   * Callback used for AMS/TCp commands (like port register)
+   */
+  private amsTcpCallback?: ((packet: AmsTcpPacket) => void);
+
+  /**
    * Connection metadata
    */
-  private metaData: ConnectionMetaData = {
+  public metaData: ConnectionMetaData = {
     deviceInfo: undefined,
     systemManagerState: undefined,
     plcRuntimeState: undefined,
@@ -92,6 +101,7 @@ export class Client extends EventEmitter {
     symbols: {},
     allDataTypesCached: false,
     dataTypes: {},
+    builtDataTypes: {},
     routerState: undefined
   };
 
@@ -179,26 +189,26 @@ export class Client extends EventEmitter {
   }
 
   /**
-   * Sets debugging using debug package on/off. 
-   * Another way for environment variable DEBUG:
-   *  - 0 = no debugging
-   *  - 1 = Extended exception stack trace
-   *  - 2 = basic debugging (same as $env:DEBUG='ads-server')
-   *  - 3 = detailed debugging (same as $env:DEBUG='ads-server,ads-server:details')
-   *  - 4 = full debugging (same as $env:DEBUG='ads-server,ads-server:details,ads-server:raw-data')
+   * Sets client debug level
    * 
-   * @param level 0 = none, 1 = extended stack traces, 2 = basic, 3 = detailed, 4 = detailed + raw data
+   *  - 0 = no debugging (default)
+   *  - 1 = basic debugging 
+   *    - same as $env:DEBUG='ads-client'
+   *  - 2 = detailed debugging
+   *    - same as $env:DEBUG='ads-client,ads-client:details'
+   *  - 3 = full debugging with raw I/O data
+   *    - same as $env:DEBUG='ads-client,ads-client:details,ads-client:raw-data'
+   * 
+   * @param level 0 = none, 1 = basic, 2 = detailed, 3 = detailed + raw data
    */
-  setDebugging(level: number): void {
-    this.debug(`setDebugging(): Setting debug level to ${level}`);
-
+  setDebugLevel(level: number): void {
     this.debugLevel_ = level;
 
-    this.debug.enabled = level >= 2;
-    this.debugD.enabled = level >= 3;
-    this.debugIO.enabled = level >= 4;
+    this.debug.enabled = level >= 1;
+    this.debugD.enabled = level >= 2;
+    this.debugIO.enabled = level >= 3;
 
-    this.debug(`setDebugging(): Debug level set to ${level}`);
+    this.debug(`setDebugLevel(): Debug level set to ${level}`);
   }
 
   /**
@@ -237,15 +247,15 @@ export class Client extends EventEmitter {
     return new Promise<Required<AdsClientConnection>>(async (resolve, reject) => {
       //Check the required settings
       if (this.settings.targetAmsNetId === undefined) {
-        return reject(new ClientException(this, "connectToTarget()", `Required setting "targetAmsNetId" is missing`));
+        return reject(new ClientError(`connectToTarget(): Required setting "targetAmsNetId" is missing`));
       }
       if (this.settings.targetAdsPort === undefined) {
-        return reject(new ClientException(this, "connectToTarget()", `Required setting "targetAdsPort" is missing`));
+        return reject(new ClientError(`connectToTarget(): Required setting "targetAdsPort" is missing`));
       }
 
       if (this.socket) {
         this.debug(`connectToTarget(): Socket is already assigned (need to disconnect first)`);
-        return reject(new ClientException(this, "connectToTarget()", "Connection is already opened. Close the connection first by calling disconnect()"));
+        return reject(new ClientError(`connectToTarget(): Connection is already opened. Close the connection first by calling disconnect()`));
       }
 
       this.debug(`connectToTarget(): Connecting to target at ${this.settings.routerAddress}:${this.settings.routerTcpPort} (reconnecting: ${isReconnecting})`);
@@ -265,7 +275,7 @@ export class Client extends EventEmitter {
         //Reset connection flag
         this.connection.connected = false;
 
-        reject(new ClientException(this, "connectToTarget()", `Connecting to ${this.settings.routerAddress}:${this.settings.routerTcpPort} failed (socket error ${err.errno})`, err));
+        reject(new ClientError(`connectToTarget(): Connecting to ${this.settings.routerAddress}:${this.settings.routerTcpPort} failed (socket error ${err.errno})`, err));
       });
 
       //Listening close event during connection
@@ -279,7 +289,7 @@ export class Client extends EventEmitter {
         //Reset connection flag
         this.connection.connected = false;
 
-        reject(new ClientException(this, "connectToTarget()", `Connecting to ${this.settings.routerAddress}:${this.settings.routerTcpPort} failed - socket closed by remote (hadError: ${hadError})`))
+        reject(new ClientError(`connectToTarget(): Connecting to ${this.settings.routerAddress}:${this.settings.routerTcpPort} failed - socket closed by remote (hadError: ${hadError})`))
       })
 
       //Listening end event during connection
@@ -294,9 +304,9 @@ export class Client extends EventEmitter {
         this.connection.connected = false;
 
         if (this.settings.localAdsPort !== undefined) {
-          return reject(new ClientException(this, "connectToTarget()", `Connecting to ${this.settings.routerAddress}:${this.settings.routerTcpPort} failed - socket ended by remote (is the ADS port "${this.settings.localAdsPort}" already in use?)`));
+          return reject(new ClientError(`connectToTarget(): Connecting to ${this.settings.routerAddress}:${this.settings.routerTcpPort} failed - socket ended by remote (is the ADS port "${this.settings.localAdsPort}" already in use?)`));
         }
-        reject(new ClientException(this, "connectToTarget()", `Connecting to ${this.settings.routerAddress}:${this.settings.routerTcpPort} failed - socket ended by remote`));
+        reject(new ClientError(`connectToTarget(): Connecting to ${this.settings.routerAddress}:${this.settings.routerTcpPort} failed - socket ended by remote`));
       });
 
       //Listening timeout event during connection
@@ -314,7 +324,7 @@ export class Client extends EventEmitter {
         //Reset connection flag
         this.connection.connected = false;
 
-        reject(new ClientException(this, "connectToTarget()", `Connecting to ${this.settings.routerAddress}:${this.settings.routerTcpPort} failed - No response from target in ${this.settings.timeoutDelay} ms (timeout)`));
+        reject(new ClientError(`connectToTarget(): Connecting to ${this.settings.routerAddress}:${this.settings.routerTcpPort} failed - No response from target in ${this.settings.timeoutDelay} ms (timeout)`));
       });
 
       //Listening for connect event
@@ -333,9 +343,11 @@ export class Client extends EventEmitter {
 
           this.connection = {
             connected: true,
-            isLocal: this.settings.targetAmsNetId === ADS.LOOPBACK_AMS_NET_ID || this.settings.targetAmsNetId === amsPortData.localAmsNetId,
-            localAmsNetId: amsPortData.localAmsNetId,
-            localAdsPort: amsPortData.localAdsPort
+            isLocal: this.settings.targetAmsNetId === ADS.LOOPBACK_AMS_NET_ID || this.settings.targetAmsNetId === amsPortData.amsNetId,
+            localAmsNetId: amsPortData.amsNetId,
+            localAdsPort: amsPortData.adsPort,
+            targetAmsNetId: this.settings.targetAmsNetId,
+            targetAdsPort: this.settings.targetAdsPort
           };
 
           this.debug(`connectToTarget(): ADS port registered. Our AMS address is ${this.connection.localAmsNetId}:${this.connection.localAdsPort}`);
@@ -350,7 +362,7 @@ export class Client extends EventEmitter {
             connected: false
           };
 
-          return reject(new ClientException(this, "connectToTarget()", `Registering ADS port failed`, err));
+          return reject(new ClientError(`connectToTarget(): Registering ADS port failed`, err));
         }
 
         //Remove the socket events that were used only during connectToTarget()
@@ -366,9 +378,9 @@ export class Client extends EventEmitter {
         if (this.settings.bareClient !== true) {
           try {
             //Initialize PLC connection (some subscriptions, pollers etc.)
-            //await this.setupPlcConnection();
+            await this.setupPlcConnection();
           } catch (err) {
-            return reject(new ClientException(this, 'connectToTarget()', `Connection failed - failed to set PLC connection (see setting "bareClient"): ${(err as ClientException).message}`, err));
+            return reject(new ClientError(`connectToTarget(): Connection failed - failed to set PLC connection (see setting "bareClient"): ${(err as ClientError).message}`, err));
           }
         }
 
@@ -411,7 +423,7 @@ export class Client extends EventEmitter {
         };
         this.socket = undefined;
 
-        reject(new ClientException(this, "connectToTarget()", `Opening socket connection to ${this.settings.routerAddress}:${this.settings.routerTcpPort} failed`, err));
+        reject(new ClientError(`connectToTarget(): Opening socket connection to ${this.settings.routerAddress}:${this.settings.routerTcpPort} failed`, err));
       }
     })
   }
@@ -419,8 +431,8 @@ export class Client extends EventEmitter {
   /**
    * Unregisters ADS port from router (if it was registered) and disconnects
    *
-   * @param [forceDisconnect] - If true, the connection is dropped immediately (default: false)
-   * @param [isReconnecting] - If true, call is made during reconnecting (default: false)
+   * @param forceDisconnect If true, the connection is dropped immediately (default: false)
+   * @param isReconnecting If true, call is made during reconnecting (default: false)
    */
   private disconnectFromTarget(forceDisconnect = false, isReconnecting = false) {
     return new Promise<void>(async (resolve, reject) => {
@@ -486,7 +498,7 @@ export class Client extends EventEmitter {
 
         this.debug(`disconnectFromTarget(): Connection closing failed, connection was forced to close`);
         this.emit("disconnect");
-        return reject(new ClientException(this, "disconnect()", `Disconnected with errors: ${(err as Error).message}`, err));
+        return reject(new ClientError(`disconnect(): Disconnected with errors: ${(err as Error).message}`, err));
       }
     })
   }
@@ -494,8 +506,8 @@ export class Client extends EventEmitter {
   /**
    * Disconnects and reconnects again
    *
-   * @param [forceDisconnect] - If true, the connection is dropped immediately (default = false)
-   * @param [isReconnecting] - If true, call is made during reconnecting
+   * @param forceDisconnect If true, the connection is dropped immediately (default: false)
+   * @param isReconnecting If true, call is made during reconnecting (default: false)
    */
   private reconnectToTarget(forceDisconnect = false, isReconnecting = false) {
     return new Promise<AdsClientConnection>(async (resolve, reject) => {
@@ -529,8 +541,8 @@ export class Client extends EventEmitter {
         const res = {
           amsTcp: {
             data: {
-              localAmsNetId: this.settings.localAmsNetId,
-              localAdsPort: this.settings.localAdsPort
+              amsNetId: this.settings.localAmsNetId,
+              adsPort: this.settings.localAdsPort
             }
           }
         } as AmsTcpPacket;
@@ -563,7 +575,7 @@ export class Client extends EventEmitter {
 
         const data = res.amsTcp.data as AmsPortRegisteredData;
 
-        this.debug(`registerAdsPort(): ADS port registered, assigned AMS address is ${data.localAmsNetId}:${data.localAdsPort}`);
+        this.debug(`registerAdsPort(): ADS port registered, assigned AMS address is ${data.amsNetId}:${data.adsPort}`);
         resolve(res);
       }
 
@@ -581,14 +593,14 @@ export class Client extends EventEmitter {
           }
         };
         this.debug(`registerAdsPort(): Failed to register ADS port: Timeout - no response in ${this.settings.timeoutDelay} ms`);
-        return reject(new ClientException(this, 'registerAdsPort()', `Timeout - no response in ${this.settings.timeoutDelay} ms`, adsError));
+        return reject(new ClientError(`registerAdsPort(): Timeout - no response in ${this.settings.timeoutDelay} ms`, adsError));
 
       }, this.settings.timeoutDelay);
 
       const errorHandler = () => {
         this.portRegisterTimeoutTimer && clearTimeout(this.portRegisterTimeoutTimer);
         this.debugD("registerAdsPort(): Socket connection error during port registeration");
-        reject(new ClientException(this, 'registerAdsPort()', "Socket connection error during port registeration"))
+        reject(new ClientError(`registerAdsPort(): Socket connection error during port registeration`));
       };
 
       this.socket?.once('error', errorHandler);
@@ -599,13 +611,10 @@ export class Client extends EventEmitter {
       } catch (err) {
         this.socket?.off('error', errorHandler);
         this.portRegisterTimeoutTimer && clearTimeout(this.portRegisterTimeoutTimer);
-        return reject(new ClientException(this, 'registerAdsPort()', "Error - Writing data to the socket failed", err));
+        return reject(new ClientError(`registerAdsPort(): Error - Writing data to the socket failed`, err));
       }
     })
   }
-
-
-
 
   /**
    * Unregisters previously registered ADS port from AMS router.
@@ -675,27 +684,152 @@ export class Client extends EventEmitter {
     })
   }
 
-
   /**
-   * Configures internals for PLC connection
+   * Configures internals for TwinCAT PLC connection
+   * 
    */
   private async setupPlcConnection() {
+    //Subscribe to runtime state changes (detect PLC run/stop etc.)
+    await this.addSubscription<Buffer>({
+      target: {
+        indexGroup: ADS.ADS_RESERVED_INDEX_GROUPS.DeviceData,
+        indexOffset: 0,
+        size: 4
+      },
+      callback: this.onPlcRuntimeStateChanged.bind(this),
+      cycleTime: 0
+    }, true);
 
-    //Read device status and subscribe to its changes
-    await this.readPlcRuntimeState();
-    await subcribeToPlcRuntimeStateChanges;
-
-    //Read device info
+    //Reading device info
     await this.readDeviceInfo();
+
+    //Reading target runtime upload info
     await this.readUploadInfo();
 
-    //Read symbol version and subscribe to its changes
-    if (!this.settings.disableSymbolVersionMonitoring) await this.readSymbolVersion();
-    if (!this.settings.disableSymbolVersionMonitoring) await _subscribeToSymbolVersionChanges.call(this);
+    //Subscribe to symbol version changes (detect PLC software updates etc.)
+    await this.addSubscription<Buffer>({
+      target: {
+        indexGroup: ADS.ADS_RESERVED_INDEX_GROUPS.SymbolVersion,
+        indexOffset: 0,
+        size: 1
+      },
+      callback: this.onSymbolVersionChanged.bind(this),
+      cycleTime: 0
+    }, true);
 
-    //Cache data 
-    if (this.settings.readAndCacheSymbols || this.metaData.allSymbolsCached) await this.readAndCacheSymbols();
-    if (this.settings.readAndCacheDataTypes || this.metaData.allDataTypesCached) await this.readAndCacheDataTypes();
+    //Pre-cache symbols
+    if (this.settings.readAndCacheSymbols || this.metaData.allSymbolsCached) {
+      await this.cacheSymbolInfos();
+    }
+
+    //Pre-cache data types
+    if (this.settings.readAndCacheDataTypes || this.metaData.allDataTypesCached) {
+      await this.cacheDataTypes();
+    }
+  }
+
+  /**
+   * Callback that is called when target PLC runtime state has changed
+   * 
+   * @param data Data as buffer
+   * @param subscription Subscription object
+   */
+  private onPlcRuntimeStateChanged(data: SubscriptionData<Buffer>, subscription: ActiveSubscription<Buffer>) {
+    const res = {} as AdsState;
+    let pos = 0;
+
+    //0..1 ADS state
+    res.adsState = data.value.readUInt16LE(pos);
+    res.adsStateStr = ADS.ADS_STATE.toString(res.adsState);
+    pos += 2;
+
+    //2..3 Device state
+    res.deviceState = data.value.readUInt16LE(pos);
+    pos += 2;
+
+    //Checking if PLC runtime state has changed
+    let stateChanged = false;
+
+    if (this.metaData.plcRuntimeState === undefined || this.metaData.plcRuntimeState.adsState !== res.adsState) {
+      this.debug(`onPlcRuntimeStateChanged(): PLC runtime state (adsState) changed from ${this.metaData.plcRuntimeState === undefined ? 'UNKNOWN' : this.metaData.plcRuntimeState.adsStateStr} to ${res.adsStateStr}`);
+      stateChanged = true;
+    }
+
+    if (this.metaData.plcRuntimeState === undefined || this.metaData.plcRuntimeState.deviceState !== res.deviceState) {
+      this.debug(`onPlcRuntimeStateChanged(): PLC runtime state (deviceState) changed from ${this.metaData.plcRuntimeState === undefined ? 'UNKNOWN' : this.metaData.plcRuntimeState.deviceState} to ${res.deviceState}`);
+      stateChanged = true;
+    }
+
+    this.metaData.plcRuntimeState = res;
+
+    if (stateChanged) {
+      this.emit('plcRuntimeStateChange', res);
+    }
+  }
+
+  /**
+   * Callback that is called when target PLC runtime symbol version has changed
+   * 
+   * @param data Data as buffer
+   * @param subscription Subscription object
+   */
+  private async onSymbolVersionChanged(data: SubscriptionData<Buffer>, subscription: ActiveSubscription<Buffer>) {
+    let pos = 0;
+
+    //0 symbol version
+    const symbolVersion = data.value.readUInt8(pos)
+
+    //Checking if symbol version has really changed
+    if (this.metaData.symbolVersion === undefined) {
+      //This happens during connect (do nothing special)
+      this.debug(`onSymbolVersionChanged(): PLC runtime symbol version is now ${symbolVersion}`);
+
+    } else if (this.metaData.symbolVersion === symbolVersion) {
+      this.debug(`onSymbolVersionChanged(): PLC runtime symbol version received (not changed). Versionis now ${symbolVersion}`);
+
+    } else if (this.metaData.symbolVersion !== symbolVersion) {
+      this.debug(`onSymbolVersionChanged(): PLC runtime symbol version changed from ${this.metaData.symbolVersion === undefined ? 'UNKNOWN' : this.metaData.symbolVersion} to ${symbolVersion} -> Refreshing all cached data and subscriptions`);
+
+      //Clear all cached symbol infos and data types etc.
+      this.metaData.dataTypes = {};
+      this.metaData.symbols = {};
+      this.metaData.builtDataTypes = {};
+      this.metaData.uploadInfo = undefined;
+
+      //Refreshing upload info
+      try {
+        await this.readUploadInfo();
+
+      } catch (err) {
+        this.debug(`onSymbolVersionChanged(): Failed to refresh upload info`);
+      }
+
+      //Refreshing symbol cache (if needed)
+      if (this.metaData.allSymbolsCached) {
+        try {
+          //TODO await this.readAndCacheSymbols();
+
+        } catch (err) {
+          this.debug(`onSymbolVersionChanged(): Failed to refresh symbol cache`);
+        }
+      }
+
+      //Refreshing data type cache (if needed)
+      if (this.metaData.allDataTypesCached) {
+        try {
+          //TODO await this.readAndCacheDataTypes();
+
+        } catch (err) {
+          this.debug(`onSymbolVersionChanged(): Failed to refresh data type cache`);
+        }
+      }
+
+      //Resubscribing all subscriptions as they might be broken now
+      //this.reInitializeSubscriptions();
+    }
+
+    this.metaData.symbolVersion = symbolVersion;
+    this.emit('symbolVersionChange', symbolVersion);
   }
 
   /**
@@ -709,7 +843,7 @@ export class Client extends EventEmitter {
   /**
    * Called when connection to the remote is lost. Handles automatic reconnecting (if enabled)
    * 
-   * @param socketFailure - If true, connection was lost due to a socket/tcp problem
+   * @param socketFailure If true, connection was lost due to a socket/tcp problem (default: false)
    */
   private async onConnectionLost(socketFailure = false) {
     this.debug(`onConnectionLost(): Connection was lost. Socket failure: ${socketFailure}`);
@@ -770,12 +904,10 @@ export class Client extends EventEmitter {
     );
   }
 
-
   /**
    * Sends an ADS command
    * 
    * @template T ADS response type. If omitted, generic AdsResponse is used
-   * 
    */
   private async sendAdsCommand<T = AdsResponse>(command: AdsCommandToSend) {
     return new Promise<AmsTcpPacket<T>>(async (resolve, reject) => {
@@ -790,10 +922,14 @@ export class Client extends EventEmitter {
           commandStr: ADS.AMS_HEADER_FLAG.toString(ADS.AMS_HEADER_FLAG.AMS_TCP_PORT_AMS_CMD)
         },
         ams: {
-          targetAmsNetId: command.targetAmsNetId ?? this.settings.targetAmsNetId,
-          targetAdsPort: command.targetAdsPort ?? this.settings.targetAdsPort,
-          sourceAmsNetId: this.connection.localAmsNetId!,
-          sourceAdsPort: this.connection.localAdsPort!,
+          targetAmsAddress: {
+            amsNetId: command.targetAmsNetId ?? this.settings.targetAmsNetId,
+            adsPort: command.targetAdsPort ?? this.settings.targetAdsPort
+          },
+          sourceAmsAddress: {
+            amsNetId: this.connection.localAmsNetId!,
+            adsPort: this.connection.localAdsPort!
+          },
           adsCommand: command.adsCommand,
           adsCommandStr: ADS.ADS_COMMAND.toString(command.adsCommand),
           stateFlags: ADS.ADS_STATE_FLAGS.AdsCommand,
@@ -807,8 +943,8 @@ export class Client extends EventEmitter {
         }
       };
 
-      if (packet.ams.targetAmsNetId === 'localhost') {
-        packet.ams.targetAmsNetId = '127.0.0.1.1.1';
+      if (packet.ams.targetAmsAddress.amsNetId === 'localhost') {
+        packet.ams.targetAmsAddress.amsNetId = '127.0.0.1.1.1';
       }
 
       this.debugD(`sendAdsCommand(): Sending an ads command ${packet.ams.adsCommandStr} (${packet.ams.dataLength} bytes): %o`, packet);
@@ -817,7 +953,7 @@ export class Client extends EventEmitter {
       try {
         var request = this.createAmsTcpRequest(packet);
       } catch (err) {
-        return reject(new ClientException(this, 'sendAdsCommand()', "Creating AmsTcpRequest failed", err));
+        return reject(new ClientError(`sendAdsCommand(): Creating AmsTcpRequest failed`, err));
       }
 
       //Registering callback for response handling
@@ -830,9 +966,9 @@ export class Client extends EventEmitter {
           delete this.activeAdsRequests[packet.ams.invokeId];
 
           if (res.ams.error) {
-            return reject(new ClientException(this, '_sendAdsCommand()', 'Response with AMS error received', res));
+            return reject(new ClientError(`sendAdsCommand(): Response with AMS error received`, res.ams));
           } else if (res.ads.error) {
-            return reject(new ClientException(this, '_sendAdsCommand()', 'Response with ADS error received', res));
+            return reject(new ClientError(`sendAdsCommand(): Response with ADS error received`, res.ads));
           }
 
           return resolve(res as AmsTcpPacket<T>);
@@ -851,7 +987,7 @@ export class Client extends EventEmitter {
               errorStr: `Timeout - no response in ${this.settings.timeoutDelay} ms`
             } as BaseAdsResponse
           }
-          return reject(new ClientException(this, 'sendAdsCommand()', `Timeout for command ${packet.ams.adsCommandStr} with invokeId ${packet.ams.invokeId} - No response in ${this.settings.timeoutDelay} ms`, adsError));
+          return reject(new ClientError(`sendAdsCommand(): Timeout for command ${packet.ams.adsCommandStr} with invokeId ${packet.ams.invokeId} - No response in ${this.settings.timeoutDelay} ms`, adsError));
 
         }, this.settings.timeoutDelay)
       };
@@ -860,7 +996,7 @@ export class Client extends EventEmitter {
       try {
         this.socketWrite(request);
       } catch (err) {
-        return reject(new ClientException(this, 'sendAdsCommand()', `Error - Socket is not available (failed to send data)`, err));
+        return reject(new ClientError(`sendAdsCommand(): Error - Socket is not available (failed to send data)`, err));
       }
     })
   }
@@ -870,7 +1006,7 @@ export class Client extends EventEmitter {
    * 
    * @param packet Object containing the full AMS/TCP packet
    */
-  protected createAmsTcpRequest(packet: AmsTcpPacket<AdsRequest>): Buffer {
+  private createAmsTcpRequest(packet: AmsTcpPacket<AdsRequest>): Buffer {
     //1. Create ADS data
     const adsData = packet.ads.payload ?? Buffer.alloc(0);
 
@@ -888,31 +1024,30 @@ export class Client extends EventEmitter {
     return amsTcpRequest;
   }
 
-
   /**
    * Creates an AMS header from given packet object
    * 
    * @param packet Object containing the full AMS/TCP packet
    */
-  protected createAmsHeader(packet: AmsTcpPacket): Buffer {
+  private createAmsHeader(packet: AmsTcpPacket): Buffer {
     //Allocating bytes for AMS header
     const header = Buffer.alloc(ADS.AMS_HEADER_LENGTH);
     let pos = 0;
 
     //0..5 Target AmsNetId
-    Buffer.from(ADS.amsNetIdStrToByteArray(packet.ams.targetAmsNetId)).copy(header, 0);
+    Buffer.from(ADS.amsNetIdStrToByteArray(packet.ams.targetAmsAddress.amsNetId)).copy(header, 0);
     pos += ADS.AMS_NET_ID_LENGTH;
 
     //6..8 Target ADS port
-    header.writeUInt16LE(packet.ams.targetAdsPort, pos);
+    header.writeUInt16LE(packet.ams.targetAmsAddress.adsPort, pos);
     pos += 2;
 
     //8..13 Source AmsNetId
-    Buffer.from(ADS.amsNetIdStrToByteArray(packet.ams.sourceAmsNetId)).copy(header, pos);
+    Buffer.from(ADS.amsNetIdStrToByteArray(packet.ams.sourceAmsAddress.amsNetId)).copy(header, pos);
     pos += ADS.AMS_NET_ID_LENGTH;
 
     //14..15 Source ADS port
-    header.writeUInt16LE(packet.ams.sourceAdsPort, pos);
+    header.writeUInt16LE(packet.ams.sourceAmsAddress.adsPort, pos);
     pos += 2;
 
     //16..17 ADS command
@@ -950,7 +1085,7 @@ export class Client extends EventEmitter {
    * @param packet Object containing the full AMS/TCP packet
    * @param amsHeader Buffer containing the previously created AMS header
    */
-  protected createAmsTcpHeader(packet: AmsTcpPacket, amsHeader: Buffer): Buffer {
+  private createAmsTcpHeader(packet: AmsTcpPacket, amsHeader: Buffer): Buffer {
     //Allocating bytes for AMS/TCP header
     const header = Buffer.alloc(ADS.AMS_TCP_HEADER_LENGTH);
     let pos = 0;
@@ -1006,7 +1141,7 @@ export class Client extends EventEmitter {
    * 
    * @param data Buffer that contains data for a single full AMS/TCP packet
    */
-  protected parseAmsTcpPacket(data: Buffer) {
+  private parseAmsTcpPacket(data: Buffer) {
     const packet = {} as AmsTcpPacket<AdsResponse>;
 
     //1. Parse AMS/TCP header
@@ -1026,14 +1161,13 @@ export class Client extends EventEmitter {
     this.onAmsTcpPacketReceived(packet);
   }
 
-
   /**
    * Parses an AMS/TCP header from given buffer
    * 
    * @param data Buffer that contains data for a single full AMS/TCP packet
    * @returns Object `{amsTcp, data}`, where amsTcp is the parsed header and data is rest of the data
    */
-  protected parseAmsTcpHeader(data: Buffer): { amsTcp: AmsTcpHeader, data: Buffer } {
+  private parseAmsTcpHeader(data: Buffer): { amsTcp: AmsTcpHeader, data: Buffer } {
     this.debugD(`parseAmsTcpHeader(): Starting to parse AMS/TCP header`)
 
     let pos = 0;
@@ -1045,7 +1179,7 @@ export class Client extends EventEmitter {
     pos += 2;
 
     //2..5 Data length
-    amsTcp.dataLength = data.readUInt32LE(pos);
+    amsTcp.length = data.readUInt32LE(pos);
     pos += 4;
 
     //Remove AMS/TCP header from data  
@@ -1059,10 +1193,9 @@ export class Client extends EventEmitter {
       //Remove data (basically creates an empty buffer..)
       data = data.subarray(data.byteLength);
     }
-
     this.debugD(`parseAmsTcpHeader(): AMS/TCP header parsed: %o`, amsTcp);
 
-    return { amsTcp, data }
+    return { amsTcp, data };
   }
 
   /**
@@ -1071,7 +1204,7 @@ export class Client extends EventEmitter {
    * @param data Buffer that contains data for a single AMS packet (without AMS/TCP header)
    * @returns Object `{ams, data}`, where ams is the parsed AMS header and data is rest of the data
    */
-  protected parseAmsHeader(data: Buffer): { ams: AmsHeader, data: Buffer } {
+  private parseAmsHeader(data: Buffer): { ams: AmsHeader, data: Buffer } {
     this.debugD("parseAmsHeader(): Starting to parse AMS header");
 
     let pos = 0;
@@ -1083,19 +1216,21 @@ export class Client extends EventEmitter {
     }
 
     //0..5 Target AMSNetId
-    ams.targetAmsNetId = ADS.byteArrayToAmsNetIdStr(data.subarray(pos, pos + ADS.AMS_NET_ID_LENGTH));
+    ams.targetAmsAddress = {} as AmsAddress;
+    ams.targetAmsAddress.amsNetId = ADS.byteArrayToAmsNetIdStr(data.subarray(pos, pos + ADS.AMS_NET_ID_LENGTH));
     pos += ADS.AMS_NET_ID_LENGTH;
 
     //6..8 Target ads port
-    ams.targetAdsPort = data.readUInt16LE(pos);
+    ams.targetAmsAddress.adsPort = data.readUInt16LE(pos);
     pos += 2;
 
     //8..13 Source AMSNetId
-    ams.sourceAmsNetId = ADS.byteArrayToAmsNetIdStr(data.subarray(pos, pos + ADS.AMS_NET_ID_LENGTH));
+    ams.sourceAmsAddress = {} as AmsAddress;
+    ams.sourceAmsAddress.amsNetId = ADS.byteArrayToAmsNetIdStr(data.subarray(pos, pos + ADS.AMS_NET_ID_LENGTH));
     pos += ADS.AMS_NET_ID_LENGTH;
 
     //14..15 Source ads port
-    ams.sourceAdsPort = data.readUInt16LE(pos);
+    ams.sourceAmsAddress.adsPort = data.readUInt16LE(pos);
     pos += 2;
 
     //16..17 ADS command
@@ -1126,22 +1261,22 @@ export class Client extends EventEmitter {
     //ADS error
     ams.error = (ams.errorCode !== null ? ams.errorCode > 0 : false);
     ams.errorStr = "";
+
     if (ams.error) {
       ams.errorStr = ADS.ADS_ERROR[ams.errorCode as keyof typeof ADS.ADS_ERROR];
     }
-
     this.debugD("parseAmsHeader(): AMS header parsed: %o", ams);
 
     return { ams, data };
   }
 
   /**
- * Parses ADS data from given buffer. Uses `packet.ams` to determine the ADS command.
- * 
- * @param data Buffer that contains data for a single ADS packet (without AMS/TCP header and AMS header)
- * @returns Object that contains the parsed ADS data
- */
-  protected parseAdsResponse(packet: AmsTcpPacket, data: Buffer): AdsResponse {
+   * Parses ADS data from given buffer. Uses `packet.ams` to determine the ADS command.
+  * 
+  * @param data Buffer that contains data for a single ADS packet (without AMS/TCP header and AMS header)
+  * @returns Object that contains the parsed ADS data
+  */
+  private parseAdsResponse(packet: AmsTcpPacket, data: Buffer): AdsResponse {
     this.debugD("parseAdsResponse(): Starting to parse ADS data");
 
     if (data.byteLength === 0) {
@@ -1244,7 +1379,7 @@ export class Client extends EventEmitter {
         ads.errorCode = data.readUInt32LE(pos);
         pos += 4;
 
-        ads.payload = {} as AdsNotificationHandle;
+        ads.payload = {} as AdsAddNotificationResponseData;
 
         //4..7 Notification handle
         ads.payload.notificationHandle = data.readUInt32LE(pos);
@@ -1299,7 +1434,7 @@ export class Client extends EventEmitter {
    * 
    * @param packet Fully parsed AMS/TCP packet, includes AMS/TCP header and if available, also AMS header and ADS data
    */
-  protected onAmsTcpPacketReceived(packet: AmsTcpPacket<AdsResponse>) {
+  private onAmsTcpPacketReceived(packet: AmsTcpPacket<AdsResponse>) {
     this.debugD(`onAmsTcpPacketReceived(): AMS packet received with command ${packet.amsTcp.command}`);
 
     switch (packet.amsTcp.command) {
@@ -1307,10 +1442,12 @@ export class Client extends EventEmitter {
       case ADS.AMS_HEADER_FLAG.AMS_TCP_PORT_AMS_CMD: ;
         packet.amsTcp.commandStr = 'ADS command';
 
-        if (packet.ams.targetAmsNetId === this.connection.localAmsNetId || packet.ams.targetAmsNetId === ADS.LOOPBACK_AMS_NET_ID) {
+        if (packet.ams.targetAmsAddress.amsNetId === this.connection.localAmsNetId
+          || packet.ams.targetAmsAddress.amsNetId === ADS.LOOPBACK_AMS_NET_ID) {
+
           this.onAdsCommandReceived(packet);
         } else {
-          this.debug(`Received ADS command but it's not for us (target: ${packet.ams.targetAmsNetId}:${packet.ams.targetAdsPort})`);
+          this.debug(`Received ADS command but it's not for us (target: ${ADS.amsAddressToString(packet.ams.targetAmsAddress)})`);
         }
         break;
 
@@ -1329,9 +1466,9 @@ export class Client extends EventEmitter {
 
           packet.amsTcp.data = {
             //0..5 Client AmsNetId
-            localAmsNetId: ADS.byteArrayToAmsNetIdStr(data.subarray(0, ADS.AMS_NET_ID_LENGTH)),
+            amsNetId: ADS.byteArrayToAmsNetIdStr(data.subarray(0, ADS.AMS_NET_ID_LENGTH)),
             //5..6 Client ADS port
-            localAdsPort: data.readUInt16LE(ADS.AMS_NET_ID_LENGTH)
+            adsPort: data.readUInt16LE(ADS.AMS_NET_ID_LENGTH)
           };
 
           if (this.amsTcpCallback) {
@@ -1375,14 +1512,12 @@ export class Client extends EventEmitter {
     }
   }
 
-
   /**
    * Handles received ADS command
    * 
    * @param packet Fully parsed AMS/TCP packet, includes AMS/TCP header, AMS header and ADS data
-   * @param socket Socket connection to use for responding
    */
-  protected onAdsCommandReceived(packet: AmsTcpPacket<AdsResponse>) {
+  private onAdsCommandReceived(packet: AmsTcpPacket<AdsResponse>) {
     this.debugD(`onAdsCommandReceived(): ADS command received (command: ${packet.ams.adsCommand})`);
 
     switch (packet.ams.adsCommand) {
@@ -1393,28 +1528,29 @@ export class Client extends EventEmitter {
           //Stamp has n samples inside
           for (let sample of stamp.samples) {
             //Try to find the subscription
-            const subscription = this.activeSubscriptions[sample.notificationHandle];
+            const key = ADS.amsAddressToString(packet.ams.sourceAmsAddress);
+            const subscription = this.activeSubscriptions[key][sample.notificationHandle];
 
             if (subscription) {
-              this.debug(`onAdsCommandReceived(): Notification received for handle "${sample.notificationHandle}" (%o)`, subscription.target)
+              this.debug(`onAdsCommandReceived(): Notification received from ${key} for handle ${sample.notificationHandle} (%o)`, subscription.options.target)
 
               subscription.parseNotification(sample.payload, stamp.timestamp)
                 .then(data => {
                   subscription.latestData = data;
 
                   try {
-                    subscription.userCallback && subscription.userCallback(subscription.latestData, subscription);
+                    subscription.options.callback && subscription.options.callback(subscription.latestData, subscription);
                   } catch (err) {
                     this.debug(`onAdsCommandReceived(): Calling user callback for notification failed: %o`, err);
                   }
                 })
                 .catch(err => {
                   this.debug(`onAdsCommandReceived(): Ads notification received but parsing Javascript object failed: %o`, err);
-                  this.emit('ads-client-error', new ClientException(this, `onAdsCommandReceived`, `Ads notification received but parsing data to Javascript object failed. Subscription: ${JSON.stringify(subscription)}`, err, subscription));
+                  this.emit('ads-client-error', new ClientError(`onAdsCommandReceived(): Ads notification received but parsing data to Javascript object failed. Subscription: ${JSON.stringify(subscription)}`, err));
                 });
             } else {
               this.debugD(`onAdsCommandReceived(): Ads notification received with unknown notificationHandle "${sample.notificationHandle}". Use unsubscribe() to save resources`);
-              this.emit('ads-client-error', new ClientException(this, `onAdsCommandReceived`, `Ads notification received with unknown notificationHandle (${sample.notificationHandle}). Use unsubscribe() to save resources.`));
+              this.emit('ads-client-error', new ClientError(`onAdsCommandReceived(): Ads notification received with unknown notificationHandle (${sample.notificationHandle}). Use unsubscribe() to save resources.`));
             }
           }
         }
@@ -1431,7 +1567,7 @@ export class Client extends EventEmitter {
 
         } else {
           this.debugD(`onAdsCommandReceived(): Ads command received with unknown invokeId "${packet.ams.invokeId}"`);
-          this.emit('ads-client-error', new ClientException(this, `onAdsCommandReceived`, `Ads command received with unknown invokeId "${packet.ams.invokeId}"`, packet));
+          this.emit('ads-client-error', new ClientError(`onAdsCommandReceived(): Ads command received with unknown invokeId "${packet.ams.invokeId}"`));
         }
         break;
     }
@@ -1532,21 +1668,24 @@ export class Client extends EventEmitter {
    * @param target 
    * @param callback 
    * @param settings 
-   * @returns 
+   * @param targetOpts Optional target settings that override values in `settings` (NOTE: If used, no caching is available -> worse performance)
    */
-  private async addSubscription(target: SubscriptionTarget, callback: SubscriptionCallback, settings: SubscriptionSettings, opts: TargetOptions = {}) {
-    this.debugD(`addSubscription(): Subscribing to %o with settings %o`, target, settings);
+  private async addSubscription<T = any>(options: SubscriptionOptions<T>, internal: boolean, targetOpts: TargetOptions = {}): Promise<ActiveSubscription<T>> {
+    this.debugD(`addSubscription(): Subscribing %o (internal: ${internal})`, options);
 
     let targetAddress = {} as AdsRawInfo;
     let symbolInfo: AdsSymbolInfo | undefined = undefined;
 
-    if (typeof target === "string") {
+    if (typeof options.target === "string") {
       try {
-        symbolInfo = await this.getSymbolInfo(target);
+        symbolInfo = await this.getSymbolInfo(options.target, targetOpts);
 
         //Read symbol datatype to cache -> It's cached when we start getting notifications
         //Otherwise with large structs and fast cycle times there might be some issues
-        await this.getDataType(symbolInfo.type);
+        //NOTE: Only when we are targetted to original target system, otherwise we don't have caching so no need to
+        if (!this.settings.disableCaching && !targetOpts.targetAdsPort && !targetOpts.targetAmsNetId) {
+          await this.getDataType(symbolInfo.type, targetOpts);
+        }
 
         targetAddress = {
           indexGroup: symbolInfo.indexGroup,
@@ -1555,16 +1694,16 @@ export class Client extends EventEmitter {
         };
 
       } catch (err) {
-        throw new ClientException(this, 'addSubscription()', `Getting symbol and data type info for ${target} failed`, err);
+        throw new ClientError(`addSubscription(): Getting symbol and data type info for ${options.target} failed`, err);
       }
     } else {
-      if (target.indexGroup === undefined || target.indexOffset === undefined) {
-        throw new ClientException(this, 'addSubscription()', `Target is missing indexGroup or indexOffset`);
+      if (options.target.indexGroup === undefined || options.target.indexOffset === undefined) {
+        throw new ClientError(`addSubscription(): Target is missing indexGroup or indexOffset`);
 
-      } else if (target.size === undefined) {
-        target.size = 0xFFFFFFFF;
+      } else if (options.target.size === undefined) {
+        options.target.size = 0xFFFFFFFF;
       }
-      targetAddress = target;
+      targetAddress = options.target;
     }
 
     //Allocating bytes for request
@@ -1584,15 +1723,15 @@ export class Client extends EventEmitter {
     pos += 4;
 
     //12..15 Transmission mode
-    data.writeUInt32LE(settings.transmissionMode, pos);
+    data.writeUInt32LE(options.sendOnChange === undefined || options.sendOnChange ? ADS.ADS_TRANS_MODE.OnChange : ADS.ADS_TRANS_MODE.Cyclic, pos);
     pos += 4
 
     //16..19 Maximum delay (ms) - When subscribing, a notification is sent after this time even if no changes 
-    data.writeUInt32LE(settings.maximumDelay * 10000, pos);
+    data.writeUInt32LE(options.initialDelay === undefined ? 0 : options.initialDelay * 10000, pos);
     pos += 4;
 
     //20..23 Cycle time (ms) - How often the PLC checks for value changes (minimum value: Task 0 cycle time)
-    data.writeUInt32LE(settings.cycleTime * 10000, pos);
+    data.writeUInt32LE(options.cycleTime === undefined ? 100 * 10000 : options.cycleTime * 10000, pos);
     pos += 4;
 
     //24..40 reserved
@@ -1600,82 +1739,57 @@ export class Client extends EventEmitter {
     try {
       const res = await this.sendAdsCommand<AdsAddNotificationResponse>({
         adsCommand: ADS.ADS_COMMAND.AddNotification,
-        targetAmsNetId: opts.targetAmsNetId,
-        targetAdsPort: opts.targetAdsPort,
+        targetAmsNetId: targetOpts.targetAmsNetId,
+        targetAdsPort: targetOpts.targetAdsPort,
         payload: data
       });
 
-      this.debugD(`addSubscription(): Subscribed to %o`, target);
+      this.debugD(`addSubscription(): Subscribed to %o`, options.target);
 
-      const subscription: ActiveSubscription = {
-        target: target,
+      const clientRef = this;
+
+      const subscription: ActiveSubscription<T> = {
+        options,
+        internal,
+        remoteAddress: res.ams.sourceAmsAddress,
         notificationHandle: res.ads.payload.notificationHandle,
-        internal: settings.internal === true,
-        symbolInfo: symbolInfo,
-        settings: settings,
+        symbolInfo,
+        unsubscribe: async function () {
+          await clientRef.unsubscribe(this);
+        },
+        parseNotification: async function (data: Buffer, timestamp: Date): Promise<SubscriptionData<T>> {
+          const result: SubscriptionData<T> = {
+            timestamp,
+            value: data as T
+          };
 
+          if (this.symbolInfo) {
+            const dataType = await clientRef.getDataType(this.symbolInfo.type, this.targetOpts);
+            result.value = clientRef.convertBufferToObject<T>(data, dataType);
+          }
+
+          this.latestData = result;
+          return result;
+        },
+        latestData: undefined,
+        targetOpts: targetOpts
       };
 
-      this.activeSubscriptions[subscription.notificationHandle] = subscription;
+      //As we might have different subscriptions for different targets, we need to use the address as key
+      const key = ADS.amsAddressToString(subscription.remoteAddress);
+
+      if (!this.activeSubscriptions[key]) {
+        this.activeSubscriptions[key] = {};
+      }
+
+      this.activeSubscriptions[key][subscription.notificationHandle] = subscription;
+
+      return subscription;
 
     } catch (err) {
-      this.debug(`addSubscription(): Subscribing to %o failed: %o`, target, err);
-      throw new ClientException(this, 'addSubscription()', `Subscribing to ${JSON.stringify(target)} failed`, err);
-
+      this.debug(`addSubscription(): Subscribing to %o failed: %o`, options.target, err);
+      throw new ClientError(`addSubscription(): Subscribing to ${JSON.stringify(options.target)} failed`, err);
     }
-    /*
-        //Passing the client to the newSub object so it can access itself by "this"
-        let client = this
-
-        //Creating new subscription object
-        let newSub = {
-          target: target,
-          settings: settings,
-          callback: callback,
-          symbolInfo: symbolInfo,
-          notificationHandle: res.ads.payload.notificationHandle,
-          lastValue: null,
-          internal: (settings.internal && settings.internal === true ? true : false),
-          unsubscribe: async function () {
-            await client.unsubscribe(this.notificationHandle)
-          },
-          dataParser: async function (value) {
-            try {
-              if (this.symbolInfo.type) {
-                const dataType = await client.getDataType(this.symbolInfo.type)
-                const data = _parsePlcDataToObject.call(client, value, dataType)
-
-                this.lastValue = data
-
-                return {
-                  value: data,
-                  timeStamp: null, //Added later
-                  type: dataType,
-                  symbol: this.symbolInfo
-                }
-              }
-
-              //If we don't know the data type
-              this.lastValue = value
-
-              return {
-                value: value,
-                timeStamp: null, //Added later
-                type: null,
-                symbol: null
-              }
-            } catch (err) {
-              throw err
-            }
-          }
-        }
-
-
-        resolve(newSub)
-      })
-      .catch((res) => {
-      })
-  })*/
   }
 
   /**
@@ -1739,10 +1853,10 @@ export class Client extends EventEmitter {
     symbol.comment = ADS.decodePlcStringBuffer(data.subarray(pos, pos + commentLength + 1));
     pos += commentLength + 1;
 
-    //Array data
-    symbol.arrayData = [];
+    //Array information
+    symbol.arrayInfo = [];
     for (let i = 0; i < symbol.arrayDimension; i++) {
-      const array = {} as AdsSymbolInfoArrayDataEntry;
+      const array = {} as AdsArrayInfoEntry;
 
       array.startIndex = data.readInt32LE(pos);
       pos += 4;
@@ -1750,7 +1864,7 @@ export class Client extends EventEmitter {
       array.length = data.readUInt32LE(pos);
       pos += 4;
 
-      symbol.arrayData.push(array);
+      symbol.arrayInfo.push(array);
     }
 
     //If flag TypeGuid set
@@ -1768,14 +1882,14 @@ export class Client extends EventEmitter {
 
       //Attributes
       for (let i = 0; i < attributeCount; i++) {
-        let attr = {} as AdsSymbolInfoAttributeEntry;
+        const attr = {} as AdsAttributeEntry;
 
         //Name length
-        let nameLength = data.readUInt8(pos);
+        const nameLength = data.readUInt8(pos);
         pos += 1;
 
         //Value length
-        let valueLength = data.readUInt8(pos);
+        const valueLength = data.readUInt8(pos);
         pos += 1;
 
         //Name
@@ -1812,7 +1926,7 @@ export class Client extends EventEmitter {
    * @param data Buffer object containing data type declaration (without first 4 bytes of ADS payload containing entry length)
    */
   private parseAdsResponseDataType(data: Buffer): AdsDataType {
-    this.debugD(`parseAdsResponseDataType(): Parsing symbol info from data (${data.byteLength} bytes)`);
+    this.debugD(`parseAdsResponseDataType(): Parsing data type from ADS response (${data.byteLength} bytes)`);
 
     let pos = 0;
     const dataType = {} as AdsDataType;
@@ -1879,10 +1993,10 @@ export class Client extends EventEmitter {
     dataType.comment = ADS.decodePlcStringBuffer(data.subarray(pos, pos + commentLength + 1));
     pos += commentLength + 1;
 
-    //Array data
-    dataType.arrayData = [];
+    //Array information
+    dataType.arrayInfos = [];
     for (let i = 0; i < dataType.arrayDimension; i++) {
-      const array = {} as AdsArrayDataEntry;
+      const array = {} as AdsArrayInfoEntry;
 
       array.startIndex = data.readInt32LE(pos);
       pos += 4;
@@ -1890,328 +2004,270 @@ export class Client extends EventEmitter {
       array.length = data.readUInt32LE(pos);
       pos += 4;
 
-      dataType.arrayData.push(array);
+      dataType.arrayInfos.push(array);
     }
 
-/*
-    //Subitems data
-    dataType.subItems = []
-    for (let i = 0; i < dataType.subItemCount; i++) {
-      //Get subitem length
-      let len = data.readUInt32LE(pos)
-      pos += 4
+    //Subitems (children data types)
+    dataType.subItems = [];
+    for (let i = 0; i < subItemCount; i++) {
+      //First 4 bytes is subitem entry length (including the 4 bytes)
+      const entryLength = data.readUInt32LE(pos);
+      pos += 4;
 
       //Parse the subitem recursively
-      dataType.subItems.push(await _parseDataType.call(this, data.slice(pos, pos + len)))
+      const subItem = this.parseAdsResponseDataType(data.subarray(pos, pos + entryLength - 4));
+      dataType.subItems.push(subItem);
 
-      pos += (len - 4)
+      pos += entryLength - 4;
     }
 
-    //If flags contain TypeGuid
-    if (dataType.flagsStr.includes('TypeGuid')) {
-      dataType.typeGuid = data.slice(pos, pos + 16).toString('hex')
-      pos += 16
+    //If flag TypeGuid set
+    if ((dataType.flags & ADS.ADS_DATA_TYPE_FLAGS.TypeGuid) === ADS.ADS_DATA_TYPE_FLAGS.TypeGuid) {
+      dataType.typeGuid = data.subarray(pos, pos + 16).toString('hex');
+      pos += 16;
     }
 
-    //If flags contain CopyMask
-    if (dataType.flagsStr.includes('CopyMask')) {
+    //If flag CopyMask set
+    if ((dataType.flags & ADS.ADS_DATA_TYPE_FLAGS.CopyMask) === ADS.ADS_DATA_TYPE_FLAGS.CopyMask) {
       //Let's skip this for now
-      pos += dataType.size
+      pos += dataType.size;
     }
 
-    dataType.rpcMethods = []
+    //If flag MethodInfos set
+    dataType.rpcMethods = [];
 
-    //If flags contain MethodInfos (TwinCAT.Ads.dll: AdsMethodEntry)
-    if (dataType.flagsStr.includes('MethodInfos')) {
-      dataType.methodCount = data.readUInt16LE(pos)
-      pos += 2
+    if ((dataType.flags & ADS.ADS_DATA_TYPE_FLAGS.MethodInfos) === ADS.ADS_DATA_TYPE_FLAGS.MethodInfos) {
+      const methodCount = data.readUInt16LE(pos);
+      pos += 2;
 
       //RPC methods
-      for (let i = 0; i < dataType.methodCount; i++) {
-        const method = {}
+      for (let i = 0; i < methodCount; i++) {
+        const method = {} as AdsRpcMethodEntry;
 
-        //0..3 method length
-        let len = data.readUInt32LE(pos)
-        pos += 4
+        //0..3 method entry length
+        //let len = data.readUInt32LE(pos)
+        pos += 4;
 
         //4..7 Version
-        method.version = data.readUInt32LE(pos)
-        pos += 4
+        method.version = data.readUInt32LE(pos);
+        pos += 4;
 
         //8..11 Virtual table index
-        method.vTableIndex = data.readUInt32LE(pos)
-        pos += 4
+        method.vTableIndex = data.readUInt32LE(pos);
+        pos += 4;
 
         //12..15 Return size
-        method.returnSize = data.readUInt32LE(pos)
-        pos += 4
+        method.returnTypeSize = data.readUInt32LE(pos);
+        pos += 4;
 
         //16..19 Return align size
         method.returnAlignSize = data.readUInt32LE(pos)
         pos += 4
 
         //20..23 Reserved
-        method.reserved = data.readUInt32LE(pos)
-        pos += 4
+        method.reserved = data.readUInt32LE(pos);
+        pos += 4;
 
         //24..39 Return type GUID
-        method.returnTypeGuid = data.slice(pos, pos + 16).toString('hex')
-        pos += 16
+        method.returnTypeGuid = data.subarray(pos, pos + 16).toString('hex');
+        pos += 16;
 
         //40..43 Return data type
-        method.retunAdsDataType = data.readUInt32LE(pos)
-        method.retunAdsDataTypeStr = ADS.ADS_DATA_TYPES.toString(method.retunAdsDataType)
-        pos += 4
+        method.returnAdsDataType = data.readUInt32LE(pos);
+        method.returnAdsDataTypeStr = ADS.ADS_DATA_TYPES.toString(method.returnAdsDataType);
+        pos += 4;
 
-        //44..47 Flags (AdsDataTypeFlags)
-        method.flags = data.readUInt32LE(pos)
-        method.flagsStr = ADS.ADS_DATA_TYPE_FLAGS.toStringArray(method.flags)
-        pos += 4
+        //44..47 Flags
+        method.flags = data.readUInt32LE(pos);
+        method.flagsStr = ADS.ADS_DATA_TYPE_FLAGS.toStringArray(method.flags);
+        pos += 4;
 
         //48..49 Name length
-        method.nameLength = data.readUInt16LE(pos)
-        pos += 2
+        const nameLength = data.readUInt16LE(pos);
+        pos += 2;
 
         //50..51 Return type length
-        method.returnTypeLength = data.readUInt16LE(pos)
-        pos += 2
+        const returnTypeLength = data.readUInt16LE(pos);
+        pos += 2;
 
         //52..53 Comment length
-        method.commentLength = data.readUInt16LE(pos)
-        pos += 2
+        const commentLength = data.readUInt16LE(pos);
+        pos += 2;
 
         //54..55 Parameter count
-        method.parameterCount = data.readUInt16LE(pos)
-        pos += 2
+        const parameterCount = data.readUInt16LE(pos);
+        pos += 2;
 
-        //56.... Name
-        method.name = _trimPlcString(iconv.decode(data.slice(pos, pos + method.nameLength + 1), 'cp1252'))
-        pos += method.nameLength + 1
+        //56.. Name
+        method.name = ADS.decodePlcStringBuffer(data.subarray(pos, pos + nameLength + 1));
+        pos += nameLength + 1;
 
-        //.. Return type
-        method.returnType = _trimPlcString(iconv.decode(data.slice(pos, pos + method.returnTypeLength + 1), 'cp1252'))
-        pos += method.returnTypeLength + 1
+        //.. Return data type
+        method.retunDataType = ADS.decodePlcStringBuffer(data.subarray(pos, pos + returnTypeLength + 1));
+        pos += returnTypeLength + 1;
 
         //.. Comment
-        method.comment = _trimPlcString(iconv.decode(data.slice(pos, pos + method.commentLength + 1), 'cp1252'))
-        pos += method.commentLength + 1
+        method.comment = ADS.decodePlcStringBuffer(data.subarray(pos, pos + commentLength + 1));
+        pos += commentLength + 1;
 
-        method.parameters = []
+        //Parameters
+        method.parameters = [];
 
-        for (let p = 0; p < method.parameterCount; p++) {
-          const param = {}
+        for (let p = 0; p < parameterCount; p++) {
+          const param = {} as AdsRpcMethodParameterEntry;
 
-          let paramStartPos = pos
+          let beginPosition = pos;
 
-          //Get parameter length
-          let paramLen = data.readUInt32LE(pos)
-          pos += 4
+          //Get parameter entry length
+          let entryLength = data.readUInt32LE(pos);
+          pos += 4;
 
           //4..7 Size
-          param.size = data.readUInt32LE(pos)
-          pos += 4
+          param.size = data.readUInt32LE(pos);
+          pos += 4;
 
           //8..11 Align size
-          param.alignSize = data.readUInt32LE(pos)
-          pos += 4
+          param.alignSize = data.readUInt32LE(pos);
+          pos += 4;
 
-          //12..15 Data type
-          param.adsDataType = data.readUInt32LE(pos)
-          param.adsDataTypeStr = ADS.ADS_DATA_TYPES.toString(param.adsDataType)
-          pos += 4
+          //12..15 ADS data type
+          param.adsDataType = data.readUInt32LE(pos);
+          param.adsDataTypeStr = ADS.ADS_DATA_TYPES.toString(param.adsDataType);
+          pos += 4;
 
-          //16..19 Flags (RCP_METHOD_PARAM_FLAGS)
-          param.flags = data.readUInt16LE(pos)
-          param.flagsStr = ADS.RCP_METHOD_PARAM_FLAGS.toStringArray(param.flags)
-          pos += 4
+          //16..19 Flags
+          param.flags = data.readUInt16LE(pos);
+          param.flagsStr = ADS.RCP_METHOD_PARAM_FLAGS.toStringArray(param.flags);
+          pos += 4;
 
           //20..23 Reserved
-          param.reserved = data.readUInt32LE(pos)
-          pos += 4
+          param.reserved = data.readUInt32LE(pos);
+          pos += 4;
 
           //24..27 Type GUID
-          param.typeGuid = data.slice(pos, pos + 16).toString('hex')
-          pos += 16
+          param.typeGuid = data.subarray(pos, pos + 16).toString('hex');
+          pos += 16;
 
           //28..31 LengthIsPara
-          param.lengthIsPara = data.readUInt16LE(pos)
-          pos += 2
+          param.lengthIsParameterIndex = data.readUInt16LE(pos);
+          pos += 2;
 
           //32..33 Name length
-          param.nameLength = data.readUInt16LE(pos)
-          pos += 2
+          const nameLength = data.readUInt16LE(pos);
+          pos += 2;
 
           //34..35 Type length
-          param.typeLength = data.readUInt16LE(pos)
-          pos += 2
+          const typeLength = data.readUInt16LE(pos);
+          pos += 2;
 
           //36..37 Comment length
-          param.commentLength = data.readUInt16LE(pos)
-          pos += 2
+          const commentLength = data.readUInt16LE(pos);
+          pos += 2;
 
-          //38.... Name
-          param.name = _trimPlcString(iconv.decode(data.slice(pos, pos + param.nameLength + 1), 'cp1252'))
-          pos += param.nameLength + 1
+          //38.. Data type name
+          param.name = ADS.decodePlcStringBuffer(data.subarray(pos, pos + nameLength + 1));
+          pos += nameLength + 1;
 
-          //.. Type
-          param.type = _trimPlcString(iconv.decode(data.slice(pos, pos + param.typeLength + 1), 'cp1252'))
-          pos += param.typeLength + 1
+          //.. Data type type
+          param.type = ADS.decodePlcStringBuffer(data.subarray(pos, pos + typeLength + 1));
+          pos += typeLength + 1;
 
-          //.. Comment
-          param.comment = _trimPlcString(iconv.decode(data.slice(pos, pos + param.commentLength + 1), 'cp1252'))
-          pos += param.commentLength + 1
+          //.. Data type comment
+          param.comment = ADS.decodePlcStringBuffer(data.subarray(pos, pos + commentLength + 1));
+          pos += commentLength + 1;
 
-          if (pos - paramStartPos > paramLen) {
-            //There is some additional data
-            param.reserved2 = data.slice(pos)
+          if (pos - beginPosition > entryLength) {
+            //There is some additional data left
+            param.reserved2 = data.subarray(pos);
           }
-          method.parameters.push(param)
+
+          method.parameters.push(param);
         }
 
         dataType.rpcMethods.push(method)
       }
     }
 
-    //If flags contain Attributes (TwinCAT.Ads.dll: AdsAttributeEntry)
-    //Attribute is for example, a pack-mode attribute above struct
-    dataType.attributes = []
-    if (dataType.flagsStr.includes('Attributes')) {
-      dataType.attributeCount = data.readUInt16LE(pos)
-      pos += 2
+    //If flag Attributes set
+    dataType.attributes = [];
+    if ((dataType.flags & ADS.ADS_DATA_TYPE_FLAGS.Attributes) === ADS.ADS_DATA_TYPE_FLAGS.Attributes) {
+      const attributeCount = data.readUInt16LE(pos);
+      pos += 2;
 
       //Attributes
-      for (let i = 0; i < dataType.attributeCount; i++) {
-        let attr = {}
+      for (let i = 0; i < attributeCount; i++) {
+        const attr = {} as AdsAttributeEntry;
 
         //Name length
-        let nameLen = data.readUInt8(pos)
-        pos += 1
+        const nameLength = data.readUInt8(pos);
+        pos += 1;
 
         //Value length
-        let valueLen = data.readUInt8(pos)
-        pos += 1
+        const valueLength = data.readUInt8(pos);
+        pos += 1;
 
         //Name
-        attr.name = _trimPlcString(iconv.decode(data.slice(pos, pos + nameLen + 1), 'cp1252'))
-        pos += (nameLen + 1)
+        attr.name = ADS.decodePlcStringBuffer(data.subarray(pos, pos + nameLength + 1));
+        pos += nameLength + 1;
 
         //Value
-        attr.value = _trimPlcString(iconv.decode(data.slice(pos, pos + valueLen + 1), 'cp1252'))
-        pos += (valueLen + 1)
+        attr.value = ADS.decodePlcStringBuffer(data.subarray(pos, pos + valueLength + 1));
+        pos += valueLength + 1;
 
-        dataType.attributes.push(attr)
+        dataType.attributes.push(attr);
       }
     }
 
+    //If flag EnumInfos set
+    dataType.enumInfos = [];
+    if ((dataType.flags & ADS.ADS_DATA_TYPE_FLAGS.EnumInfos) === ADS.ADS_DATA_TYPE_FLAGS.EnumInfos) {
+      const enumInfoCount = data.readUInt16LE(pos);
+      pos += 2;
 
-    //If flags contain EnumInfos (TwinCAT.Ads.dll: AdsEnumInfoEntry)
-    //EnumInfo contains the enumeration values as string
-    if (dataType.flagsStr.includes('EnumInfos')) {
-      dataType.enumInfoCount = data.readUInt16LE(pos)
-      pos += 2
-      //EnumInfos
-      dataType.enumInfo = []
-      for (let i = 0; i < dataType.enumInfoCount; i++) {
-        let enumInfo = {}
+      for (let i = 0; i < enumInfoCount; i++) {
+        let enumInfo = {} as AdsEnumInfo;
 
         //Name length
-        let nameLen = data.readUInt8(pos)
-        pos += 1
+        const nameLength = data.readUInt8(pos);
+        pos += 1;
 
-        //Name
-        enumInfo.name = _trimPlcString(iconv.decode(data.slice(pos, pos + nameLen + 1), 'cp1252'))
-        pos += (nameLen + 1)
+        //Enumeration name
+        enumInfo.name = ADS.decodePlcStringBuffer(data.subarray(pos, pos + nameLength + 1));
+        pos += nameLength + 1;
 
-        //Value
-        enumInfo.value = data.slice(pos, pos + dataType.size)
-        pos += dataType.size
+        //Enumeration value
+        enumInfo.value = data.subarray(pos, pos + dataType.size);
+        pos += dataType.size;
 
-        dataType.enumInfo.push(enumInfo)
+        dataType.enumInfos.push(enumInfo)
       }
     }
 
     //Reserved, if any
-    dataType.reserved = data.slice(pos)
-*/
-    return dataType
+    dataType.reserved = data.subarray(pos);
+
+    this.debugD(`parseAdsResponseDataType(): Data type parsed (result: ${dataType.name})`);
+
+    return dataType;
   }
 
   /**
-   * Builds data type declaration for requested type.
-   * Calls itself recursively to build also subtypes
+   * Gets data type declaration for requested type
+   * NOTE: Only returns the requested data type and its direct children. Not the children of children.
+   * The full datatype should be built using buildDataType()
    * 
    * @param name Data type name in the PLC (such as `ST_Struct`)
-   * @param opts Optional target settings that override values in `settings` 
+   * @param targetOpts Optional target settings that override values in `settings` (NOTE: If used, no caching is available -> worse performance)
    */
-  private async buildDataType(name: string, opts: TargetOptions = {}): Promise<AdsDataType> {
-    this.debug(`buildDataType(): Building data type for "${name}"`);
-
-    //Is this symbol already cached?
-    if (this.metaData.symbols[path.toLowerCase()]) {
-      this.debug(`getSymbolInfo(): Symbol info found from cache for "${path}"`);
-      return this.metaData.symbols[path.toLowerCase()];
-    }
-
-    //Reading from target
-    this.debug(`getSymbolInfo(): Symbol info for "${path}" not cached, reading from target`);
-
-    //Allocating bytes for request
-    const data = Buffer.alloc(16 + path.length + 1);
-    let pos = 0;
-
-    //0..3 IndexGroup
-    data.writeUInt32LE(ADS.ADS_RESERVED_INDEX_GROUPS.SymbolInfoByNameEx, pos);
-    pos += 4;
-
-    //4..7 IndexOffset
-    data.writeUInt32LE(0, pos);
-    pos += 4;
-
-    //8..11 Read data length
-    data.writeUInt32LE(0xFFFFFFFF, pos); //Seems to work OK (we don't know the size)
-    pos += 4;
-
-    //12..15 Write data length
-    data.writeUInt32LE(path.length + 1, pos);
-    pos += 4;
-
-    //16..n Data
-    ADS.encodeStringToPlcStringBuffer(path).copy(data, pos);
-    pos += path.length;
-
-    try {
-      const res = await this.sendAdsCommand<AdsReadWriteResponse>({
-        adsCommand: ADS.ADS_COMMAND.ReadWrite,
-        targetAmsNetId: opts.targetAmsNetId,
-        targetAdsPort: opts.targetAdsPort,
-        payload: data
-      });
-
-      //Parsing the symbol, first 4 bytes can be skipped (data length)
-      const symbol = this.parseAdsResponseSymbolInfo(res.ads.payload.subarray(4));
-      this.metaData.symbols[path.toLowerCase()] = symbol;
-
-      this.debug(`getSymbolInfo(): Symbol info read and parsed for "${path}"`);
-
-      return symbol;
-
-    } catch (err) {
-      this.debug(`getSymbolInfo(): Reading symbol info for "${path} failed: %o`, err);
-      throw new ClientException(this, 'getSymbolInfo()', `Reading symbol info for "${path} failed`, err);
-    }
-  }
-
-  /**
-   * Gets data type declaration for requested type 
-   * 
-   * @param name Data type name in the PLC (such as `ST_Struct`)
-   * @param opts Optional target settings that override values in `settings` 
-   */
-  public async TEST_getDataTypeDeclaration(name: string, opts: TargetOptions = {}): Promise<AdsDataType> {
+  private async getDataTypeDeclaration(name: string, targetOpts: TargetOptions = {}): Promise<AdsDataType> {
     this.debug(`getDataTypeDeclaration(): Data type declaration requested for "${name}"`);
 
     //Is this data type already cached? Skip check if we have different target
-    if (!opts.targetAdsPort && !opts.targetAmsNetId && this.metaData.dataTypes[name.toLowerCase()]) {
+    if (!this.settings.disableCaching
+      && !targetOpts.targetAdsPort
+      && !targetOpts.targetAmsNetId
+      && this.metaData.dataTypes[name.toLowerCase()]) {
+
       this.debug(`getDataTypeDeclaration(): Data type declaration found from cache for "${name}"`);
       return this.metaData.dataTypes[name.toLowerCase()];
     }
@@ -2246,41 +2302,303 @@ export class Client extends EventEmitter {
     try {
       const res = await this.sendAdsCommand<AdsReadWriteResponse>({
         adsCommand: ADS.ADS_COMMAND.ReadWrite,
-        targetAmsNetId: opts.targetAmsNetId,
-        targetAdsPort: opts.targetAdsPort,
+        targetAmsNetId: targetOpts.targetAmsNetId,
+        targetAdsPort: targetOpts.targetAdsPort,
         payload: data
       });
 
       //Parsing the data type, first 4 bytes can be skipped (data length)
       const dataType = this.parseAdsResponseDataType(res.ads.payload.subarray(4));
-      this.metaData.dataTypes[name.toLowerCase()] = dataType;
 
+      //Only cache when original target
+      if (!this.settings.disableCaching && !targetOpts.targetAdsPort && !targetOpts.targetAmsNetId) {
+        this.metaData.dataTypes[name.toLowerCase()] = dataType;
+      }
       this.debug(`getDataTypeDeclaration(): Data type declaration read and parsed for "${name}"`);
 
       return dataType;
 
     } catch (err) {
       this.debug(`getDataTypeDeclaration(): Reading data type declaration for "${name} failed: %o`, err);
-      throw new ClientException(this, 'getDataTypeDeclaration()', `Reading data type declaration for "${name} failed`, err);
+      throw new ClientError(`getDataTypeDeclaration(): Reading data type declaration for "${name}" failed`, err);
     }
   }
 
   /**
-   * Returns symbol information for given variable path (symbol)
+   * Builds data type declaration for requested type with all children and their children
+   * 
+   * @param name Data type name in the PLC (such as `ST_Struct`)
+   * @param targetOpts Optional target settings that override values in `settings` (NOTE: If used, no caching is available -> worse performance)
+   * @param isRootType If true, this is the root type / first call (not recursive call)
+   * @param knownSize Data type size (if known) - used with pseudo data types and TwinCAT 2 primite types
+   * 
+   * @throws {AdsError}
+   */
+  private async buildDataType(name: string, targetOpts: TargetOptions = {}, isRootType = true, knownSize?: number): Promise<AdsDataType> {
+    try {
+      this.debug(`buildDataType(): Building data type for "${name}"`);
+
+      //Is this built data type already cached? Skip check if we have different target
+      if (!this.settings.disableCaching
+        && !targetOpts.targetAdsPort
+        && !targetOpts.targetAmsNetId
+        && this.metaData.builtDataTypes[name.toLowerCase()]) {
+
+        this.debug(`buildDataType(): Built full data type declaration found from cache for "${name}"`);
+        return this.metaData.builtDataTypes[name.toLowerCase()];
+      }
+
+      let dataType: AdsDataType | undefined;
+
+      try {
+        dataType = await this.getDataTypeDeclaration(name, targetOpts);
+
+      } catch (err) {
+        if ((err as ClientError).adsError && (err as ClientError).adsError?.errorCode === 1808) {
+          //Type wasn't found.
+          //Might be TwinCAT 2 system that doesn't provide pseudo or base data types by ADS --> check if we know the type ourselves
+          if (ADS.BASE_DATA_TYPES.isPseudoType(name)) {
+            //This converts e.g. PVOID to a primitive type
+            if (knownSize === undefined) {
+              throw new ClientError(`Failed to convert pseudo type ${name} to primitive type as size is not known`);
+            }
+            name = ADS.BASE_DATA_TYPES.getTypeByPseudoType(name, knownSize)!;
+          }
+
+          if (ADS.BASE_DATA_TYPES.isKnownType(name)) {
+            //This type is known
+            const baseType = ADS.BASE_DATA_TYPES.find(name)!;
+
+            dataType = {
+              version: 0,
+              hashValue: 0,
+              typeHashValue: 0,
+              size: knownSize ?? baseType.size,
+              offset: 0,
+              adsDataType: baseType.adsDataType,
+              adsDataTypeStr: ADS.ADS_DATA_TYPES.toString(baseType.adsDataType),
+              flags: 0,
+              flagsStr: [],
+              arrayDimension: 0,
+              name: name,
+              type: "",
+              comment: "",
+              arrayInfos: [],
+              subItems: [],
+              typeGuid: "",
+              rpcMethods: [],
+              attributes: [],
+              enumInfos: [],
+              reserved: Buffer.alloc(0)
+            };
+          } else {
+            //Type is unknown - we can't do anything
+            throw new ClientError(`Data type ${name} is unknown (PLC doesn't provide it and it's not a base type)`);
+          }
+        } else {
+          //Other ADS error
+          throw new ClientError(`Failed to get data type for ${name}`, err);
+        }
+      }
+
+      let builtType: AdsDataType;
+
+      if (dataType.subItems.length > 0) {
+        //Data type has subitems -> building recursively
+        builtType = {
+          ...dataType,
+          subItems: []
+        };
+
+        for (let i = 0; i < dataType.subItems.length; i++) {
+          //Using subItems[i] as default
+          let subItemType: AdsDataType;
+
+          //Support for TwinCAT 3 < 4022: If we have empty struct, do nothing. 
+          //ADS API will not return data type for empty struct.
+          if (dataType.subItems[i].size === 0) {
+            subItemType = { ...dataType.subItems[i] };
+          } else {
+            //Note: creating copy as otherwise we would edit cached datatype as objects are references
+            subItemType = {
+              ...(await this.buildDataType(dataType.subItems[i].type, targetOpts, false, dataType.subItems[i].size))
+            };
+
+            //Changing the type<-> name as it's subitem
+            //Also keeping some data from parent datatype, such as offset
+            subItemType.type = subItemType.name;
+            subItemType.name = dataType.subItems[i].name;
+            subItemType.hashValue = dataType.subItems[i].hashValue;
+            subItemType.offset = dataType.subItems[i].offset;
+            subItemType.comment = dataType.subItems[i].comment;
+          }
+
+          builtType.subItems.push(subItemType);
+        }
+
+      } else if ((((dataType.type === '' && !ADS.BASE_DATA_TYPES.isPseudoType(dataType.name)) || ADS.BASE_DATA_TYPES.isKnownType(dataType.name))
+        && dataType.flagsStr.includes('DataType')
+        && !dataType.flagsStr.includes('EnumInfos')
+        && dataType.arrayDimension === 0)) {
+        //This is final form (no need to go deeper)
+        builtType = dataType;
+
+      } else if (dataType.arrayDimension > 0) {
+        //Data type is an array
+        //Get array subtype
+        builtType = {
+          ...(await this.buildDataType(dataType.type, targetOpts, false))
+        };
+
+        builtType.arrayInfos = [...dataType.arrayInfos, ...builtType.arrayInfos];
+
+      } else if (ADS.BASE_DATA_TYPES.isPseudoType(dataType.name)) {
+        //Data type is a pseudo type (POINTER, REFERENCE, PVOID, UXINT)
+        builtType = {
+          ...dataType,
+          name: ADS.BASE_DATA_TYPES.getTypeByPseudoType(dataType.name, dataType.size)!
+        };
+
+      } else if (dataType.flagsStr.includes('DataType') && dataType.flagsStr.includes('EnumInfos')) {
+        //Enumeration - get original data type
+        builtType = {
+          ...(await this.buildDataType(dataType.type, targetOpts, false))
+        };
+
+        builtType = {
+          ...builtType,
+          enumInfos: dataType.enumInfos.map(entry => {
+            const temp = {
+              ...builtType,
+              type: builtType.name
+            };
+
+            return {
+              ...entry,
+              value: this.convertBufferToPrimitiveType(entry.value as Buffer, temp)
+            };
+          })
+        };
+
+      } else if (dataType.subItems.length === 0 && dataType.adsDataType === ADS.ADS_DATA_TYPES.ADST_BIGTYPE) {
+        //TwinCAT 2 - If we have empty struct, it's size is not 0 but it has no subitems
+        //This is final form (no need to go deeper)
+        builtType = dataType;
+      } else {
+        //This is not the final data type -> continue
+        builtType = await this.buildDataType(dataType.type, targetOpts, false);
+      }
+
+      if (isRootType) {
+        //The root type has actually the data type in "name" property
+        builtType.type = builtType.name;
+        builtType.name = '';
+
+        //Only cache when original target
+        if (!this.settings.disableCaching && !targetOpts.targetAdsPort && !targetOpts.targetAmsNetId) {
+          this.metaData.builtDataTypes[name.toLowerCase()] = builtType;
+        }
+      }
+
+      return builtType;
+
+    } catch (err) {
+      this.debug(`buildDataType(): Building data type for "${name}" failed: %o`, err);
+      throw new ClientError(`buildDataType(): Building data type for "${name}" failed`, err);
+    }
+  }
+
+  /**
+   * Converts given Buffer data to primitive PLC type
+   * 
+   * @param buffer Buffer containing the raw data
+   * @param dataType Target data type
+   * @returns 
+   */
+  private convertBufferToPrimitiveType(buffer: Buffer, dataType: AdsDataType): PlcPrimitiveType {
+    if (dataType.size === 0) {
+      return {};
+    }
+
+    if (dataType.adsDataType === ADS.ADS_DATA_TYPES.ADST_STRING) {
+      return ADS.decodePlcStringBuffer(buffer);
+    } else if (dataType.adsDataType === ADS.ADS_DATA_TYPES.ADST_WSTRING) {
+      return ADS.decodePlcWstringBuffer(buffer);
+    } else {
+      return ADS.BASE_DATA_TYPES.fromBuffer(dataType.type, buffer, this.settings.convertDatesToJavascript);
+    }
+  }
+
+  private convertBufferToObject<T = any>(data: Buffer, dataType: AdsDataType, isArrayItem: boolean = false): T {
+    let result: any;
+
+    if ((dataType.arrayInfos.length === 0 || isArrayItem) && dataType.subItems.length > 0) {
+      //Struct or array item
+      result = {};
+      data = data.subarray(dataType.offset);
+
+      for (const item of dataType.subItems) {
+        result[item.name] = this.convertBufferToObject(data, item);
+      }
+
+    } else if (dataType.arrayInfos.length > 0 && !isArrayItem) {
+      //Array
+      result = [];
+
+      const convertArrayDimension = (dim: number): any[] => {
+        const temp = [];
+
+        for (let i = 0; i < dataType.arrayInfos[dim].length; i++) {
+          if (dataType.arrayInfos[dim + 1]) {
+            //More dimensions available -> go deeper
+            temp.push(convertArrayDimension(dim + 1));
+          } else {
+            //Final dimension
+            temp.push(this.convertBufferToObject(data, dataType, true));
+            data = data.subarray(dataType.size);
+          }
+        }
+
+        return temp;
+      }
+
+      result = convertArrayDimension(0);
+
+    } else if (dataType.enumInfos.length > 0 && this.settings.objectifyEnumerations) {
+      //Enumeration (and enums are converted to objects)
+      result = 'moro'
+    } else {
+      //Primitive type
+      result = this.convertBufferToPrimitiveType(data.subarray(dataType.offset, dataType.offset + dataType.size), dataType) as T;
+    }
+
+    return result as T;
+  }
+
+
+
+
+  /**
+   * Reads and parses symbol information for given variable path (symbol)
+   * Saved to cache if target not overriden.
    * 
    * @param path Full variable path in the PLC (such as `GVL_Test.ExampleStruct`)
-   * @param opts Optional target settings that override values in `settings` 
+   * @param targetOpts Optional target settings that override values in `settings` (NOTE: If used, no caching is available -> worse performance)
    */
-  public async getSymbolInfo(path: string, opts: TargetOptions = {}): Promise<AdsSymbolInfo> {
+  public async getSymbolInfo(path: string, targetOpts: TargetOptions = {}): Promise<AdsSymbolInfo> {
     if (!this.connection.connected) {
-      throw new ClientException(this, 'getSymbolInfo()', `Client is not connected. Use connect() to connect to the target first.`);
+      throw new ClientError(`getSymbolInfo(): Client is not connected. Use connect() to connect to the target first.`);
     }
     path = path.trim();
 
     this.debug(`getSymbolInfo(): Symbol info requested for "${path}"`);
 
-    //Is this symbol already cached?
-    if (this.metaData.symbols[path.toLowerCase()]) {
+    //Is this symbol already cached? Skip check if we have different target
+    if (!this.settings.disableCaching
+      && !targetOpts.targetAdsPort
+      && !targetOpts.targetAmsNetId
+      && this.metaData.symbols[path.toLowerCase()]) {
+
       this.debug(`getSymbolInfo(): Symbol info found from cache for "${path}"`);
       return this.metaData.symbols[path.toLowerCase()];
     }
@@ -2315,51 +2633,56 @@ export class Client extends EventEmitter {
     try {
       const res = await this.sendAdsCommand<AdsReadWriteResponse>({
         adsCommand: ADS.ADS_COMMAND.ReadWrite,
-        targetAmsNetId: opts.targetAmsNetId,
-        targetAdsPort: opts.targetAdsPort,
+        targetAmsNetId: targetOpts.targetAmsNetId,
+        targetAdsPort: targetOpts.targetAdsPort,
         payload: data
       });
 
       //Parsing the symbol, first 4 bytes can be skipped (data length)
       const symbol = this.parseAdsResponseSymbolInfo(res.ads.payload.subarray(4));
-      this.metaData.symbols[path.toLowerCase()] = symbol;
+
+      //Only cache when original target
+      if (!this.settings.disableCaching && !targetOpts.targetAdsPort && !targetOpts.targetAmsNetId) {
+        this.metaData.symbols[path.toLowerCase()] = symbol;
+      }
 
       this.debug(`getSymbolInfo(): Symbol info read and parsed for "${path}"`);
-
       return symbol;
 
     } catch (err) {
-      this.debug(`getSymbolInfo(): Reading symbol info for "${path} failed: %o`, err);
-      throw new ClientException(this, 'getSymbolInfo()', `Reading symbol info for "${path} failed`, err);
+      this.debug(`getSymbolInfo(): Reading symbol info for "${path}" failed: %o`, err);
+      throw new ClientError(`getSymbolInfo(): Reading symbol info for "${path} failed`, err);
     }
   }
 
   /**
-   * Returns data type declaration for given data type
+   * Returns full built data type declaration with subitems for given data type
    * 
    * @param name Data type name in the PLC (such as `ST_Struct`)
-   * @param opts Optional target settings that override values in `settings` 
+   * @param targetOpts Optional target settings that override values in `settings` (NOTE: If used, no caching is available -> worse performance)
    */
-  public async getDataType(name: string, opts: TargetOptions = {}): Promise<AdsDataType> {
+  public async getDataType(name: string, targetOpts: TargetOptions = {}): Promise<AdsDataType> {
     if (!this.connection.connected) {
-      throw new ClientException(this, 'getDataType()', `Client is not connected. Use connect() to connect to the target first.`);
+      throw new ClientError(`getDataType(): Client is not connected. Use connect() to connect to the target first.`);
     }
     name = name.trim();
 
     this.debug(`getDataType(): Data type requested for "${name}"`);
-    const dataType = await this.buildDataType(name, opts);
+    const dataType = await this.buildDataType(name, targetOpts);
     this.debug(`getDataType(): Data type read and built for "${name}"`);
 
     return dataType;
-  }
 
+  }
   /**
     * Reads target PLC runtime state
-    * Also saves it to the `metaData.plcRuntimeStatus`
+    * If original target, the state is also saved to the `metaData.plcRuntimeStatus`
+    * 
+    * @param targetOpts Optional target settings that override values in `settings` (NOTE: If used, no caching is available -> worse performance)
     */
-  public async readPlcRuntimeState(opts: TargetOptions = {}) {
+  public async readPlcRuntimeState(targetOpts: TargetOptions = {}): Promise<AdsState> {
     if (!this.connection.connected) {
-      throw new ClientException(this, 'readPlcRuntimeState()', `Client is not connected. Use connect() to connect to the target first.`);
+      throw new ClientError(`readPlcRuntimeState(): Client is not connected. Use connect() to connect to the target first.`);
     }
 
     try {
@@ -2367,13 +2690,13 @@ export class Client extends EventEmitter {
 
       const res = await this.sendAdsCommand<AdsReadStateResponse>({
         adsCommand: ADS.ADS_COMMAND.ReadState,
-        targetAmsNetId: opts.targetAmsNetId,
-        targetAdsPort: opts.targetAdsPort
+        targetAmsNetId: targetOpts.targetAmsNetId,
+        targetAdsPort: targetOpts.targetAdsPort
       });
 
       this.debug(`readPlcRuntimeState(): Device state read successfully. State is %o`, res.ads.payload);
 
-      if (!opts.targetAdsPort) {
+      if (!targetOpts.targetAdsPort && !targetOpts.targetAmsNetId) {
         //Target is not overridden -> save to metadata
         this.metaData.plcRuntimeState = res.ads.payload;
       }
@@ -2382,39 +2705,484 @@ export class Client extends EventEmitter {
 
     } catch (err) {
       this.debug(`readPlcRuntimeState(): Reading PLC runtime state failed: %o`, err);
-      throw new ClientException(this, 'readPlcRuntimeState()', `Reading PLC runtime state failed`, err);
+      throw new ClientError(`readPlcRuntimeState(): Reading PLC runtime state failed`, err);
     }
   }
 
   /**
-   * Subscribes to variable value change notifications.
-   * Callback is called with latest value when it changes.
+   * **NOTE: Consider using new variant `subscribeAny()`**
    * 
-   * @param variableName Variable name in the PLC (full path) - Example: "MAIN.SomeStruct.SomeValue"
-   * @param callback - Callback function that is called when new value (notification) is received
-   * @param cycleTimeMs - How often (ms) the PLC checks for value changes (default: 10 ms)
-   * @param sendOnChange - If true, PLC sends the notification only when value has changed. If false, the value is sent every `cycleTime` milliseconds even when not changed (default: true)
-   * @param initialDelayMs - How long the PLC waits before sending the value (default: 0 ms)
+   * Subscribes to variable value change notifications (ADS notifications)
+   * Callback is called with latest value when changed
+   * 
+   * @param target - Variable name in the PLC (full path, any type) - example: "MAIN.SomeStruct"
+   * @param callback - Callback function that is called when a new value (notification) is received
+   * @param cycleTime - How often (milliseconds) the PLC checks for value changes (default: 100 ms)
+   * @param onChange - If true, PLC sends the notification only when value has changed. If false, the value is sent every cycleTime milliseconds (default: true)
+   * @param initialDelay - How long the PLC waits for sending the value - default 0 ms (immediately)
+   * @param targetOpts Optional target settings that override values in `settings` (NOTE: If used, no caching is available -> worse performance)
+   * 
+   * @template T Typescript data type of the PLC data, for example `subscribe<number>(...)` or `subscripe<ST_TypedStruct>(...)`
    */
-  public subscribe(variableName: string, callback: SubscriptionCallback, cycleTimeMs = 10, sendOnChange = true, initialDelayMs = 0) {
+  public subscribe<T = any>(target: string, callback: SubscriptionCallback<T>, cycleTime: number = 100, sendOnChange: boolean = true, initialDelay: number = 0, targetOpts: TargetOptions = {}): Promise<ActiveSubscription<T>> {
     if (!this.connection.connected) {
-      throw new ClientException(this, 'subscribe()', `Client is not connected. Use connect() to connect to the target first.`);
+      throw new ClientError(`subscribe(): Client is not connected. Use connect() to connect to the target first.`);
     }
 
     try {
-      this.debug(`subscribe(): Subscribing to variable "${variableName}" changes`);
+      this.debug(`subscribe(): Subscribing to "%o"`, target);
 
-      const res = this.createSubscription(
-        variableName,
+      return this.addSubscription<T>({
+        target,
         callback,
-        {
-          transmissionMode: (onChange === true ? ADS.ADS_TRANS_MODE.OnChange : ADS.ADS_TRANS_MODE.Cyclic),
-          cycleTime: cycleTime,
-          maximumDelay: initialDelay
-        }
-      )
-        .then(res => resolve(res))
-        .catch(err => reject(new ClientException(this, 'subscribe()', `Subscribing to ${variableName} failed`, err)))
-    } catch { }
+        cycleTime,
+        sendOnChange,
+        initialDelay
+      }, false, targetOpts);
+
+    } catch (err) {
+      this.debug(`subscribe(): Subscribing to "${target}" failed: %o`, err);
+      throw new ClientError(`subscribe(): Subscribing to "${target}" failed`, err);
+    }
   }
+
+  /**
+   * Subscribes to variable or raw address value change notifications (ADS notifications)
+   * Callback is called with latest value when changed
+   * 
+   * @param options - Subscription options
+   * @param targetOpts Optional target settings that override values in `settings` (NOTE: If used, no caching is available -> worse performance)
+   * 
+   * @template T Typescript data type of the PLC data, for example `subscribe<number>(...)` or `subscripe<ST_TypedStruct>(...)`
+   */
+  public subscribeAny<T = any>(options: SubscriptionOptions<T>, targetOpts: TargetOptions = {}): Promise<ActiveSubscription<T>> {
+    if (!this.connection.connected) {
+      throw new ClientError(`subscribeAny(): Client is not connected. Use connect() to connect to the target first.`);
+    }
+
+    try {
+      this.debug(`subscribeAny(): Subscribing to "%o"`, options.target);
+
+      return this.addSubscription<T>(options, false, targetOpts);
+
+    } catch (err) {
+      this.debug(`subscribe(): Subscribing to "${options.target}" failed: %o`, err);
+      throw new ClientError(`subscribe(): Subscribing to "${options.target}" failed`, err);
+    }
+  }
+
+  /**
+   * **NOTE: Consider using new variant `subscribeAny<Buffer>()`**
+   * 
+   * Subscribes to raw address value change notifications (ADS notifications)
+   * Callback is called with latest value when changed
+   * 
+   * @param target - Variable address in the PLC
+   * @param callback - Callback function that is called when a new value (notification) is received
+   * @param cycleTime - How often (milliseconds) the PLC checks for value changes (default: 100 ms)
+   * @param onChange - If true, PLC sends the notification only when value has changed. If false, the value is sent every cycleTime milliseconds (default: true)
+   * @param initialDelay - How long the PLC waits for sending the value - default 0 ms (immediately)
+   * @param targetOpts Optional target settings that override values in `settings` (NOTE: If used, no caching is available -> worse performance)
+   * 
+   */
+  public subscribeRaw(target: AdsRawInfo, callback: SubscriptionCallback<Buffer>, cycleTime: number = 100, sendOnChange: boolean = true, initialDelay: number = 0, targetOpts: TargetOptions = {}): Promise<ActiveSubscription<Buffer>> {
+    if (!this.connection.connected) {
+      throw new ClientError(`subscribeRaw(): Client is not connected. Use connect() to connect to the target first.`);
+    }
+
+    try {
+      this.debug(`subscribeRaw(): Subscribing to "%o"`, target);
+
+      return this.addSubscription<Buffer>({
+        target,
+        callback,
+        cycleTime,
+        sendOnChange,
+        initialDelay
+      }, false, targetOpts);
+
+    } catch (err) {
+      this.debug(`subscribeRaw(): Subscribing to "${target}" failed: %o`, err);
+      throw new ClientError(`subscribeRaw(): Subscribing to "${target}" failed`, err);
+    }
+  }
+
+  /**
+   * Unsubscribes given subscription by notificationHandle or subscription object
+   * 
+   * @param target Subscription object to unsubscribe (return value of `subscribe()` call)
+   */
+  public async unsubscribe(target: ActiveSubscription): Promise<void> {
+    if (!this.connection.connected) {
+      throw new ClientError(`unsubscribe(): Client is not connected. Use connect() to connect to the target first.`);
+    }
+
+    this.debug(`unsubscribe(): Unsubscribing %o`, target);
+
+    //Allocating bytes for request
+    const data = Buffer.alloc(4);
+    let pos = 0;
+
+    //0..3 Notification handle
+    data.writeUInt32LE(target.notificationHandle, pos);
+    pos += 4;
+
+    try {
+      const res = await this.sendAdsCommand<AdsDeleteNotificationResponse>({
+        adsCommand: ADS.ADS_COMMAND.DeleteNotification,
+        targetAmsNetId: target.remoteAddress.amsNetId,
+        targetAdsPort: target.remoteAddress.adsPort,
+        payload: data
+      });
+
+      const address = ADS.amsAddressToString(target.remoteAddress);
+
+      if (this.activeSubscriptions[address]) {
+        delete this.activeSubscriptions[address][target.notificationHandle];
+      }
+
+      this.debug(`unsubscribe(): Subscription with handle ${target.notificationHandle} unsubscribed from ${address}`);
+
+    } catch (err) {
+      this.debug(`unsubscribe(): Unsubscribing failed: %o`, err);
+      throw new ClientError(`unsubscribe(): Unsubscribing failed`, err);
+    }
+  }
+
+  /**
+    * Reads target device / system manager information
+    * If original target, the state is also saved to the `metaData.deviceInfo`
+    * 
+    * @param targetOpts Optional target settings that override values in `settings`
+    */
+  public async readDeviceInfo(targetOpts: TargetOptions = {}): Promise<AdsDeviceInfo> {
+    if (!this.connection.connected) {
+      throw new ClientError(`readDeviceInfo(): Client is not connected. Use connect() to connect to the target first.`);
+    }
+
+    try {
+      this.debug(`readDeviceInfo(): Reading device info`);
+
+      const res = await this.sendAdsCommand<AdsReadDeviceInfoResponse>({
+        adsCommand: ADS.ADS_COMMAND.ReadDeviceInfo,
+        targetAmsNetId: targetOpts.targetAmsNetId,
+        targetAdsPort: targetOpts.targetAdsPort
+      });
+
+      this.debug(`readDeviceInfo(): Device info read successfully. Device is %o`, res.ads.payload);
+
+      if (!targetOpts.targetAdsPort && !targetOpts.targetAmsNetId) {
+        //Target is not overridden -> save to metadata
+        this.metaData.deviceInfo = res.ads.payload;
+      }
+
+      return res.ads.payload;
+
+    } catch (err) {
+      this.debug(`readDeviceInfo(): Reading device info failed: %o`, err);
+      throw new ClientError(`readDeviceInfo():Reading device info failed`, err);
+    }
+  }
+
+  /**
+   * Reads target PLC runtime upload information 
+   * Info about data types and symbols
+   * 
+   * @param targetOpts Optional target settings that override values in `settings`
+   */
+  public async readUploadInfo(targetOpts: TargetOptions = {}): Promise<AdsUploadInfo> {
+    if (!this.connection.connected) {
+      throw new ClientError(`readUploadInfo(): Client is not connected. Use connect() to connect to the target first.`);
+    }
+
+    this.debug(`readUploadInfo(): Reading upload info`);
+
+    //Allocating bytes for request
+    const data = Buffer.alloc(12);
+    let pos = 0;
+
+    //0..3 IndexGroup 
+    data.writeUInt32LE(ADS.ADS_RESERVED_INDEX_GROUPS.SymbolUploadInfo2, pos);
+    pos += 4;
+
+    //4..7 IndexOffset
+    data.writeUInt32LE(0, pos);
+    pos += 4;
+
+    //8..11 Read data length
+    data.writeUInt32LE(24, pos);
+    pos += 4;
+
+    try {
+      const res = await this.sendAdsCommand<AdsReadResponse>({
+        adsCommand: ADS.ADS_COMMAND.Read,
+        targetAmsNetId: targetOpts.targetAmsNetId,
+        targetAdsPort: targetOpts.targetAdsPort,
+        payload: data
+      });
+
+      const uploadInfo = {} as AdsUploadInfo;
+
+      let pos = 0;
+      const response = res.ads.payload;
+
+      //0..3 Symbol count
+      uploadInfo.symbolCount = response.readUInt32LE(pos);
+      pos += 4;
+
+      //4..7 Symbol length
+      uploadInfo.symbolLength = response.readUInt32LE(pos);
+      pos += 4;
+
+      //8..11 Data type count
+      uploadInfo.dataTypeCount = response.readUInt32LE(pos);
+      pos += 4;
+
+      //12..15 Data type length
+      uploadInfo.dataTypeLength = response.readUInt32LE(pos);
+      pos += 4;
+
+      //16..19 Extra count
+      uploadInfo.extraCount = response.readUInt32LE(pos);
+      pos += 4;
+
+      //20..23 Extra length
+      uploadInfo.extraLength = response.readUInt32LE(pos);
+      pos += 4;
+
+      if (!targetOpts.targetAdsPort && !targetOpts.targetAmsNetId) {
+        //Target is not overridden -> save to metadata
+        this.metaData.uploadInfo = uploadInfo;
+      }
+
+      this.debug(`readUploadInfo(): Upload info read and parsed for ${ADS.amsAddressToString(res.ams.sourceAmsAddress)}`);
+      return uploadInfo;
+
+    } catch (err) {
+      this.debug(`readUploadInfo(): Reading upload info failed: %o`, err);
+      throw new ClientError(`readUploadInfo(): Reading upload info failed`, err);
+    }
+  }
+
+  /**
+   * Reads and parses ALL target PLC symbol information data.
+   * 
+   * If target is not overridden, also caches the result.
+   * 
+   * **WARNING: The returned object might be VERY large**
+   * 
+   * @param targetOpts Optional target settings that override values in `settings`
+   */
+  public async getSymbolInfos(targetOpts: TargetOptions = {}): Promise<AdsSymbolsContainer> {
+    if (!this.connection.connected) {
+      throw new ClientError(`getSymbolInfos(): Client is not connected. Use connect() to connect to the target first.`);
+    }
+    this.debug(`getSymbolInfos(): Reading symbol information`);
+
+    let uploadInfo: AdsUploadInfo;
+    try {
+      this.debug(`getSymbolInfos(): Updating upload info (needed for symbol reading)`)
+
+      uploadInfo = await this.readUploadInfo(targetOpts);
+
+    } catch (err) {
+      this.debug(`getSymbolInfos(): Reading upload info failed`)
+      throw new ClientError(`getSymbolInfos(): Reading upload info failed`, err);
+    }
+
+    //Allocating bytes for request
+    const data = Buffer.alloc(12);
+    let pos = 0;
+
+    //0..3 IndexGroup 
+    data.writeUInt32LE(ADS.ADS_RESERVED_INDEX_GROUPS.SymbolUpload, pos);
+    pos += 4;
+
+    //4..7 IndexOffset
+    data.writeUInt32LE(0, pos);
+    pos += 4;
+
+    //8..11 Read data length
+    data.writeUInt32LE(uploadInfo.symbolLength, pos);
+    pos += 4;
+
+    try {
+      const res = await this.sendAdsCommand<AdsReadResponse>({
+        adsCommand: ADS.ADS_COMMAND.Read,
+        targetAmsNetId: targetOpts.targetAmsNetId,
+        targetAdsPort: targetOpts.targetAdsPort,
+        payload: data
+      });
+
+      const symbols = {} as AdsSymbolsContainer;
+
+      let response = res.ads.payload;
+      let count = 0;
+
+      while (response.byteLength > 0) {
+        let pos = 0;
+
+        //0..3 Symbol information bytelength
+        const len = response.readUInt32LE(pos);
+        pos += 4;
+
+        const symbol = this.parseAdsResponseSymbolInfo(response.subarray(pos, pos + len));
+        symbols[symbol.name.trim().toLowerCase()] = symbol;
+
+        response = response.subarray(len);
+        count++;
+      }
+
+      if (!targetOpts.targetAdsPort && !targetOpts.targetAmsNetId) {
+        //Target is not overridden -> save to metadata
+        this.metaData.symbols = symbols;
+        this.metaData.allSymbolsCached = true;
+        this.debug(`getSymbolInfos(): All symbols read and cached (symbol count ${count})`);
+
+      } else {
+        this.debug(`getSymbolInfos(): All symbols read (symbol count ${count})`);
+      }
+
+      return symbols;
+
+    } catch (err) {
+      this.debug(`getSymbolInfos(): Reading symbol information failed: %o`, err);
+      throw new ClientError(`getSymbolInfos(): Reading symbol information failed`, err);
+    }
+  }
+
+  /**
+   * Caches all symbol information data from target PLC runtime
+   * 
+   * Can be used to pre-cache all symbols to speed up communication. 
+   * Caching is only available for the original target configured in settings. 
+   * 
+   * Wrapper for `getSymbolInfos()` (calling it without overridden target has the same effect)
+   */
+  public async cacheSymbolInfos() {
+    this.debug(`cacheSymbolInfos(): Caching all symbol information`);
+
+    try {
+      await this.getSymbolInfos();
+
+      this.debug(`cacheSymbolInfos(): All symbol information is now cached`);
+
+    } catch (err) {
+      this.debug(`cacheSymbolInfos(): Caching symbol information failed: %o`, err);
+      throw new ClientError(`cacheSymbolInfos(): Caching symbol information failed`, err);
+    }
+  }
+
+  /**
+   * Reads and parses ALL target PLC data type data.
+   * 
+   * If target is not overridden, also caches the result.
+   * 
+   * **IMPORTANT:** These data types do not have full construction with deep-level subitems.
+   * To get full data type declaration for specific data type, use `getDataType()`.
+   * 
+   * **WARNING: The returned object might be VERY large**
+   * 
+   * @param targetOpts Optional target settings that override values in `settings`
+   */
+  public async getDataTypes(targetOpts: TargetOptions = {}): Promise<AdsDataTypesContainer> {
+    if (!this.connection.connected) {
+      throw new ClientError(`getDataTypes(): Client is not connected. Use connect() to connect to the target first.`);
+    }
+    this.debug(`getDataTypes(): Reading data types`);
+
+    let uploadInfo: AdsUploadInfo;
+    try {
+      this.debug(`getDataTypes(): Updating upload info (needed for data type reading)`)
+
+      uploadInfo = await this.readUploadInfo(targetOpts);
+
+    } catch (err) {
+      this.debug(`getDataTypes(): Reading upload info failed`)
+      throw new ClientError(`getDataTypes(): Reading upload info failed`, err);
+    }
+
+    //Allocating bytes for request
+    const data = Buffer.alloc(12);
+    let pos = 0;
+
+    //0..3 IndexGroup 
+    data.writeUInt32LE(ADS.ADS_RESERVED_INDEX_GROUPS.SymbolDataTypeUpload, pos);
+    pos += 4;
+
+    //4..7 IndexOffset
+    data.writeUInt32LE(0, pos);
+    pos += 4;
+
+    //8..11 Read data length
+    data.writeUInt32LE(uploadInfo.dataTypeLength, pos);
+    pos += 4;
+
+    try {
+      const res = await this.sendAdsCommand<AdsReadResponse>({
+        adsCommand: ADS.ADS_COMMAND.Read,
+        targetAmsNetId: targetOpts.targetAmsNetId,
+        targetAdsPort: targetOpts.targetAdsPort,
+        payload: data
+      });
+
+      const dataTypes = {} as AdsDataTypesContainer;
+
+      let response = res.ads.payload;
+      let count = 0;
+
+      while (response.byteLength > 0) {
+        let pos = 0;
+
+        //0..3 Data type information bytelength
+        const len = response.readUInt32LE(pos);
+        pos += 4;
+
+        const dataType = this.parseAdsResponseDataType(response.subarray(pos, pos + len));
+        dataTypes[dataType.name.trim().toLowerCase()] = dataType;
+
+        response = response.subarray(len);
+        count++;
+      }
+
+      if (!targetOpts.targetAdsPort && !targetOpts.targetAmsNetId) {
+        //Target is not overridden -> save to metadata
+        this.metaData.dataTypes = dataTypes;
+        this.metaData.allDataTypesCached = true;
+        this.debug(`getDataTypes(): All data types read and cached (data type count ${count})`);
+
+      } else {
+        this.debug(`getDataTypes(): All symbols read (data type count ${count})`);
+      }
+
+      return dataTypes;
+
+    } catch (err) {
+      this.debug(`getDataTypes(): Reading data type information failed: %o`, err);
+      throw new ClientError(`getDataTypes(): Reading data type information failed`, err);
+    }
+  }
+
+  /**
+   * Caches all data types from target PLC runtime
+   * 
+   * Can be used to pre-cache all data types to speed up communication. 
+   * Caching is only available for the original target configured in settings. 
+   * 
+   * Wrapper for `getDataTypes()` (calling it without overridden target has the same effect)
+   */
+  public async cacheDataTypes() {
+    this.debug(`cacheDataTypes(): Caching all data types`);
+
+    try {
+      await this.getDataTypes();
+
+      this.debug(`cacheDataTypes(): All data types are now cached`);
+
+    } catch (err) {
+      this.debug(`cacheDataTypes(): Caching data types failed: %o`, err);
+      throw new ClientError(`cacheDataTypes(): Caching data types failed`, err);
+    }
+  }
+
 }

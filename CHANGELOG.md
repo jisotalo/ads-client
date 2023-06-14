@@ -7,12 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [2.0.0] - xx.xx.2023
 - Version 2
 ### Changed
-- `disableBigInt` setting removed as library now targets Node.js version 16 and newer
+- `disableBigInt` setting removed, BigInt is now used always if available
+- Built data types (full data type trees of data types with subitems, such as structures) are now cached as well
+  - Huge impact on performance when handling structured data types
+- Added new setting `disableCaching` to disable all symbol and data type caching
+- Added optional `opts` argument in all methods
+  - Possible to provide different AmsNetId and/or AdsPort than specified in the settings
+  - Symbol and data type caching not used when using `opts` (only for target provided in settings)
 
 ### Breaking changes
+- `unsubscribe()` no longer accepts numerical notification handle (only subscription object)
 - Subscription data `timeStamp`->`timestamp`
 - Removed nameLength, typeLength, commentLength and attributeCount from symbol info object
 - Removed nameLength, typeLength, commentLength, subItemCount and attributeCount from data type object
+- enumInfo -> enumInfos, arrayData -> arrayInfos
+- ClientException changed to ClientError
+  - Simplified error object, longer stack trace as default
+- setDebugging() -> setDebugLevel()
+  - Possible values 0,1,2,3 instead of 0,1,2,3,4
+- `readSymbolVersion()` removed (active value is available at `client.metaData.symbolVersion`)
+- `readAndCacheSymbols()` changed to `getSymbolInfos()` and `cacheSymbolInfos()`
+- `readAndCacheDataTypes()` changed to `getDataTypes()` and `cacheDataTypes()`
+
+
 
 
 ## [1.14.1] - 13.09.2022

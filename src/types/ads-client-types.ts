@@ -1,4 +1,4 @@
-import { AdsDataType, AdsDeviceInfo, AdsRawInfo, AdsResponse, AdsState, AdsSymbolInfo, AmsTcpPacket } from "./ads-protocol-types"
+import { AdsDataType, AdsDeviceInfo, AdsRawInfo, AdsResponse, AdsState, AdsSymbolInfo, AmsAddress, AmsTcpPacket } from "./ads-protocol-types"
 
 interface ConnectionSettings {
   /** **REQUIRED**: Target system AmsNetId address. For local (same machine), use `localhost` or `127.0.0.1.1` */
@@ -45,7 +45,9 @@ export interface AdsClientSettings extends ConnectionSettings {
   /** Optional: If true, the connect() will success even no targer runtime is found (but system manager is available) - For example if PLC software is not yet downloaded but we want to connect in advance. (default: false) */
   allowHalfOpen?: boolean,
   /** Optional: If true, only direct ADS connection is established to target. Can be used to connect to system without system manager etc. (non-TwinCAT or direct I/O) (default: false) */
-  bareClient?: boolean
+  bareClient?: boolean,
+  /** Optional: If true, symbols and data types are not cached. Descriptions are read every time from target and built (slows communication but data is guaranteed to be up-to-date) (default: false) */
+  disableCaching?: boolean
 }
 
 export interface TimerObject {
@@ -63,37 +65,47 @@ export interface AdsClientConnection {
   /** Local AmsNetId of the client */
   localAmsNetId?: string,
   /** Local ADS port of the client */
-  localAdsPort?: number
+  localAdsPort?: number,
+  /** Target AmsNetId */
+  targetAmsNetId?: string,
+  /** Target ADS port */
+  targetAdsPort?: number,
 }
 
 /** Object containing all active subscriptions (notification handle as key) */
 export interface ActiveSubscriptionContainer {
+  [K: string]: TargetActiveSubscriptionContainer
+}
+
+export interface TargetActiveSubscriptionContainer {
   [K: number]: ActiveSubscription
 }
 
-/** Object containing information for an active subscription created by subscribe() */
-export interface ActiveSubscription {
-  /** PLC variable name or raw address (and size) of this subscriptions target*/
-  target: SubscriptionTarget;
-  /** Latest data that has been received (if any) */
-  latestData?: SubscriptionData,
-  /** */
-  notificationHandle: number,
-  /** */
+/** Object containing information for an active subscription */
+export interface ActiveSubscription<T = any> {
+  /** Options for this subscription */
+  options: SubscriptionOptions<T>,
+  /** True = This subscription is ads-client internal, not created by user */
   internal: boolean,
-  /** */
-  symbolInfo?: SymbolInfo,
-  /** */
-  settings: SubscriptionSettings,
-  /** Function that parses received data to variable */
-  parseNotification: (data: Buffer, timestamp: Date) => Promise<SubscriptionData>;
-  /** Callback function provided by user that is called when new data arrives */
-  userCallback?: (data: SubscriptionData, subscription: ActiveSubscription) => void;
+  /** Remote AMS address and port */
+  remoteAddress: AmsAddress,
+  /** Notification handle (number) of this subscription's ADS device notification */
+  notificationHandle: number,
+  /** Symbol info of the target variable (if any) */
+  symbolInfo?: AdsSymbolInfo,
+  /** Function that can be called to unsubscribe (same as `client.unsubscribe(...)`) */
+  unsubscribe: () => Promise<void>,
+  /** Function that parses received raw data to a variable */
+  parseNotification: (data: Buffer, timestamp: Date) => Promise<SubscriptionData<T>>,
+  /** Latest data that has been received (if any) */
+  latestData?: SubscriptionData<T>,
+  /** Optional target settings that override values in `settings` (NOTE: If used, no caching is available -> worse performance) */
+  targetOpts?: TargetOptions
 }
 
-export interface SubscriptionData {
-  timestamp: Date
-
+export interface SubscriptionData<T = any> {
+  timestamp: Date,
+  value: T
 }
 
 
@@ -124,8 +136,10 @@ export interface ConnectionMetaData {
   symbols: AdsSymbolsContainer,
   /** True if client has cached all data types previously - we know to cache all again after a symbol version change */
   allDataTypesCached: boolean,
-  /** All cached target runtime data types */
+  /** All target runtime cached data types (without subitems, see builtDataTypes for full data types)*/
   dataTypes: AdsDataTypesContainer,
+  /** All target runtime cached built data types (with subitems / full data type tree) */
+  builtDataTypes: AdsDataTypesContainer,
   /** Local AMS router state (if available) */
   routerState?: AmsRouterState
 };
@@ -145,9 +159,9 @@ export interface AdsUploadInfo {
   /** Length of downloadable data type description data (bytes) */
   dataTypeLength: number,
   /** Unknown */
-  extraCount: 2000,
+  extraCount: number,
   /** Unknown */
-  extraLength: 0
+  extraLength: number
 }
 
 export interface AdsSymbolsContainer {
@@ -176,13 +190,28 @@ export interface TargetOptions{
   targetAdsPort?: number,
 }
 
-export type SubscriptionTarget = AdsRawInfo | string;
+/**
+ * Represents a callback function used in a subscription.
+ * 
+ * @template T - The type of data being passed to the callback
+ * 
+ * @param data - The data received
+ * @param subscription - The active subscription object
+ */
+export type SubscriptionCallback<T = any> = (data: SubscriptionData<T>, subscription: ActiveSubscription<T>) => void;
 
-export type SubscriptionCallback = () => void;
-
-export interface SubscriptionSettings {
-  transmissionMode: number,
-  maximumDelay: number,
-  cycleTime: number,
-  internal?: boolean,
+export interface SubscriptionOptions<T = any> {
+  /** Target of the subscription (variable name or raw address) */
+  target: AdsRawInfo | string,
+  /** Callback that is called when new data has arrived */
+  callback: SubscriptionCallback<T>,
+  /** How often the notification is sent at max (milliseconds) */
+  cycleTime?: number,
+  /** If true, PLC sends the notification only when value has changed. Otherwise sent intervally */
+  sendOnChange?: boolean,
+  /** How long the PLC waits before sending the value */
+  initialDelay?: number,
 }
+
+ 
+export type PlcPrimitiveType = string | boolean | number | Buffer | Date | {};
