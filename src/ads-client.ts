@@ -2331,8 +2331,6 @@ export class Client extends EventEmitter {
    * @param targetOpts Optional target settings that override values in `settings` (NOTE: If used, no caching is available -> worse performance)
    * @param isRootType If true, this is the root type / first call (not recursive call)
    * @param knownSize Data type size (if known) - used with pseudo data types and TwinCAT 2 primite types
-   * 
-   * @throws {AdsError}
    */
   private async buildDataType(name: string, targetOpts: TargetOptions = {}, isRootType = true, knownSize?: number): Promise<AdsDataType> {
     try {
@@ -2440,12 +2438,12 @@ export class Client extends EventEmitter {
         && dataType.flagsStr.includes('DataType')
         && !dataType.flagsStr.includes('EnumInfos')
         && dataType.arrayDimension === 0)) {
+
         //This is final form (no need to go deeper)
-        builtType = dataType;
+        builtType = { ...dataType };
 
       } else if (dataType.arrayDimension > 0) {
-        //Data type is an array
-        //Get array subtype
+        //Data type is an array - get array subtype
         builtType = {
           ...(await this.buildDataType(dataType.type, targetOpts, false))
         };
@@ -2465,27 +2463,26 @@ export class Client extends EventEmitter {
           ...(await this.buildDataType(dataType.type, targetOpts, false))
         };
 
-        builtType = {
-          ...builtType,
-          enumInfos: dataType.enumInfos.map(entry => {
-            const temp = {
-              ...builtType,
-              type: builtType.name
-            };
+        //Converting enumeration info values from buffers to correct ones
+        builtType.enumInfos = dataType.enumInfos.map(entry => {
+          const temp = {
+            ...builtType,
+            type: builtType.name
+          };
 
-            return {
-              ...entry,
-              value: this.convertBufferToPrimitiveType(entry.value as Buffer, temp)
-            };
-          })
-        };
+          return {
+            ...entry,
+            value: this.convertBufferToPrimitiveType(entry.value as Buffer, temp)
+          };
+        });
 
-      } else if (dataType.subItems.length === 0 && dataType.adsDataType === ADS.ADS_DATA_TYPES.ADST_BIGTYPE) {
+      } else if (dataType.type === '' && dataType.subItems.length === 0 && dataType.adsDataType === ADS.ADS_DATA_TYPES.ADST_BIGTYPE) {
         //TwinCAT 2 - If we have empty struct, it's size is not 0 but it has no subitems
         //This is final form (no need to go deeper)
-        builtType = dataType;
+        builtType = { ...dataType };
+
       } else {
-        //This is not the final data type -> continue
+        //This is not the final data type -> continue recursively
         builtType = await this.buildDataType(dataType.type, targetOpts, false);
       }
 
@@ -2493,11 +2490,10 @@ export class Client extends EventEmitter {
         //The root type has actually the data type in "name" property
         builtType.type = builtType.name;
         builtType.name = '';
+      }
 
-        //Only cache when original target
-        if (!this.settings.disableCaching && !targetOpts.targetAdsPort && !targetOpts.targetAmsNetId) {
-          this.metaData.builtDataTypes[name.toLowerCase()] = builtType;
-        }
+      if (!this.settings.disableCaching && !targetOpts.targetAdsPort && !targetOpts.targetAmsNetId) {
+        this.metaData.builtDataTypes[name.toLowerCase()] = builtType;
       }
 
       return builtType;
