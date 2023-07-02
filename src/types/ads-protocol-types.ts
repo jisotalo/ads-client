@@ -22,11 +22,11 @@ SOFTWARE.
 import * as ADS from '../ads-commons';
 import { PlcPrimitiveType } from "./ads-client-types";
 
-/** AMS address */
+/** AMS address, such as 192.168.1.2.1.1:851 */
 export interface AmsAddress {
-  /** AmsNetId */
+  /** AmsNetId, such as 192.168.1.2.1.1*/
   amsNetId: string,
-  /** ADS port */
+  /** ADS port, such as 851 */
   adsPort: number,
 }
 

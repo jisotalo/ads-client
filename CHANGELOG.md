@@ -11,9 +11,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Built data types (full data type trees of data types with subitems, such as structures) are now cached as well
   - Huge impact on performance when handling structured data types
 - Added new setting `disableCaching` to disable all symbol and data type caching
-- Added optional `opts` argument in all methods
+- Added optional `targetOpts` argument in all methods
   - Possible to provide different AmsNetId and/or AdsPort than specified in the settings
-  - Symbol and data type caching not used when using `opts` (only for target provided in settings)
+  - Symbol and data type caching not used when using `targetOpts` (only for target provided in settings)
 
 ### Breaking changes
 - `unsubscribe()` no longer accepts numerical notification handle (only subscription object)

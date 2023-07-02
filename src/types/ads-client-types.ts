@@ -100,7 +100,7 @@ export interface ActiveSubscription<T = any> {
   /** Latest data that has been received (if any) */
   latestData?: SubscriptionData<T>,
   /** Optional target settings that override values in `settings` (NOTE: If used, no caching is available -> worse performance) */
-  targetOpts?: TargetOptions
+  targetOpts?: Partial<AmsAddress>
 }
 
 export interface SubscriptionData<T = any> {
@@ -183,13 +183,6 @@ export interface AdsCommandToSend {
   payload?: Buffer
 }
 
-export interface TargetOptions{
-  /** Override target AmsNetId (if different than client `settings.targetAmsNetId` */
-  targetAmsNetId?: string,
-  /** Override target ADS port (if different than client `settings.targetAdsPort` */
-  targetAdsPort?: number,
-}
-
 /**
  * Represents a callback function used in a subscription.
  * 
@@ -215,3 +208,10 @@ export interface SubscriptionOptions<T = any> {
 
  
 export type PlcPrimitiveType = string | boolean | number | Buffer | Date | {};
+
+export interface Symbol<T = any> {
+  value: T,
+  rawValue: Buffer,
+  dataType: AdsDataType,
+  symbolInfo: AdsSymbolInfo
+}

@@ -1,17 +1,18 @@
 import EventEmitter from "events";
-import type { ActiveAdsRequestContainer, ActiveSubscription, ActiveSubscriptionContainer, AdsClientConnection, AdsClientSettings, AdsCommandToSend, AdsDataTypesContainer, AdsSymbolsContainer, AdsUploadInfo, ConnectionMetaData, PlcPrimitiveType, SubscriptionCallback, SubscriptionData, SubscriptionOptions, TargetOptions, TimerObject } from "./types/ads-client-types";
+import type { ActiveAdsRequestContainer, ActiveSubscription, ActiveSubscriptionContainer, AdsClientConnection, AdsClientSettings, AdsCommandToSend, AdsDataTypesContainer, AdsSymbolsContainer, AdsUploadInfo, ConnectionMetaData, PlcPrimitiveType, SubscriptionCallback, SubscriptionData, SubscriptionOptions, Symbol, TimerObject } from "./types/ads-client-types";
 import { AdsAddNotificationResponse, AdsAddNotificationResponseData, AdsArrayInfoEntry, AdsAttributeEntry, AdsDataType, AdsDeleteNotificationResponse, AdsDeviceInfo, AdsEnumInfo, AdsNotification, AdsNotificationResponse, AdsNotificationSample, AdsNotificationStamp, AdsRawInfo, AdsReadDeviceInfoResponse, AdsReadResponse, AdsReadStateResponse, AdsReadWriteResponse, AdsRequest, AdsResponse, AdsRpcMethodEntry, AdsRpcMethodParameterEntry, AdsState, AdsSymbolInfo, AdsWriteControlResponse, AdsWriteResponse, AmsAddress, AmsHeader, AmsPortRegisteredData, AmsRouterState, AmsRouterStateData, AmsTcpHeader, AmsTcpPacket, BaseAdsResponse, EmptyAdsResponse, UnknownAdsResponse } from "./types/ads-protocol-types";
-
 import {
   Socket,
   SocketConnectOpts
 } from "net";
 import Debug from "debug";
-import * as ADS from './ads-commons';
 import Long from "long";
-import { ClientError } from "./client-error";
+
+import * as ADS from './ads-commons';
+import ClientError from "./client-error";
 export * as ADS from './ads-commons';
 
+//TODO: Remove this (only for v2 development use)
 const die = (...args: any) => {
 
   const util = require("util");
@@ -807,7 +808,7 @@ export class Client extends EventEmitter {
       //Refreshing symbol cache (if needed)
       if (this.metaData.allSymbolsCached) {
         try {
-          //TODO await this.readAndCacheSymbols();
+          await this.cacheSymbolInfos();
 
         } catch (err) {
           this.debug(`onSymbolVersionChanged(): Failed to refresh symbol cache`);
@@ -817,7 +818,7 @@ export class Client extends EventEmitter {
       //Refreshing data type cache (if needed)
       if (this.metaData.allDataTypesCached) {
         try {
-          //TODO await this.readAndCacheDataTypes();
+          await this.cacheDataTypes();
 
         } catch (err) {
           this.debug(`onSymbolVersionChanged(): Failed to refresh data type cache`);
@@ -1670,7 +1671,7 @@ export class Client extends EventEmitter {
    * @param settings 
    * @param targetOpts Optional target settings that override values in `settings` (NOTE: If used, no caching is available -> worse performance)
    */
-  private async addSubscription<T = any>(options: SubscriptionOptions<T>, internal: boolean, targetOpts: TargetOptions = {}): Promise<ActiveSubscription<T>> {
+  private async addSubscription<T = any>(options: SubscriptionOptions<T>, internal: boolean, targetOpts: Partial<AmsAddress> = {}): Promise<ActiveSubscription<T>> {
     this.debugD(`addSubscription(): Subscribing %o (internal: ${internal})`, options);
 
     let targetAddress = {} as AdsRawInfo;
@@ -1683,7 +1684,7 @@ export class Client extends EventEmitter {
         //Read symbol datatype to cache -> It's cached when we start getting notifications
         //Otherwise with large structs and fast cycle times there might be some issues
         //NOTE: Only when we are targetted to original target system, otherwise we don't have caching so no need to
-        if (!this.settings.disableCaching && !targetOpts.targetAdsPort && !targetOpts.targetAmsNetId) {
+        if (!this.settings.disableCaching && !targetOpts.adsPort && !targetOpts.amsNetId) {
           await this.getDataType(symbolInfo.type, targetOpts);
         }
 
@@ -1739,8 +1740,8 @@ export class Client extends EventEmitter {
     try {
       const res = await this.sendAdsCommand<AdsAddNotificationResponse>({
         adsCommand: ADS.ADS_COMMAND.AddNotification,
-        targetAmsNetId: targetOpts.targetAmsNetId,
-        targetAdsPort: targetOpts.targetAdsPort,
+        targetAmsNetId: targetOpts.amsNetId,
+        targetAdsPort: targetOpts.adsPort,
         payload: data
       });
 
@@ -2259,13 +2260,13 @@ export class Client extends EventEmitter {
    * @param name Data type name in the PLC (such as `ST_Struct`)
    * @param targetOpts Optional target settings that override values in `settings` (NOTE: If used, no caching is available -> worse performance)
    */
-  private async getDataTypeDeclaration(name: string, targetOpts: TargetOptions = {}): Promise<AdsDataType> {
+  private async getDataTypeDeclaration(name: string, targetOpts: Partial<AmsAddress> = {}): Promise<AdsDataType> {
     this.debug(`getDataTypeDeclaration(): Data type declaration requested for "${name}"`);
 
     //Is this data type already cached? Skip check if we have different target
     if (!this.settings.disableCaching
-      && !targetOpts.targetAdsPort
-      && !targetOpts.targetAmsNetId
+      && !targetOpts.adsPort
+      && !targetOpts.amsNetId
       && this.metaData.dataTypes[name.toLowerCase()]) {
 
       this.debug(`getDataTypeDeclaration(): Data type declaration found from cache for "${name}"`);
@@ -2302,8 +2303,8 @@ export class Client extends EventEmitter {
     try {
       const res = await this.sendAdsCommand<AdsReadWriteResponse>({
         adsCommand: ADS.ADS_COMMAND.ReadWrite,
-        targetAmsNetId: targetOpts.targetAmsNetId,
-        targetAdsPort: targetOpts.targetAdsPort,
+        targetAmsNetId: targetOpts.amsNetId,
+        targetAdsPort: targetOpts.adsPort,
         payload: data
       });
 
@@ -2311,7 +2312,7 @@ export class Client extends EventEmitter {
       const dataType = this.parseAdsResponseDataType(res.ads.payload.subarray(4));
 
       //Only cache when original target
-      if (!this.settings.disableCaching && !targetOpts.targetAdsPort && !targetOpts.targetAmsNetId) {
+      if (!this.settings.disableCaching && !targetOpts.adsPort && !targetOpts.amsNetId) {
         this.metaData.dataTypes[name.toLowerCase()] = dataType;
       }
       this.debug(`getDataTypeDeclaration(): Data type declaration read and parsed for "${name}"`);
@@ -2329,21 +2330,23 @@ export class Client extends EventEmitter {
    * 
    * @param name Data type name in the PLC (such as `ST_Struct`)
    * @param targetOpts Optional target settings that override values in `settings` (NOTE: If used, no caching is available -> worse performance)
-   * @param isRootType If true, this is the root type / first call (not recursive call)
+   * @param isRootType If true, this is the root type / first call / not recursive call (default: true)
    * @param knownSize Data type size (if known) - used with pseudo data types and TwinCAT 2 primite types
    */
-  private async buildDataType(name: string, targetOpts: TargetOptions = {}, isRootType = true, knownSize?: number): Promise<AdsDataType> {
+  private async buildDataType(name: string, targetOpts: Partial<AmsAddress> = {}, isRootType = true, knownSize?: number): Promise<AdsDataType> {
     try {
       this.debug(`buildDataType(): Building data type for "${name}"`);
 
       //Is this built data type already cached? Skip check if we have different target
       if (!this.settings.disableCaching
-        && !targetOpts.targetAdsPort
-        && !targetOpts.targetAmsNetId
+        && !targetOpts.adsPort
+        && !targetOpts.amsNetId
         && this.metaData.builtDataTypes[name.toLowerCase()]) {
 
         this.debug(`buildDataType(): Built full data type declaration found from cache for "${name}"`);
-        return this.metaData.builtDataTypes[name.toLowerCase()];
+        return {
+          ...this.metaData.builtDataTypes[name.toLowerCase()]
+        };
       }
 
       let dataType: AdsDataType | undefined;
@@ -2492,7 +2495,7 @@ export class Client extends EventEmitter {
         builtType.name = '';
       }
 
-      if (!this.settings.disableCaching && !targetOpts.targetAdsPort && !targetOpts.targetAmsNetId) {
+      if (!this.settings.disableCaching && !targetOpts.adsPort && !targetOpts.amsNetId) {
         this.metaData.builtDataTypes[name.toLowerCase()] = builtType;
       }
 
@@ -2575,13 +2578,13 @@ export class Client extends EventEmitter {
 
 
   /**
-   * Reads and parses symbol information for given variable path (symbol)
-   * Saved to cache if target not overriden.
+   * Reads and parses symbol information for given variable path
+   * Saved to cache if target is not overridden.
    * 
    * @param path Full variable path in the PLC (such as `GVL_Test.ExampleStruct`)
    * @param targetOpts Optional target settings that override values in `settings` (NOTE: If used, no caching is available -> worse performance)
    */
-  public async getSymbolInfo(path: string, targetOpts: TargetOptions = {}): Promise<AdsSymbolInfo> {
+  public async getSymbolInfo(path: string, targetOpts: Partial<AmsAddress> = {}): Promise<AdsSymbolInfo> {
     if (!this.connection.connected) {
       throw new ClientError(`getSymbolInfo(): Client is not connected. Use connect() to connect to the target first.`);
     }
@@ -2591,8 +2594,8 @@ export class Client extends EventEmitter {
 
     //Is this symbol already cached? Skip check if we have different target
     if (!this.settings.disableCaching
-      && !targetOpts.targetAdsPort
-      && !targetOpts.targetAmsNetId
+      && !targetOpts.adsPort
+      && !targetOpts.amsNetId
       && this.metaData.symbols[path.toLowerCase()]) {
 
       this.debug(`getSymbolInfo(): Symbol info found from cache for "${path}"`);
@@ -2629,8 +2632,8 @@ export class Client extends EventEmitter {
     try {
       const res = await this.sendAdsCommand<AdsReadWriteResponse>({
         adsCommand: ADS.ADS_COMMAND.ReadWrite,
-        targetAmsNetId: targetOpts.targetAmsNetId,
-        targetAdsPort: targetOpts.targetAdsPort,
+        targetAmsNetId: targetOpts.amsNetId,
+        targetAdsPort: targetOpts.adsPort,
         payload: data
       });
 
@@ -2638,7 +2641,7 @@ export class Client extends EventEmitter {
       const symbol = this.parseAdsResponseSymbolInfo(res.ads.payload.subarray(4));
 
       //Only cache when original target
-      if (!this.settings.disableCaching && !targetOpts.targetAdsPort && !targetOpts.targetAmsNetId) {
+      if (!this.settings.disableCaching && !targetOpts.adsPort && !targetOpts.amsNetId) {
         this.metaData.symbols[path.toLowerCase()] = symbol;
       }
 
@@ -2657,7 +2660,7 @@ export class Client extends EventEmitter {
    * @param name Data type name in the PLC (such as `ST_Struct`)
    * @param targetOpts Optional target settings that override values in `settings` (NOTE: If used, no caching is available -> worse performance)
    */
-  public async getDataType(name: string, targetOpts: TargetOptions = {}): Promise<AdsDataType> {
+  public async getDataType(name: string, targetOpts: Partial<AmsAddress> = {}): Promise<AdsDataType> {
     if (!this.connection.connected) {
       throw new ClientError(`getDataType(): Client is not connected. Use connect() to connect to the target first.`);
     }
@@ -2676,7 +2679,7 @@ export class Client extends EventEmitter {
     * 
     * @param targetOpts Optional target settings that override values in `settings` (NOTE: If used, no caching is available -> worse performance)
     */
-  public async readPlcRuntimeState(targetOpts: TargetOptions = {}): Promise<AdsState> {
+  public async readPlcRuntimeState(targetOpts: Partial<AmsAddress> = {}): Promise<AdsState> {
     if (!this.connection.connected) {
       throw new ClientError(`readPlcRuntimeState(): Client is not connected. Use connect() to connect to the target first.`);
     }
@@ -2686,13 +2689,13 @@ export class Client extends EventEmitter {
 
       const res = await this.sendAdsCommand<AdsReadStateResponse>({
         adsCommand: ADS.ADS_COMMAND.ReadState,
-        targetAmsNetId: targetOpts.targetAmsNetId,
-        targetAdsPort: targetOpts.targetAdsPort
+        targetAmsNetId: targetOpts.amsNetId,
+        targetAdsPort: targetOpts.adsPort
       });
 
       this.debug(`readPlcRuntimeState(): Device state read successfully. State is %o`, res.ads.payload);
 
-      if (!targetOpts.targetAdsPort && !targetOpts.targetAmsNetId) {
+      if (!targetOpts.adsPort && !targetOpts.amsNetId) {
         //Target is not overridden -> save to metadata
         this.metaData.plcRuntimeState = res.ads.payload;
       }
@@ -2720,7 +2723,7 @@ export class Client extends EventEmitter {
    * 
    * @template T Typescript data type of the PLC data, for example `subscribe<number>(...)` or `subscripe<ST_TypedStruct>(...)`
    */
-  public subscribe<T = any>(target: string, callback: SubscriptionCallback<T>, cycleTime: number = 100, sendOnChange: boolean = true, initialDelay: number = 0, targetOpts: TargetOptions = {}): Promise<ActiveSubscription<T>> {
+  public subscribe<T = any>(target: string, callback: SubscriptionCallback<T>, cycleTime: number = 100, sendOnChange: boolean = true, initialDelay: number = 0, targetOpts: Partial<AmsAddress> = {}): Promise<ActiveSubscription<T>> {
     if (!this.connection.connected) {
       throw new ClientError(`subscribe(): Client is not connected. Use connect() to connect to the target first.`);
     }
@@ -2751,7 +2754,7 @@ export class Client extends EventEmitter {
    * 
    * @template T Typescript data type of the PLC data, for example `subscribe<number>(...)` or `subscripe<ST_TypedStruct>(...)`
    */
-  public subscribeAny<T = any>(options: SubscriptionOptions<T>, targetOpts: TargetOptions = {}): Promise<ActiveSubscription<T>> {
+  public subscribeAny<T = any>(options: SubscriptionOptions<T>, targetOpts: Partial<AmsAddress> = {}): Promise<ActiveSubscription<T>> {
     if (!this.connection.connected) {
       throw new ClientError(`subscribeAny(): Client is not connected. Use connect() to connect to the target first.`);
     }
@@ -2781,7 +2784,7 @@ export class Client extends EventEmitter {
    * @param targetOpts Optional target settings that override values in `settings` (NOTE: If used, no caching is available -> worse performance)
    * 
    */
-  public subscribeRaw(target: AdsRawInfo, callback: SubscriptionCallback<Buffer>, cycleTime: number = 100, sendOnChange: boolean = true, initialDelay: number = 0, targetOpts: TargetOptions = {}): Promise<ActiveSubscription<Buffer>> {
+  public subscribeRaw(target: AdsRawInfo, callback: SubscriptionCallback<Buffer>, cycleTime: number = 100, sendOnChange: boolean = true, initialDelay: number = 0, targetOpts: Partial<AmsAddress> = {}): Promise<ActiveSubscription<Buffer>> {
     if (!this.connection.connected) {
       throw new ClientError(`subscribeRaw(): Client is not connected. Use connect() to connect to the target first.`);
     }
@@ -2851,7 +2854,7 @@ export class Client extends EventEmitter {
     * 
     * @param targetOpts Optional target settings that override values in `settings`
     */
-  public async readDeviceInfo(targetOpts: TargetOptions = {}): Promise<AdsDeviceInfo> {
+  public async readDeviceInfo(targetOpts: Partial<AmsAddress> = {}): Promise<AdsDeviceInfo> {
     if (!this.connection.connected) {
       throw new ClientError(`readDeviceInfo(): Client is not connected. Use connect() to connect to the target first.`);
     }
@@ -2861,13 +2864,13 @@ export class Client extends EventEmitter {
 
       const res = await this.sendAdsCommand<AdsReadDeviceInfoResponse>({
         adsCommand: ADS.ADS_COMMAND.ReadDeviceInfo,
-        targetAmsNetId: targetOpts.targetAmsNetId,
-        targetAdsPort: targetOpts.targetAdsPort
+        targetAmsNetId: targetOpts.amsNetId,
+        targetAdsPort: targetOpts.adsPort
       });
 
       this.debug(`readDeviceInfo(): Device info read successfully. Device is %o`, res.ads.payload);
 
-      if (!targetOpts.targetAdsPort && !targetOpts.targetAmsNetId) {
+      if (!targetOpts.adsPort && !targetOpts.amsNetId) {
         //Target is not overridden -> save to metadata
         this.metaData.deviceInfo = res.ads.payload;
       }
@@ -2886,7 +2889,7 @@ export class Client extends EventEmitter {
    * 
    * @param targetOpts Optional target settings that override values in `settings`
    */
-  public async readUploadInfo(targetOpts: TargetOptions = {}): Promise<AdsUploadInfo> {
+  public async readUploadInfo(targetOpts: Partial<AmsAddress> = {}): Promise<AdsUploadInfo> {
     if (!this.connection.connected) {
       throw new ClientError(`readUploadInfo(): Client is not connected. Use connect() to connect to the target first.`);
     }
@@ -2912,8 +2915,8 @@ export class Client extends EventEmitter {
     try {
       const res = await this.sendAdsCommand<AdsReadResponse>({
         adsCommand: ADS.ADS_COMMAND.Read,
-        targetAmsNetId: targetOpts.targetAmsNetId,
-        targetAdsPort: targetOpts.targetAdsPort,
+        targetAmsNetId: targetOpts.amsNetId,
+        targetAdsPort: targetOpts.adsPort,
         payload: data
       });
 
@@ -2946,7 +2949,7 @@ export class Client extends EventEmitter {
       uploadInfo.extraLength = response.readUInt32LE(pos);
       pos += 4;
 
-      if (!targetOpts.targetAdsPort && !targetOpts.targetAmsNetId) {
+      if (!targetOpts.adsPort && !targetOpts.amsNetId) {
         //Target is not overridden -> save to metadata
         this.metaData.uploadInfo = uploadInfo;
       }
@@ -2969,7 +2972,7 @@ export class Client extends EventEmitter {
    * 
    * @param targetOpts Optional target settings that override values in `settings`
    */
-  public async getSymbolInfos(targetOpts: TargetOptions = {}): Promise<AdsSymbolsContainer> {
+  public async getSymbolInfos(targetOpts: Partial<AmsAddress> = {}): Promise<AdsSymbolsContainer> {
     if (!this.connection.connected) {
       throw new ClientError(`getSymbolInfos(): Client is not connected. Use connect() to connect to the target first.`);
     }
@@ -3005,8 +3008,8 @@ export class Client extends EventEmitter {
     try {
       const res = await this.sendAdsCommand<AdsReadResponse>({
         adsCommand: ADS.ADS_COMMAND.Read,
-        targetAmsNetId: targetOpts.targetAmsNetId,
-        targetAdsPort: targetOpts.targetAdsPort,
+        targetAmsNetId: targetOpts.amsNetId,
+        targetAdsPort: targetOpts.adsPort,
         payload: data
       });
 
@@ -3029,7 +3032,7 @@ export class Client extends EventEmitter {
         count++;
       }
 
-      if (!targetOpts.targetAdsPort && !targetOpts.targetAmsNetId) {
+      if (!targetOpts.adsPort && !targetOpts.amsNetId) {
         //Target is not overridden -> save to metadata
         this.metaData.symbols = symbols;
         this.metaData.allSymbolsCached = true;
@@ -3081,7 +3084,7 @@ export class Client extends EventEmitter {
    * 
    * @param targetOpts Optional target settings that override values in `settings`
    */
-  public async getDataTypes(targetOpts: TargetOptions = {}): Promise<AdsDataTypesContainer> {
+  public async getDataTypes(targetOpts: Partial<AmsAddress> = {}): Promise<AdsDataTypesContainer> {
     if (!this.connection.connected) {
       throw new ClientError(`getDataTypes(): Client is not connected. Use connect() to connect to the target first.`);
     }
@@ -3117,8 +3120,8 @@ export class Client extends EventEmitter {
     try {
       const res = await this.sendAdsCommand<AdsReadResponse>({
         adsCommand: ADS.ADS_COMMAND.Read,
-        targetAmsNetId: targetOpts.targetAmsNetId,
-        targetAdsPort: targetOpts.targetAdsPort,
+        targetAmsNetId: targetOpts.amsNetId,
+        targetAdsPort: targetOpts.adsPort,
         payload: data
       });
 
@@ -3141,7 +3144,7 @@ export class Client extends EventEmitter {
         count++;
       }
 
-      if (!targetOpts.targetAdsPort && !targetOpts.targetAmsNetId) {
+      if (!targetOpts.adsPort && !targetOpts.amsNetId) {
         //Target is not overridden -> save to metadata
         this.metaData.dataTypes = dataTypes;
         this.metaData.allDataTypesCached = true;
@@ -3180,5 +3183,181 @@ export class Client extends EventEmitter {
       throw new ClientError(`cacheDataTypes(): Caching data types failed`, err);
     }
   }
+
+  /**
+   * Reads raw byte data from the target system by provided index group, index offset and data length (bytes)
+   * 
+   * This is the `ADS read` command in ADS protocol.
+   *  
+   * @param indexGroup Index group (address) of the data to read
+   * @param indexOffset Index offset (address) of the data to read
+   * @param size Data length to read (bytes)
+   * @param targetOpts Optional target settings that override values in `settings`
+   * @returns Data read
+   */
+  public async readRaw(indexGroup: number, indexOffset: number, size: number, targetOpts: Partial<AmsAddress> = {}): Promise<Buffer> {
+    if (!this.connection.connected) {
+      throw new ClientError(`readRaw(): Client is not connected. Use connect() to connect to the target first.`);
+    }
+    this.debug(`readRaw(): Reading raw data (${JSON.stringify({ indexGroup, indexOffset, size })})`);
+
+    //Allocating bytes for request
+    const data = Buffer.alloc(12);
+    let pos = 0;
+
+    //0..3 IndexGroup 
+    data.writeUInt32LE(indexGroup, pos);
+    pos += 4;
+
+    //4..7 IndexOffset
+    data.writeUInt32LE(indexOffset, pos);
+    pos += 4;
+
+    //8..11 Read data length
+    data.writeUInt32LE(size, pos);
+    pos += 4;
+
+    try {
+      const res = await this.sendAdsCommand<AdsReadResponse>({
+        adsCommand: ADS.ADS_COMMAND.Read,
+        targetAmsNetId: targetOpts.amsNetId,
+        targetAdsPort: targetOpts.adsPort,
+        payload: data
+      });
+
+      this.debug(`readRaw(): Reading raw data (${JSON.stringify({ indexGroup, indexOffset, size })}) done (${res.ads.length} bytes)`);
+      return res.ads.payload;
+
+    } catch (err) {
+      this.debug(`readRaw(): Reading raw data (${JSON.stringify({ indexGroup, indexOffset, size })}) failed: %o`, err);
+      throw new ClientError(`readRaw(): Reading raw data (${JSON.stringify({ indexGroup, indexOffset, size })}) failed`, err);
+    }
+  }
+
+  /**
+   * Writes raw byte data to the target system by provided index group and index offset.
+   * 
+   * This is the `ADS write` command in ADS protocol.
+   *  
+   * @param indexGroup Index group (address) of the data to write to
+   * @param indexOffset Index offset (address) of the data to write to
+   * @param value Data to write
+   * @param targetOpts Optional target settings that override values in `settings`
+   */
+  public async writeRaw(indexGroup: number, indexOffset: number, value: Buffer, targetOpts: Partial<AmsAddress> = {}): Promise<void> {
+    if (!this.connection.connected) {
+      throw new ClientError(`writeRaw(): Client is not connected. Use connect() to connect to the target first.`);
+    }
+    this.debug(`readRaw(): Writing raw data to (${JSON.stringify({ indexGroup, indexOffset })})`);
+
+    //Allocating bytes for request
+    const data = Buffer.alloc(12 + value.byteLength);
+    let pos = 0;
+
+    //0..3 IndexGroup 
+    data.writeUInt32LE(indexGroup, pos);
+    pos += 4;
+
+    //4..7 IndexOffset
+    data.writeUInt32LE(indexOffset, pos);
+    pos += 4;
+
+    //8..11 Write data length
+    data.writeUInt32LE(value.byteLength, pos);
+    pos += 4;
+
+    //12..n Data
+    value.copy(data, pos);
+
+    try {
+      const res = await this.sendAdsCommand<AdsWriteResponse>({
+        adsCommand: ADS.ADS_COMMAND.Write,
+        targetAmsNetId: targetOpts.amsNetId,
+        targetAdsPort: targetOpts.adsPort,
+        payload: data
+      });
+
+      die(res);
+
+      this.debug(`writeRaw(): Writing raw data (${JSON.stringify({ indexGroup, indexOffset })}) done (${value.byteLength} bytes)`);
+
+    } catch (err) {
+      this.debug(`writeRaw(): Writing raw data (${JSON.stringify({ indexGroup, indexOffset })}) failed: %o`, err);
+      throw new ClientError(`writeRaw(): Writing raw data (${JSON.stringify({ indexGroup, indexOffset })}) failed`, err);
+    }
+  }
+
+  /**
+   * Reads a PLC symbol value by symbol path and converts the value to a Javascript object.
+   * 
+   * Returns the converted value, the raw value, the symbol data type and the symbol information object.
+   * 
+   * @param path Variable path in the PLC to read (such as `GVL_Test.ExampleStruct`)
+   * @param targetOpts Optional target settings that override values in `settings`
+   * @returns 
+   * 
+   * @template T Typescript data type of the PLC data, for example `readSymbol<number>(...)` or `readSymbol<ST_TypedStruct>(...)`
+   */
+  public async readSymbol<T = any>(path: string, targetOpts: Partial<AmsAddress> = {}): Promise<Symbol<T>> {
+    if (!this.connection.connected) {
+      throw new ClientError(`readSymbol(): Client is not connected. Use connect() to connect to the target first.`);
+    }
+
+    this.debug(`readSymbol(): Reading symbol for ${path}`);
+
+    //Getting the symbol information
+    let symbolInfo: AdsSymbolInfo;
+    try {
+      this.debugD(`readSymbol(): Getting symbol information for ${path}`);
+      symbolInfo = await this.getSymbolInfo(path, targetOpts);
+
+    } catch (err) {
+      this.debug(`readSymbol(): Getting symbol information for ${path} failed: %o`, err);
+      throw new ClientError(`readSymbol(): Getting symbol information for ${path} failed`, err);
+    }
+
+    //Getting the symbol data type
+    let dataType: AdsDataType;
+    try {
+      this.debugD(`readSymbol(): Getting data type for ${path}`);
+      dataType = await this.buildDataType(symbolInfo.type, targetOpts); //TODO change type -> dataType?
+
+    } catch (err) {
+      this.debug(`readSymbol(): Getting symbol information for ${path} failed: %o`, err);
+      throw new ClientError(`readSymbol(): Getting symbol information for ${path} failed`, err);
+    }
+
+    //Reading value by the symbol address
+    let rawValue: Buffer;
+    try {
+      this.debugD(`readSymbol(): Reading raw value for ${path}`);
+      rawValue = await this.readRaw(symbolInfo.indexGroup, symbolInfo.indexOffset, symbolInfo.size, targetOpts);
+
+    } catch (err) {
+      this.debug(`readSymbol(): Reading raw value for ${path} failed: %o`, err);
+      throw new ClientError(`readSymbol(): Reading raw value for ${path} failed`, err);
+    }
+
+    //Converting byte data to javascript object
+    let value: T;
+    try {
+      this.debugD(`readSymbol(): Converting raw value to object for ${path}`);
+      value = await this.convertBufferToObject<T>(rawValue, dataType);
+
+    } catch (err) {
+      this.debug(`readSymbol(): Converting raw value to object for ${path} failed: %o`, err);
+      throw new ClientError(`readSymbol(): Converting raw value to object for ${path} failed`, err);
+    }
+
+    this.debug(`readSymbol(): Reading symbol for ${path} done`);
+
+    return {
+      value,
+      rawValue,
+      dataType,
+      symbolInfo
+    };
+  }
+
 
 }

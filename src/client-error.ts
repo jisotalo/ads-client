@@ -1,6 +1,6 @@
 import { AdsError, AmsHeader, BaseAdsResponse } from "./types/ads-protocol-types";
 
-export class ClientError extends Error {
+export default class ClientError extends Error {
   public adsError?: AdsError;
   public trace: string[] = [];
 
