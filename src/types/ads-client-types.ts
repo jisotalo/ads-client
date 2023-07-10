@@ -133,13 +133,13 @@ export interface ConnectionMetaData {
   /** True if client has cached all symbols previously - we know to cache all again after a symbol version change */
   allSymbolsCached: boolean,
   /** All cached target runtime symbols */
-  symbols: AdsSymbolsContainer,
+  symbols: AdsSymbolInfoContainer,
   /** True if client has cached all data types previously - we know to cache all again after a symbol version change */
   allDataTypesCached: boolean,
   /** All target runtime cached data types (without subitems, see builtDataTypes for full data types)*/
-  dataTypes: AdsDataTypesContainer,
+  dataTypes: AdsDataTypeContainer,
   /** All target runtime cached built data types (with subitems / full data type tree) */
-  builtDataTypes: AdsDataTypesContainer,
+  builtDataTypes: AdsDataTypeContainer,
   /** Local AMS router state (if available) */
   routerState?: AmsRouterState
 };
@@ -164,11 +164,11 @@ export interface AdsUploadInfo {
   extraLength: number
 }
 
-export interface AdsSymbolsContainer {
+export interface AdsSymbolInfoContainer {
   [K: string]: AdsSymbolInfo
 }
 
-export interface AdsDataTypesContainer {
+export interface AdsDataTypeContainer {
   [K: string]: AdsDataType
 }
 
@@ -209,9 +209,14 @@ export interface SubscriptionOptions<T = any> {
  
 export type PlcPrimitiveType = string | boolean | number | Buffer | Date | {};
 
-export interface Symbol<T = any> {
+export interface ReadSymbolResult<T = any> {
   value: T,
   rawValue: Buffer,
   dataType: AdsDataType,
   symbolInfo: AdsSymbolInfo
+}
+
+export interface ObjectToBufferConversionResult {
+  rawValue: Buffer,
+  missingProperty?: string
 }

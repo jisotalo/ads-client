@@ -1,6 +1,6 @@
 import EventEmitter from "events";
-import type { ActiveAdsRequestContainer, ActiveSubscription, ActiveSubscriptionContainer, AdsClientConnection, AdsClientSettings, AdsCommandToSend, AdsDataTypesContainer, AdsSymbolsContainer, AdsUploadInfo, ConnectionMetaData, PlcPrimitiveType, SubscriptionCallback, SubscriptionData, SubscriptionOptions, Symbol, TimerObject } from "./types/ads-client-types";
-import { AdsAddNotificationResponse, AdsAddNotificationResponseData, AdsArrayInfoEntry, AdsAttributeEntry, AdsDataType, AdsDeleteNotificationResponse, AdsDeviceInfo, AdsEnumInfo, AdsNotification, AdsNotificationResponse, AdsNotificationSample, AdsNotificationStamp, AdsRawInfo, AdsReadDeviceInfoResponse, AdsReadResponse, AdsReadStateResponse, AdsReadWriteResponse, AdsRequest, AdsResponse, AdsRpcMethodEntry, AdsRpcMethodParameterEntry, AdsState, AdsSymbolInfo, AdsWriteControlResponse, AdsWriteResponse, AmsAddress, AmsHeader, AmsPortRegisteredData, AmsRouterState, AmsRouterStateData, AmsTcpHeader, AmsTcpPacket, BaseAdsResponse, EmptyAdsResponse, UnknownAdsResponse } from "./types/ads-protocol-types";
+import type { ActiveAdsRequestContainer, ActiveSubscription, ActiveSubscriptionContainer, AdsClientConnection, AdsClientSettings, AdsCommandToSend, AdsDataTypeContainer, AdsSymbolInfoContainer, AdsUploadInfo, ConnectionMetaData, PlcPrimitiveType, SubscriptionCallback, SubscriptionData, SubscriptionOptions, ReadSymbolResult, TimerObject, ObjectToBufferConversionResult } from "./types/ads-client-types";
+import { AdsAddNotificationResponse, AdsAddNotificationResponseData, AdsArrayInfoEntry, AdsAttributeEntry, AdsDataType, AdsDeleteNotificationResponse, AdsDeviceInfo, AdsEnumInfoEntry, AdsNotification, AdsNotificationResponse, AdsNotificationSample, AdsNotificationStamp, AdsRawInfo, AdsReadDeviceInfoResponse, AdsReadResponse, AdsReadStateResponse, AdsReadWriteResponse, AdsRequest, AdsResponse, AdsRpcMethodEntry, AdsRpcMethodParameterEntry, AdsState, AdsSymbolInfo, AdsWriteControlResponse, AdsWriteResponse, AmsAddress, AmsHeader, AmsPortRegisteredData, AmsRouterState, AmsRouterStateData, AmsTcpHeader, AmsTcpPacket, BaseAdsResponse, EmptyAdsResponse, UnknownAdsResponse } from "./types/ads-protocol-types";
 import {
   Socket,
   SocketConnectOpts
@@ -2226,7 +2226,7 @@ export class Client extends EventEmitter {
       pos += 2;
 
       for (let i = 0; i < enumInfoCount; i++) {
-        let enumInfo = {} as AdsEnumInfo;
+        let enumInfo = {} as AdsEnumInfoEntry;
 
         //Name length
         const nameLength = data.readUInt8(pos);
@@ -2564,8 +2564,21 @@ export class Client extends EventEmitter {
       result = convertArrayDimension(0);
 
     } else if (dataType.enumInfos.length > 0 && this.settings.objectifyEnumerations) {
-      //Enumeration (and enums are converted to objects)
-      result = 'moro'
+      //Enumeration and objectifyEnumerations is enabled
+      const enumValue = this.convertBufferToPrimitiveType(data.subarray(dataType.offset, dataType.offset + dataType.size), dataType);
+      const enumEntry = dataType.enumInfos.find(entry => entry.value === enumValue);
+
+      if (enumEntry) {
+        result = enumEntry;
+
+      } else {
+        //Value is not valid enum value
+        result = {
+          name: '',
+          value: enumValue
+        } as AdsEnumInfoEntry;
+      }
+
     } else {
       //Primitive type
       result = this.convertBufferToPrimitiveType(data.subarray(dataType.offset, dataType.offset + dataType.size), dataType) as T;
@@ -2574,8 +2587,86 @@ export class Client extends EventEmitter {
     return result as T;
   }
 
+  private convertObjectToBuffer<T = any>(value: T, dataType: AdsDataType, objectPath: string = '', isArrayItem: boolean = false): ObjectToBufferConversionResult {
+    let rawValue = Buffer.alloc(dataType.size);//Buffer.alloc(0);
+    let missingProperty = '';
+    const pathInfo = objectPath === '' && dataType.name === '' ? '' : ` for ${objectPath}.${dataType.name}`;
+    const allowedEnumValuesStr = dataType.enumInfos.map(entry => entry.name).join(', ');
 
+    if (dataType.subItems.length > 0 && (dataType.arrayInfos.length === 0 || isArrayItem)) {
+      //This is a struct or array item  
 
+    } else if (dataType.arrayInfos.length > 0 && !isArrayItem) {
+      //This is an array
+
+    } else if (dataType.enumInfos.length > 0) {
+      //This is an enumeration value (number, string or object)
+      let enumEntry: AdsEnumInfoEntry | undefined;
+
+      if (typeof value === 'string') {
+        //Is this a valid enum value?
+        enumEntry = dataType.enumInfos.find(entry => entry.name.trim().toLowerCase() === value.trim().toLowerCase());
+
+        if (!enumEntry) {
+          throw new ClientError(`Provided value "${value}"${pathInfo} is not a valid value for this ENUM. Allowed values are a number and any of the following: ${allowedEnumValuesStr}`);
+        }
+      
+      } else if (typeof value === 'object' && (value as AdsEnumInfoEntry).value !== undefined) {
+        enumEntry = value as AdsEnumInfoEntry;
+        
+      } else if (typeof value === 'object' && (value as AdsEnumInfoEntry).name !== undefined) {
+        //Is this a valid enum value?
+        enumEntry = dataType.enumInfos.find(entry => entry.name.trim().toLowerCase() === (value as AdsEnumInfoEntry).name.trim().toLowerCase());
+
+        if (!enumEntry) {
+          throw new ClientError(`Provided value "${(value as AdsEnumInfoEntry).name}"${pathInfo} is not a valid value for this ENUM. Allowed values are a number and any of the following: ${allowedEnumValuesStr}`);
+        }
+
+      } else if (typeof value === 'number') {
+        //Note: We allow any numeric value, just like TwinCAT does
+        enumEntry = {
+          name: '',
+          value: value
+        };
+
+      } else {
+        throw new ClientError(`Provided value "${JSON.stringify(value)}"${pathInfo} is not valid value for this ENUM. Allowed values are a number and any of the following: ${allowedEnumValuesStr}`);
+      }
+
+      this.convertPrimitiveTypeToBuffer(enumEntry.value, dataType, rawValue);
+
+    } else if (dataType.size > 0) {
+      //This is a normal non-empty variable
+      this.convertPrimitiveTypeToBuffer(value as PlcPrimitiveType, dataType, rawValue);
+    }
+
+    return {
+      rawValue
+    };
+  }
+
+  /**
+   * Converts a primitive type value to raw value
+   * 
+   * @param value Value to convert, such as number, date, string etc.
+   * @param dataType Data type of the value
+   * @param buffer Buffer where to write that raw value (reference)
+   */
+  private convertPrimitiveTypeToBuffer(value: PlcPrimitiveType, dataType: AdsDataType, buffer: Buffer) {
+    if (dataType.size === 0) {
+      return;
+    }
+
+    if (dataType.adsDataType === ADS.ADS_DATA_TYPES.ADST_STRING) {
+      ADS.encodeStringToPlcStringBuffer(value as string).copy(buffer);
+
+    } else if (dataType.adsDataType === ADS.ADS_DATA_TYPES.ADST_WSTRING) {
+      ADS.encodeStringToPlcWstringBuffer(value as string).copy(buffer);
+
+    } else {
+      return ADS.BASE_DATA_TYPES.toBuffer(dataType.type, value, buffer);
+    }
+  }
 
   /**
    * Reads and parses symbol information for given variable path
@@ -2972,7 +3063,7 @@ export class Client extends EventEmitter {
    * 
    * @param targetOpts Optional target settings that override values in `settings`
    */
-  public async getSymbolInfos(targetOpts: Partial<AmsAddress> = {}): Promise<AdsSymbolsContainer> {
+  public async getSymbolInfos(targetOpts: Partial<AmsAddress> = {}): Promise<AdsSymbolInfoContainer> {
     if (!this.connection.connected) {
       throw new ClientError(`getSymbolInfos(): Client is not connected. Use connect() to connect to the target first.`);
     }
@@ -3013,7 +3104,7 @@ export class Client extends EventEmitter {
         payload: data
       });
 
-      const symbols = {} as AdsSymbolsContainer;
+      const symbols = {} as AdsSymbolInfoContainer;
 
       let response = res.ads.payload;
       let count = 0;
@@ -3084,7 +3175,7 @@ export class Client extends EventEmitter {
    * 
    * @param targetOpts Optional target settings that override values in `settings`
    */
-  public async getDataTypes(targetOpts: Partial<AmsAddress> = {}): Promise<AdsDataTypesContainer> {
+  public async getDataTypes(targetOpts: Partial<AmsAddress> = {}): Promise<AdsDataTypeContainer> {
     if (!this.connection.connected) {
       throw new ClientError(`getDataTypes(): Client is not connected. Use connect() to connect to the target first.`);
     }
@@ -3125,8 +3216,7 @@ export class Client extends EventEmitter {
         payload: data
       });
 
-      const dataTypes = {} as AdsDataTypesContainer;
-
+      const dataTypes = {} as AdsDataTypeContainer;
       let response = res.ads.payload;
       let count = 0;
 
@@ -3298,7 +3388,7 @@ export class Client extends EventEmitter {
    * 
    * @template T Typescript data type of the PLC data, for example `readSymbol<number>(...)` or `readSymbol<ST_TypedStruct>(...)`
    */
-  public async readSymbol<T = any>(path: string, targetOpts: Partial<AmsAddress> = {}): Promise<Symbol<T>> {
+  public async readSymbol<T = any>(path: string, targetOpts: Partial<AmsAddress> = {}): Promise<ReadSymbolResult<T>> {
     if (!this.connection.connected) {
       throw new ClientError(`readSymbol(): Client is not connected. Use connect() to connect to the target first.`);
     }
@@ -3357,6 +3447,106 @@ export class Client extends EventEmitter {
       dataType,
       symbolInfo
     };
+  }
+
+  /**
+   * Writes a PLC symbol value by symbol path. Converts the value from a Javascript object to raw value.
+   * 
+   * Returns the converted value, the raw value, the symbol data type and the symbol information object.
+   * 
+   * @param path Variable path in the PLC to read (such as `GVL_Test.ExampleStruct`)
+   * @param targetOpts Optional target settings that override values in `settings`
+   * @returns 
+   * 
+   * @template T Typescript data type of the PLC data, for example `writeSymbol<number>(...)` or `writeSymbol<ST_TypedStruct>(...)`
+   */
+  public async writeSymbol<T = any>(path: string, value: T, autoFill: boolean = false, targetOpts: Partial<AmsAddress> = {}): Promise<void> {
+    if (!this.connection.connected) {
+      throw new ClientError(`writeSymbol(): Client is not connected. Use connect() to connect to the target first.`);
+    }
+
+    this.debug(`writeSymbol(): Writing symbol for ${path}`);
+
+    //Getting the symbol information
+    let symbolInfo: AdsSymbolInfo;
+    try {
+      this.debugD(`writeSymbol(): Getting symbol information for ${path}`);
+      symbolInfo = await this.getSymbolInfo(path, targetOpts);
+
+    } catch (err) {
+      this.debug(`writeSymbol(): Getting symbol information for ${path} failed: %o`, err);
+      throw new ClientError(`writeSymbol(): Getting symbol information for ${path} failed`, err);
+    }
+
+    //Getting the symbol data type
+    let dataType: AdsDataType;
+    try {
+      this.debugD(`writeSymbol(): Getting data type for ${path}`);
+      dataType = await this.buildDataType(symbolInfo.type, targetOpts); //TODO change type -> dataType?
+
+    } catch (err) {
+      this.debug(`writeSymbol(): Getting symbol information for ${path} failed: %o`, err);
+      throw new ClientError(`writeSymbol(): Getting symbol information for ${path} failed`, err);
+    }
+
+    //Creating raw data from object
+    try {
+      let { rawValue, missingProperty } = this.convertObjectToBuffer(value, dataType);
+
+      if (missingProperty && autoFill) {
+        //Some fields are missing and autoFill is used -> try to auto fill missing values
+        //TODO: Read value, assign object and then try again
+        ({ rawValue, missingProperty } = this.convertObjectToBuffer(value, dataType));
+
+        if (missingProperty) {
+          //This shouldn't happen ever
+          throw new ClientError(`writeSymbol(): Converting object to raw value for ${path} failed (failed to autoFill missing values)`);
+        }
+
+      } else if (missingProperty) {
+        //Not using autoFill -> failed
+        throw new ClientError(`writeSymbol(): Converting object to raw value for ${path} failed and autoFill parameter is false. ${missingProperty}`);
+      }
+
+      console.log("Converted:", rawValue);
+
+
+    } catch (err) {
+      this.debug(`writeSymbol(): Converting object to raw value for ${path} failed: %o`, err);
+      throw new ClientError(`writeSymbol(): Converting object to raw value for ${path} failed`, err);
+    }
+
+    /*
+    //Reading value by the symbol address
+    let rawValue: Buffer;
+    try {
+      this.debugD(`readSymbol(): Reading raw value for ${path}`);
+      rawValue = await this.readRaw(symbolInfo.indexGroup, symbolInfo.indexOffset, symbolInfo.size, targetOpts);
+
+    } catch (err) {
+      this.debug(`readSymbol(): Reading raw value for ${path} failed: %o`, err);
+      throw new ClientError(`readSymbol(): Reading raw value for ${path} failed`, err);
+    }
+
+    //Converting byte data to javascript object
+    let value: T;
+    try {
+      this.debugD(`readSymbol(): Converting raw value to object for ${path}`);
+      value = await this.convertBufferToObject<T>(rawValue, dataType);
+
+    } catch (err) {
+      this.debug(`readSymbol(): Converting raw value to object for ${path} failed: %o`, err);
+      throw new ClientError(`readSymbol(): Converting raw value to object for ${path} failed`, err);
+    }
+
+    this.debug(`readSymbol(): Reading symbol for ${path} done`);
+
+    return {
+      value,
+      rawValue,
+      dataType,
+      symbolInfo
+    };*/
   }
 
 

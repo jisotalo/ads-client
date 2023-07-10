@@ -368,7 +368,7 @@ export interface AdsDataType {
   /** */
   attributes: Array<AdsAttributeEntry>,
   /** */
-  enumInfos: Array<AdsEnumInfo>,
+  enumInfos: Array<AdsEnumInfoEntry>,
   /** */
   reserved: Buffer
 }
@@ -431,7 +431,7 @@ export interface AdsRpcMethodParameterEntry {
   reserved2: Buffer
 }
 
-export interface AdsEnumInfo {
+export interface AdsEnumInfoEntry {
   /** Enumeration name*/
   name: string,
   /** Enumeration value */

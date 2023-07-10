@@ -19,8 +19,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `unsubscribe()` no longer accepts numerical notification handle (only subscription object)
 - Subscription data `timeStamp`->`timestamp`
 - Removed nameLength, typeLength, commentLength and attributeCount from symbol info object
-- Removed nameLength, typeLength, commentLength, subItemCount and attributeCount from data type object
-- enumInfo -> enumInfos, arrayData -> arrayInfos
+- Symbol information `type` property renamed to `dataType`
+- Data type object:
+  - Removed `nameLength`, `typeLength`, `commentLength`, `subItemCount` and `attributeCount` properties
+  - `enumInfo` -> `enumInfos`, `arrayData` -> `arrayInfos`
+  - `type` property renamed to `dataType`
 - ClientException changed to ClientError
   - Simplified error object, longer stack trace as default
 - setDebugging() -> setDebugLevel()
@@ -29,6 +32,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `readAndCacheSymbols()` changed to `getSymbolInfos()` and `cacheSymbolInfos()`
 - `readAndCacheDataTypes()` changed to `getDataTypes()` and `cacheDataTypes()`
 
+### Minor changes
+- If read ENUM has a value that has no corresponding string, an object of type `{name: '', value}` is returned instead of name being `null`
 
 
 

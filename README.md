@@ -17,10 +17,20 @@ This project is coded from scratch using
 * [WireShark](https://www.wireshark.org/)
 
 # Project status
-This is version 2.0 branch of the project.
+This is version 2.0 branch of the project. 
 
-**This branch is not ready for production use!**
+The target of 2.0 is to rewrite evertyhing in Typescript. During the development some features are added, caching is optimized and everything is checked for possible improvements.
 
+**This branch is not ready for production use! It might have bugs and missing features.**
+
+### Probably working features
+- `readSymbol()` and `writeSymbol()`
+- `subscribe()` and `unsubscribe()`
+- `readRaw()` and `writeRaw()`
+- Reading and caching symbols
+- Reading and caching data types
+- PLC connection internals (symbol version etc.)
+- Reading device info and state
 # License
 
 Licensed under [MIT License](http://www.opensource.org/licenses/MIT) so commercial use is possible.
