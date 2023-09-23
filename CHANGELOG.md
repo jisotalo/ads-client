@@ -4,6 +4,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.14.3] - 23.09.2023
+### Changed
+- Bug fix: Some TwinCAT 2 devices (such as BK9050) do not send data length if answering with error code
+  - This caused `RangeError: Index out of range` exception as there wasn't enough bytes received
+  - See [issue #116](https://github.com/jisotalo/ads-client/issues/116)
+- Bug fix: If using older Node.js versions such as 8.x, connection lost could have caused unhandled exception
+  - Reason was `catch {}` which isn't supported in old versions
+  - See [issue #116](https://github.com/jisotalo/ads-client/issues/116)
+
+### Added
+- Updated readme to include information about TypeScript types
+  - Thanks to [Christian Rishøj](https://github.com/crishoj)
+- Updated readme with FAQ about TwinCAT 2 low-end devices
+- Updated readme about v2 development
+- Added option to run tests with usermode runtime AmsNetId (`192.168.4.1.1.1`) instead of localhost (`npm run test-um`)
+
 ## [1.14.2] - 02.05.2023
 ### Changed
 - Bug fix: `ADS_DATA_TYPE_FLAGS` (`dataType.flags`) were parsed incorrectly. 

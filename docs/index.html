@@ -62,17 +62,19 @@
     <section class="readme usertext">
         <article><h1 id="ads-client">ads-client</h1>
 <p><a href="https://www.npmjs.org/package/ads-client"><img src="https://img.shields.io/npm/v/ads-client" alt="npm version"></a>
-<a href="https://www.paypal.com/donate/?business=KUWBXXCVGZZME&amp;no_recurring=0&amp;currency_code=EUR"><img src="https://img.shields.io/badge/Donate-PayPal-yellow" alt="Donate"></a>
+<a href="https://www.paypal.com/donate/?business=KUWBXXCVGZZME&amp;no_recurring=0&amp;currency_code=EUR"><img src="https://img.shields.io/badge/Support-PayPal-yellow" alt="Donate"></a>
 <a href="https://github.com/jisotalo/ads-client"><img src="https://img.shields.io/badge/View%20on-GitHub-brightgreen" alt="GitHub"></a>
 <a href="https://choosealicense.com/licenses/mit/"><img src="https://img.shields.io/github/license/jisotalo/ads-client" alt="License"></a></p>
 <p>Beckhoff TwinCAT ADS client library for Node.js (unofficial). Connects to Beckhoff TwinCAT automation systems using ADS protocol.</p>
 <p>Coded from scratch using <a href="https://infosys.beckhoff.com/content/1033/tc3_ads_intro/116157835.html?id=124964102706356243">TwinCAT ADS specification</a> and <a href="https://www.nuget.org/packages/Beckhoff.TwinCAT.Ads/5.0.0-preview6">Beckhoff.TwinCAT.Ads nuget package</a>. Inspiration from similar projects like <a href="https://www.npmjs.com/package/node-ads">node-ads</a>, <a href="https://www.npmjs.com/package/beckhoff-js">beckhoff-js</a> and <a href="https://www.npmjs.com/package/iecstruct">iecstruct</a>.</p>
-<p>There is automatically created documentation available at https://jisotalo.github.io/ads-client/</p>
+<p>There is automatically created documentation available at https://jisotalo.fi/ads-client/</p>
 <h1 id="project-status">Project status</h1>
 <p>This project is currently &quot;ready&quot;. It's maintained actively and used in projects by the author and others (also lot's of commercial projects)</p>
 <p>Bugs are fixed if found and new features can be added. Please let me know if you have any ideas!</p>
-<p>And if you want you can buy me a beer using PayPal :)</p>
-<p><a href="https://www.paypal.com/donate/?business=KUWBXXCVGZZME&amp;no_recurring=0&amp;currency_code=EUR"><img src="https://img.shields.io/badge/Donate%20a%20beer!-PayPal-yellow" alt="Donate"></a></p>
+<p>If you want to support my work, you can do it using PayPal. I can provide you support in exchange.</p>
+<p><a href="https://www.paypal.com/donate/?business=KUWBXXCVGZZME&amp;no_recurring=0&amp;currency_code=EUR"><img src="https://img.shields.io/badge/Support%20my%20work!-PayPal-yellow" alt="Donate"></a></p>
+<h2 id="version-2">Version 2</h2>
+<p>Version 2 is under development in <a href="https://github.com/jisotalo/ads-client/tree/v2-dev"><code>v2-dev</code></a> branch. It's written in TypeScript (including all types!) and will also be more optimized. At the moment basic functions <em>might</em>  work but it's not ready for production use.</p>
 <h1 id="using-node-red%3F">Using Node-RED?</h1>
 <p>Check out the <a href="https://www.npmjs.com/package/node-red-contrib-ads-client">node-red-contrib-ads-client</a> package. It's an <code>ads-client</code> wrapper for Node-RED to get the same functionality.</p>
 <h1 id="table-of-contents">Table of contents</h1>
@@ -177,6 +179,10 @@
 <p>Install the <a href="https://www.npmjs.com/package/ads-client">npm package</a> using npm command:</p>
 <pre class="prettyprint source lang-bash"><code>npm i ads-client
 </code></pre>
+<p>If you are using TypeScript, install unofficial types using npm command (thanks <a href="https://github.com/crishoj">Christian Rishøj</a>):</p>
+<pre class="prettyprint source lang-bash"><code>npm install --save @types/ads-client
+</code></pre>
+<p><em>Note: Version 2 under development will be written in 100% TypeScript</em></p>
 <p>Include the module in your code</p>
 <pre class="prettyprint source lang-js"><code>const ads = require('ads-client')
 </code></pre>
@@ -1656,10 +1662,15 @@ For example, setting localAddress to 192.168.10.1 when the computer has only eth
 <li>When closing application, first unsubscribe from all notifications using <code>unsubscribeAll()</code></li>
 <li>Use router instead of direct connection, see https://github.com/jisotalo/ads-client/issues/85#issuecomment-1193098519</li>
 </ul>
+<h3 id="issues-with-twincat-2-low-end-devices-(bk9050%2C-bc9050-etc.)">Issues with TwinCAT 2 low-end devices (BK9050, BC9050 etc.)</h3>
+<ul>
+<li>You can only use raw commands (such as <code>readRaw()</code>, <code>writeRaw()</code>, <code>subscribeRaw()</code>) as these devices provide no symbols</li>
+<li>See <a href="https://github.com/jisotalo/ads-client/issues/114">issue 114</a> and <a href="https://github.com/jisotalo/ads-client/issues/116">issue 116</a> for starters</li>
+</ul>
 <h1 id="automatic-testing">Automatic testing</h1>
 <p>Since version 1.14.0 the library has automatic testing using Jest. Idea is to run the tests before updates to make sure everything works OK (this should have been done much earlier...)</p>
 <p>Separate PLC project is required for testing, see https://github.com/jisotalo/ads-client-test-plc-project for more project and more info.</p>
-<p>Tests are run with command <code>npm test</code> (not in npm version, please clone this repository).</p>
+<p>Tests are run with command <code>npm test</code> or <code>npm run test-um</code> (usermode runtime) (not in npm version, please clone this repository).</p>
 <h1 id="documentation">Documentation</h1>
 <p>You can find the full html documentation from the project <a href="https://jisotalo.github.io/ads-client/">GitHub home page</a> as well as from <code>./docs/</code> folder in the repository.</p>
 <h1 id="license">License</h1>
@@ -1694,7 +1705,7 @@ SOFTWARE.</p></article>
 <br class="clear">
 
 <footer>
-    Documentation generated by <a href="https://github.com/jsdoc3/jsdoc">JSDoc 3.6.7</a> on Tue May 02 2023 21:37:58 GMT+0300 (Itä-Euroopan kesäaika) using the <a href="https://github.com/clenemt/docdash">docdash</a> theme.
+    Documentation generated by <a href="https://github.com/jsdoc3/jsdoc">JSDoc 3.6.11</a> on Sat Sep 23 2023 08:34:17 GMT+0300 (Itä-Euroopan kesäaika) using the <a href="https://github.com/clenemt/docdash">docdash</a> theme.
 </footer>
 
 <script>prettyPrint();</script>

@@ -2,7 +2,7 @@
 
 
 [![npm version](https://img.shields.io/npm/v/ads-client)](https://www.npmjs.org/package/ads-client) 
-[![Donate](https://img.shields.io/badge/Donate-PayPal-yellow)](https://www.paypal.com/donate/?business=KUWBXXCVGZZME&no_recurring=0&currency_code=EUR)
+[![Donate](https://img.shields.io/badge/Support-PayPal-yellow)](https://www.paypal.com/donate/?business=KUWBXXCVGZZME&no_recurring=0&currency_code=EUR)
 [![GitHub](https://img.shields.io/badge/View%20on-GitHub-brightgreen)](https://github.com/jisotalo/ads-client)
 [![License](https://img.shields.io/github/license/jisotalo/ads-client)](https://choosealicense.com/licenses/mit/)
 
@@ -10,16 +10,19 @@ Beckhoff TwinCAT ADS client library for Node.js (unofficial). Connects to Beckho
 
 Coded from scratch using [TwinCAT ADS specification](https://infosys.beckhoff.com/content/1033/tc3_ads_intro/116157835.html?id=124964102706356243) and [Beckhoff.TwinCAT.Ads nuget package](https://www.nuget.org/packages/Beckhoff.TwinCAT.Ads/5.0.0-preview6). Inspiration from similar projects like [node-ads](https://www.npmjs.com/package/node-ads), [beckhoff-js](https://www.npmjs.com/package/beckhoff-js) and [iecstruct](https://www.npmjs.com/package/iecstruct).
 
-There is automatically created documentation available at https://jisotalo.github.io/ads-client/
+There is automatically created documentation available at https://jisotalo.fi/ads-client/
 
 # Project status
 This project is currently "ready". It's maintained actively and used in projects by the author and others (also lot's of commercial projects)
 
 Bugs are fixed if found and new features can be added. Please let me know if you have any ideas!
 
-And if you want you can buy me a beer using PayPal :)
+If you want to support my work, you can do it using PayPal. I can provide you support in exchange.
 
-[![Donate](https://img.shields.io/badge/Donate%20a%20beer!-PayPal-yellow)](https://www.paypal.com/donate/?business=KUWBXXCVGZZME&no_recurring=0&currency_code=EUR)
+[![Donate](https://img.shields.io/badge/Support%20my%20work!-PayPal-yellow)](https://www.paypal.com/donate/?business=KUWBXXCVGZZME&no_recurring=0&currency_code=EUR)
+
+## Version 2
+Version 2 is under development in [`v2-dev`](https://github.com/jisotalo/ads-client/tree/v2-dev) branch. It's written in TypeScript (including all types!) and will also be more optimized. At the moment basic functions *might*  work but it's not ready for production use.
 
 
 # Using Node-RED?
@@ -100,6 +103,13 @@ Install the [npm package](https://www.npmjs.com/package/ads-client) using npm co
 ```bash
 npm i ads-client
 ```
+
+If you are using TypeScript, install unofficial types using npm command (thanks [Christian Rishøj](https://github.com/crishoj)):
+```bash
+npm install --save @types/ads-client
+```
+
+*Note: Version 2 under development will be written in 100% TypeScript*
 
 Include the module in your code
 ```js
@@ -1764,12 +1774,17 @@ Solution:
 * When closing application, first unsubscribe from all notifications using `unsubscribeAll()`
 * Use router instead of direct connection, see https://github.com/jisotalo/ads-client/issues/85#issuecomment-1193098519
 
+### Issues with TwinCAT 2 low-end devices (BK9050, BC9050 etc.)
+* You can only use raw commands (such as `readRaw()`, `writeRaw()`, `subscribeRaw()`) as these devices provide no symbols
+* See [issue 114](https://github.com/jisotalo/ads-client/issues/114) and [issue 116](https://github.com/jisotalo/ads-client/issues/116) for starters
+
+
 # Automatic testing
 Since version 1.14.0 the library has automatic testing using Jest. Idea is to run the tests before updates to make sure everything works OK (this should have been done much earlier...)
 
 Separate PLC project is required for testing, see https://github.com/jisotalo/ads-client-test-plc-project for more project and more info.
 
-Tests are run with command `npm test` (not in npm version, please clone this repository).
+Tests are run with command `npm test` or `npm run test-um` (usermode runtime) (not in npm version, please clone this repository).
 
 # Documentation
 

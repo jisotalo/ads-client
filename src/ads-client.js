@@ -894,7 +894,7 @@ class Client extends EventEmitter {
       } catch (err) {
         return reject(new ClientException(this, 'readSymbol()', `Reading symbol ${variableName} failed: Reading data type failed`, err))
       }
-      
+
       //4. Parse the data to javascript object
       let data = {}
       try {
@@ -3658,7 +3658,7 @@ function _reconnect(forceDisconnect = false, isReconnecting = false) {
 
             debug(`_reconnect(): Connection and some subscriptions reinitialized. Connection is back.`)
           })
-        
+
         this.emit('reconnect')
 
         resolve(res)
@@ -3945,7 +3945,9 @@ async function _onConnectionLost(socketFailure = false) {
     _console.call(this, 'WARNING: Connection was lost and setting autoReconnect=false. Quiting.')
     try {
       await this.disconnect(true)
-    } catch { }
+    } catch (err) {
+      debugD(`_onConnectionLost(): Error during disconnecting. Quiting.`)
+    }
 
     return
   }
@@ -3965,7 +3967,7 @@ async function _onConnectionLost(socketFailure = false) {
     //Try to reconnect
     _reconnect.call(this, socketFailure, true)
       .then(res => {
-        
+
         //Success -> remove timer
         _clearTimer(this._internals.reconnectionTimer)
 
@@ -3974,7 +3976,7 @@ async function _onConnectionLost(socketFailure = false) {
         //Reconnecting failed
         if (firstTime)
           _console.call(this, `WARNING: Reconnecting failed. Keeping trying in the background every ${this.settings.reconnectInterval} ms...`)
-        
+
         //If this is still a valid timer, start over again
         if (this._internals.reconnectionTimer.id === timerId) {
           //Creating a new timer with the same id
@@ -4018,7 +4020,7 @@ function _clearTimer(timerObject) {
   //Increasing timer id
   timerObject.id = timerObject.id < Number.MAX_SAFE_INTEGER ? timerObject.id + 1 : 0;
 }
-  
+
 
 
 
@@ -4294,7 +4296,7 @@ function _systemManagerStatePoller() {
     let oldState = this.metaData.systemManagerState
 
     //If the timer has changed, quit here
-    if (this._internals.systemManagerStatePoller.id !== timerId){
+    if (this._internals.systemManagerStatePoller.id !== timerId) {
       return
     }
 
@@ -4353,7 +4355,7 @@ function _systemManagerStatePoller() {
     () => poller(this._internals.systemManagerStatePoller.id),
     this.settings.checkStateInterval
   )
-    
+
 }
 
 
@@ -5241,7 +5243,7 @@ function _parseJsObjectToBuffer(value, dataType, objectPathStr = '', isArraySubI
   //Struct or array subitem - Go through each subitem 
   if ((dataType.arrayData.length === 0 || isArraySubItem) && dataType.subItems.length > 0) {
     buffer = Buffer.alloc(dataType.size)
-    
+
     for (const subItem of dataType.subItems) {
       //Try the find the subitem from javascript object
       let key = null
@@ -6040,10 +6042,15 @@ function _parseAdsData(packet, data) {
     case ADS.ADS_COMMAND.ReadWrite:
     case ADS.ADS_COMMAND.Read:
 
-
       //0..3 Ads error number
       ads.errorCode = data.readUInt32LE(pos)
       pos += 4
+
+      if (data.byteLength <= 4) {
+        ads.dataLength = 0
+        ads.data = Buffer.alloc(0)
+        break
+      }
 
       //4..7 Data length (bytes)
       ads.dataLength = data.readUInt32LE(pos)
@@ -6055,8 +6062,6 @@ function _parseAdsData(packet, data) {
 
       break
 
-
-
     //-------------- Write ---------------
     case ADS.ADS_COMMAND.Write:
 
@@ -6066,8 +6071,6 @@ function _parseAdsData(packet, data) {
 
       break
 
-
-
     //-------------- Device info ---------------
     case ADS.ADS_COMMAND.ReadDeviceInfo:
 
@@ -6076,6 +6079,10 @@ function _parseAdsData(packet, data) {
       pos += 4
 
       ads.data = {}
+
+      if (data.byteLength <= 4) {
+        break
+      }
 
       //4 Major version
       ads.data.majorVersion = data.readUInt8(pos)
@@ -6094,10 +6101,6 @@ function _parseAdsData(packet, data) {
 
       break
 
-
-
-
-
     //-------------- Device status ---------------
     case ADS.ADS_COMMAND.ReadState:
 
@@ -6106,6 +6109,10 @@ function _parseAdsData(packet, data) {
       pos += 4
 
       ads.data = {}
+
+      if (data.byteLength <= 4) {
+        break
+      }
 
       //4..5 ADS state
       ads.data.adsState = data.readUInt16LE(pos)
@@ -6118,9 +6125,6 @@ function _parseAdsData(packet, data) {
 
       break
 
-
-
-
     //-------------- Add notification ---------------
     case ADS.ADS_COMMAND.AddNotification:
 
@@ -6130,14 +6134,15 @@ function _parseAdsData(packet, data) {
 
       ads.data = {}
 
+      if (data.byteLength <= 4) {
+        break
+      }
+
       //4..7 Notification handle
       ads.data.notificationHandle = data.readUInt32LE(pos)
       pos += 4
 
       break
-
-
-
 
     //-------------- Delete notification ---------------
     case ADS.ADS_COMMAND.DeleteNotification:
@@ -6148,16 +6153,12 @@ function _parseAdsData(packet, data) {
 
       break
 
-
-
     //-------------- Notification ---------------
     case ADS.ADS_COMMAND.Notification:
 
       ads.data = _parseAdsNotification.call(this, data)
 
       break
-
-
 
     //-------------- WriteControl ---------------
     case ADS.ADS_COMMAND.WriteControl:
@@ -6167,7 +6168,6 @@ function _parseAdsData(packet, data) {
       pos += 4
 
       break
-
 
     default:
       //Unknown command, return a custom error
