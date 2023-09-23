@@ -25,11 +25,11 @@ SOFTWARE.
  * This must match with GVL_AdsClientTests.VERSION
  */
 const PLC_PROJECT_VERSION = '1.0.0.0'
-
 const ads = require('../src/ads-client')
+const AMS_NET_ID = (process.env['ADS_CLIENT_TEST_AMS'] ?? 'localhost').trim()
 
 const client = new ads.Client({
-  targetAmsNetId: 'localhost',
+  targetAmsNetId: AMS_NET_ID,
   targetAdsPort: 851
 })
 
@@ -44,7 +44,7 @@ describe('connection', () => {
   test('checking ads client settings', async () => {
     expect(client).toBeInstanceOf(ads.Client)
     expect(client).toHaveProperty('settings')
-    expect(client.settings.targetAmsNetId).toBe('127.0.0.1.1.1')
+    expect(client.settings.targetAmsNetId).toBe(AMS_NET_ID === 'localhost' ? '127.0.0.1.1.1' : AMS_NET_ID)
     expect(client.settings.targetAdsPort).toBe(851)
   })
 
