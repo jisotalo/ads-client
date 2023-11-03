@@ -1090,6 +1090,16 @@ const BASE_DATA_TYPES = {
           return buffer
       }
     },
+    {
+      name: ['INTERFACE'],
+      adsDataType: ADS_DATA_TYPES.ADST_VOID,
+      size: 0,
+      toBuffer: (value, buffer, settings) => {
+      },
+      fromBuffer: (buffer, settings) => {
+          return null
+      }
+    },
   ],
 
 
@@ -1156,6 +1166,13 @@ const BASE_DATA_TYPES = {
       actualTypesBySize: {
         4: 'DWORD',
         8: 'LWORD'
+      }
+    },
+    {
+      name: ['INTERFACE', 'I_'],
+      actualTypesBySize: {
+        4: 'INTERFACE',
+        8: 'INTERFACE'
       }
     },
   ]
