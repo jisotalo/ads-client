@@ -31,10 +31,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `readSymbolVersion()` removed (active value is available at `client.metaData.symbolVersion`)
 - `readAndCacheSymbols()` changed to `getSymbolInfos()` and `cacheSymbolInfos()`
 - `readAndCacheDataTypes()` changed to `getDataTypes()` and `cacheDataTypes()`
-
+- `restartPlc()` now also starts the PLC runtime. Previously only did a "reset cold" operation. (new `resetPlc()` does this now) 
+- `readSystemManagerState()` renamed to `readTcSystemState()`
 ### Minor changes
 - If read ENUM has a value that has no corresponding string, an object of type `{name: '', value}` is returned instead of name being `null`
 
+### Added
+- `resetPlc()`
 
 
 ## [1.14.1] - 13.09.2022

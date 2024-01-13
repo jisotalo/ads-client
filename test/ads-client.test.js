@@ -24,106 +24,412 @@ SOFTWARE.
  * PLC project version
  * This must match with GVL_AdsClientTests.VERSION
  */
-const PLC_PROJECT_VERSION = '1.0.0.0'
+const PLC_PROJECT_VERSION = '2.0.0';
+const AMS_NET_ID = '192.168.4.1.1.1';
 
-const ads = require('../src/ads-client')
+const { Client, ADS } = require('../dist/ads-client');
 
-const client = new ads.Client({
-  targetAmsNetId: 'localhost',
+const client = new Client({
+  targetAmsNetId: AMS_NET_ID,
   targetAdsPort: 851
-})
+});
 
-test('IMPORTANT NOTE: This test requires running a specific PLC project locally (https://github.com/jisotalo/ads-client-test-plc-project)', () => {})
+const delay = (ms) => new Promise((resolve, reject) => {
+  setTimeout(() => resolve(), ms);
+});
+
+test('IMPORTANT NOTE: This test requires running a specific PLC project locally (https://github.com/jisotalo/ads-client-test-plc-project)', () => { });
 
 describe('connection', () => {
 
   test('client is not connected at beginning', () => {
-    expect(client.connection.connected).toBe(false)
-  })
+    expect(client.connection.connected).toBe(false);
+  });
 
   test('checking ads client settings', async () => {
-    expect(client).toBeInstanceOf(ads.Client)
-    expect(client).toHaveProperty('settings')
-    expect(client.settings.targetAmsNetId).toBe('127.0.0.1.1.1')
-    expect(client.settings.targetAdsPort).toBe(851)
-  })
+    expect(client).toBeInstanceOf(Client);
+    expect(client).toHaveProperty('settings');
+    expect(client.settings.targetAmsNetId).toBe(AMS_NET_ID);
+    expect(client.settings.targetAdsPort).toBe(851);
+  });
 
-  test('connecting to localhost and 851', async () => {
+  test('connecting to target', async () => {
     try {
-      const res = await client.connect()
+      const res = await client.connect();
 
-      expect(res).toHaveProperty('connected')
-      expect(res.connected).toBe(true)
+      expect(res).toHaveProperty('connected');
+      expect(res.connected).toBe(true);
 
     } catch (err) {
-      throw new Error(`connecting localhost failed (${err.message}`, err)
+      throw new Error(`connecting localhost failed (${err.message}`, err);
     }
-  })
-
+  });
 
   test('checking that test PLC project is active', async () => {
     try {
-      const res = await client.readSymbol('GVL_AdsClientTests.IsTestProject')
-      //console.log(res)
-      expect(res).toHaveProperty('value')
+      const res = await client.readSymbol('GVL_AdsClientTests.IsTestProject');
+      expect(res).toHaveProperty('value');
+      expect(res.value).toBe(true);
 
-      expect(res.value).toBe(true)
     } catch (err) {
-      throw new Error('Failed to check for test PLC project - is correct PLC project active?')
+      throw new Error('Failed to check for test PLC project - is correct PLC project active?');
     }
-  })
+  });
 
   test('checking that test PLC project version is correct', async () => {
-    const res = await client.readSymbol('GVL_AdsClientTests.VERSION')
-    expect(res.value).toBe(PLC_PROJECT_VERSION)
-  })
-})
+    const res = await client.readSymbol('GVL_AdsClientTests.VERSION');
+    expect(res.value).toBe(PLC_PROJECT_VERSION);
+  });
+});
 
 describe('resetting PLC to original state', () => {
   test('resetting PLC', async () => {
-    await client.restartPlc()
-  })
+    await client.resetPlc();
+  });
 
   test('checking that reset was succesful', async () => {
-    const res = await client.readSymbol('GVL_AdsClientTests.IsReset')
-    expect(res.value).toBe(true)
-  })
+    const res = await client.readSymbol('GVL_AdsClientTests.IsReset');
+    expect(res.value).toBe(true);
+  });
+
+  test('checking that PLC is not running', async () => {
+    const res = await client.readSymbol('GVL_AdsClientTests.IsRunning');
+    expect(res.value).toBe(false);
+
+    const state = await client.readPlcRuntimeState();
+    expect(state.adsState).toBe(ADS.ADS_STATE.Stop);
+  });
 
   test('setting IsReset to false', async () => {
-    const res = await client.writeSymbol('GVL_AdsClientTests.IsReset', false)
-  })
+    const res = await client.writeSymbol('GVL_AdsClientTests.IsReset', false);
+  });
+
+  test('starting PLC', async () => {
+    await client.startPlc();
+  });
 
   test('checking that test PLC project is running', async () => {
-    const res = await client.readSymbol('GVL_AdsClientTests.IsRunning')
-    expect(res.value).toBe(true)
-  })
-})
+    //Some delay as PLC was just started
+    await delay(1000);
+    const res = await client.readSymbol('GVL_AdsClientTests.IsRunning');
+    expect(res.value).toBe(true);
+  });
+});
 
-describe('basic tests', () => {
-  test('reading system manager state', async () => {
-    const res = await client.readSystemManagerState()
-    expect(res).toHaveProperty('adsState')
-    expect(res).toHaveProperty('adsStateStr')
-    expect(res).toHaveProperty('deviceState')
-  })
+describe('testing PLC runtime stop, start, restart', () => {
+  test('stopping PLC', async () => {
+    let state = await client.readPlcRuntimeState();
+    expect(state.adsState).toBe(ADS.ADS_STATE.Run);
 
-  test('reading plc runtime state', async () => {
-    const res = await client.readPlcRuntimeState()
-    expect(res).toHaveProperty('adsState')
-    expect(res).toHaveProperty('adsStateStr')
-    expect(res).toHaveProperty('deviceState')
-  })
+    await client.stopPlc();
 
-  test('reading device info', async () => {
-    const res = await client.readDeviceInfo()
-    //console.log(res)
-    expect(res).toHaveProperty('deviceName')
-    expect(res).toHaveProperty('majorVersion')
-    expect(res).toHaveProperty('minorVersion')
-    expect(res).toHaveProperty('versionBuild')
-  })
+    state = await client.readPlcRuntimeState();
+    expect(state.adsState).toBe(ADS.ADS_STATE.Stop);
+  });
 
-})
+  test('starting PLC', async () => {
+    let state = await client.readPlcRuntimeState();
+    expect(state.adsState).toBe(ADS.ADS_STATE.Stop);
+
+    await client.startPlc();
+
+    state = await client.readPlcRuntimeState();
+    expect(state.adsState).toBe(ADS.ADS_STATE.Run);
+  });
+
+  test('restarting PLC', async () => {
+    let state = await client.readPlcRuntimeState();
+    expect(state.adsState).toBe(ADS.ADS_STATE.Run);
+    await client.writeSymbol('GVL_AdsClientTests.IsReset', false);
+
+    await client.restartPlc();
+
+    state = await client.readPlcRuntimeState();
+    expect(state.adsState).toBe(ADS.ADS_STATE.Run);
+
+    const res = await client.readSymbol('GVL_AdsClientTests.IsReset');
+    expect(res.value).toBe(true);
+  });
+});
+
+describe('system state, PLC runtime states and device information', () => {
+  test('reading twinCAT system state', async () => {
+    const res = await client.readTcSystemState();
+    expect(res).toHaveProperty('adsState');
+    expect(res).toHaveProperty('adsStateStr');
+    expect(res).toHaveProperty('deviceState');
+    expect(res.adsState).toBe(ADS.ADS_STATE.Run);
+  });
+
+  test('reading plc runtime (port 851) state', async () => {
+    const res = await client.readPlcRuntimeState();
+    expect(res).toHaveProperty('adsState');
+    expect(res).toHaveProperty('adsStateStr');
+    expect(res).toHaveProperty('deviceState');
+  });
+
+  test('reading plc runtime (port 852) state', async () => {
+    const res = await client.readPlcRuntimeState({ adsPort: 852 });
+    expect(res).toHaveProperty('adsState');
+    expect(res).toHaveProperty('adsStateStr');
+    expect(res).toHaveProperty('deviceState');
+  });
+
+  test('reading PLC runtime device info', async () => {
+    const res = await client.readDeviceInfo();
+
+    //Note: checking only keys
+    expect(Object.keys(res)).toStrictEqual(Object.keys({
+      majorVersion: 0,
+      minorVersion: 0,
+      versionBuild: 0,
+      deviceName: ''
+    }));
+
+    expect(res.deviceName).toBe('Plc30 App');
+  });
+
+  test('reading TwinCAT system device info', async () => {
+    const res = await client.readDeviceInfo({ adsPort: 10000 });
+
+    //Note: checking only keys
+    expect(Object.keys(res)).toStrictEqual(Object.keys({
+      majorVersion: 0,
+      minorVersion: 0,
+      versionBuild: 0,
+      deviceName: ''
+    }));
+
+    expect(res.deviceName).toBe('TwinCAT System');
+  });
+});
+
+describe('symbols and data types', () => {
+  test('reading upload info', async () => {
+    const res = await client.readUploadInfo();
+
+    //Note: checking only keys
+    expect(Object.keys(res)).toStrictEqual(Object.keys({
+      symbolCount: 0,
+      symbolLength: 0,
+      dataTypeCount: 0,
+      dataTypeLength: 0,
+      extraCount: 0,
+      extraLength: 0
+    }));
+  });
+
+  test('reading all symbol information', async () => {
+    const res = await client.getSymbolInfos();
+    const uploadInfo = await client.readUploadInfo();
+
+    expect(Object.keys(res).length).toBe(uploadInfo.symbolCount);
+    const testSymbol = res['GVL_SymbolsAndDataTypes.TestSymbol'.toLowerCase()];
+
+    expect(testSymbol).toBeDefined();
+
+    //Note: checking only keys
+    expect(Object.keys(testSymbol)).toStrictEqual(Object.keys({
+      indexGroup: 16448,
+      indexOffset: 450248,
+      size: 83,
+      adsDataType: 30,
+      adsDataTypeStr: 'ADST_STRING',
+      flags: 4105,
+      flagsStr: ['Persistent', 'TypeGuid', 'Attributes'],
+      arrayDimension: 0,
+      name: 'GVL_SymbolsAndDataTypes.TestSymbol',
+      type: 'STRING(82)',
+      comment: 'Test comment äääöö',
+      arrayInfo: [],
+      typeGuid: '95190718000000000000000100000052',
+      attributes: [{ name: 'ads-client-attribute', value: 'example-value-ääö' }],
+      extendedFlags: 0,
+      reserved: Buffer.alloc(0)
+    }));
+
+    //Note: Commented out properties that are system-dependant
+    expect(testSymbol).toMatchObject({
+      //indexGroup: 16448,
+      //indexOffset: 450248,
+      size: 83,
+      adsDataType: 30,
+      adsDataTypeStr: 'ADST_STRING',
+      flags: 4105,
+      flagsStr: ['Persistent', 'TypeGuid', 'Attributes'],
+      arrayDimension: 0,
+      name: 'GVL_SymbolsAndDataTypes.TestSymbol',
+      type: 'STRING(82)',
+      comment: 'Test comment äääöö',
+      arrayInfo: [],
+      //typeGuid: '95190718000000000000000100000052',
+      attributes: [{ name: 'ads-client-attribute', value: 'example-value-ääö' }],
+      extendedFlags: 0,
+      //reserved: <Buffer 00 00 00 00 00 00 00 88 00 00 00>
+    });
+  });
+
+  test('reading single symbol information', async () => {
+    const res = await client.getSymbolInfo('GVL_SymbolsAndDataTypes.TestSymbol');
+
+    //Note: checking only keys
+    expect(Object.keys(res)).toStrictEqual(Object.keys({
+      indexGroup: 16448,
+      indexOffset: 450248,
+      size: 83,
+      adsDataType: 30,
+      adsDataTypeStr: 'ADST_STRING',
+      flags: 4105,
+      flagsStr: ['Persistent', 'TypeGuid', 'Attributes'],
+      arrayDimension: 0,
+      name: 'GVL_SymbolsAndDataTypes.TestSymbol',
+      type: 'STRING(82)',
+      comment: 'Test comment äääöö',
+      arrayInfo: [],
+      typeGuid: '95190718000000000000000100000052',
+      attributes: [{ name: 'ads-client-attribute', value: 'example-value-ääö' }],
+      extendedFlags: 0,
+      reserved: Buffer.alloc(0)
+    }));
+
+    //Note: Commented out properties that are system-dependant
+    expect(res).toMatchObject({
+      //indexGroup: 16448,
+      //indexOffset: 450248,
+      size: 83,
+      adsDataType: 30,
+      adsDataTypeStr: 'ADST_STRING',
+      flags: 4105,
+      flagsStr: ['Persistent', 'TypeGuid', 'Attributes'],
+      arrayDimension: 0,
+      name: 'GVL_SymbolsAndDataTypes.TestSymbol',
+      type: 'STRING(82)',
+      comment: 'Test comment äääöö',
+      arrayInfo: [],
+      //typeGuid: '95190718000000000000000100000052',
+      attributes: [{ name: 'ads-client-attribute', value: 'example-value-ääö' }],
+      extendedFlags: 0,
+      //reserved: <Buffer 00 00 00 00 00 00 00 88 00 00 00>
+    });
+  });
+
+  test('reading all data type information', async () => {
+    const res = await client.getDataTypes();
+    const uploadInfo = await client.readUploadInfo();
+
+    expect(Object.keys(res).length).toBe(uploadInfo.dataTypeCount);
+    const testType = res['ST_TestDataType'.toLowerCase()];
+
+    expect(testType).toBeDefined();
+
+    //Note: checking only keys
+    expect(Object.keys(testType)).toStrictEqual(Object.keys({
+      version: 1,
+      hashValue: 0,
+      typeHashValue: 0,
+      size: 60,
+      offset: 0,
+      adsDataType: 65,
+      adsDataTypeStr: 'ADST_BIGTYPE',
+      flags: 2101377,
+      flagsStr: ['DataType', 'TypeGuid', 'Attributes', 'PersistantDatatype'],
+      arrayDimension: 0,
+      name: 'ST_TestDataType',
+      type: '',
+      comment: 'Test comment äääöö ',
+      arrayInfos: [],
+      subItems: [
+        {
+          version: 1,
+          hashValue: 0,
+          typeHashValue: 0,
+          size: 60,
+          offset: 0,
+          adsDataType: 65,
+          adsDataTypeStr: 'ADST_BIGTYPE',
+          flags: 130,
+          flagsStr: ['DataItem', 'TypeGuid'],
+          arrayDimension: 0,
+          name: 'Member',
+          type: 'ST_Struct',
+          comment: '',
+          arrayInfos: [],
+          subItems: [],
+          typeGuid: 'c2654024f8dfbe4b020b33f08643d2ad',
+          rpcMethods: [],
+          attributes: [],
+          enumInfos: [],
+          reserved: Buffer.alloc(0)
+        }
+      ],
+      typeGuid: 'e25ca2c595fc17906eb25949c2faeb1c',
+      rpcMethods: [],
+      attributes: [
+        { name: 'pack_mode', value: '3' },
+        {
+          name: 'ads-client-datatype-attribute',
+          value: 'example-datatype-value-ääö'
+        }
+      ],
+      enumInfos: [],
+      reserved: Buffer.alloc(0)
+    }));
+
+    //Note: Commented out properties that are system-dependant
+    expect(testType).toMatchObject({
+      version: 1,
+      hashValue: 0,
+      typeHashValue: 0,
+      size: 60,
+      offset: 0,
+      adsDataType: 65,
+      adsDataTypeStr: 'ADST_BIGTYPE',
+      flags: 2101377,
+      flagsStr: ['DataType', 'TypeGuid', 'Attributes', 'PersistantDatatype'],
+      arrayDimension: 0,
+      name: 'ST_TestDataType',
+      type: '',
+      comment: 'Test comment äääöö ',
+      arrayInfos: [],
+      subItems: [
+        {
+          version: 1,
+          hashValue: 0,
+          typeHashValue: 0,
+          size: 60,
+          offset: 0,
+          adsDataType: 65,
+          adsDataTypeStr: 'ADST_BIGTYPE',
+          flags: 130,
+          flagsStr: ['DataItem', 'TypeGuid'],
+          arrayDimension: 0,
+          name: 'Member',
+          type: 'ST_Struct',
+          comment: '',
+          arrayInfos: [],
+          subItems: [],
+          //typeGuid: 'c2654024f8dfbe4b020b33f08643d2ad',
+          rpcMethods: [],
+          attributes: [],
+          enumInfos: [],
+          //reserved: Buffer.alloc(0)
+        }
+      ],
+      //typeGuid: 'e25ca2c595fc17906eb25949c2faeb1c',
+      rpcMethods: [],
+      attributes: [
+        { name: 'pack_mode', value: '3' },
+        {
+          name: 'ads-client-datatype-attribute',
+          value: 'example-datatype-value-ääö'
+        }
+      ],
+      enumInfos: [],
+      //reserved: Buffer.alloc(0)
+    });
+  });
+
+});
 
 describe('reading values', () => {
 
@@ -839,6 +1145,7 @@ describe('issue specific tests', () => {
 
 describe('finalizing', () => {
   test('disconnecting', async () => {
+    console.log("DISCONNECTING");
     if (client?.connection.connected) {
       const task = client.disconnect()
 

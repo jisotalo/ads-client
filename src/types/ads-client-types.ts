@@ -1,9 +1,9 @@
 import { AdsDataType, AdsDeviceInfo, AdsRawInfo, AdsResponse, AdsState, AdsSymbolInfo, AmsAddress, AmsTcpPacket } from "./ads-protocol-types"
 
 interface ConnectionSettings {
-  /** **REQUIRED**: Target system AmsNetId address. For local (same machine), use `localhost` or `127.0.0.1.1` */
+  /** **REQUIRED**: Default target TwinCAT system AmsNetId address. For local (same machine), use `localhost` or `127.0.0.1.1` */
   targetAmsNetId: string,
-  /** **REQUIRED**: Target runtime ADS port. E.g. `851` for TwinCAT 3 PLC runtime 1 */
+  /** **REQUIRED**: Default target ADS port. E.g. `851` for TwinCAT 3 PLC runtime 1 */
   targetAdsPort: number,
   /** Optional: Target ADS router TCP port (default: 48898) */
   routerTcpPort?: number,
@@ -122,8 +122,8 @@ export interface ActiveAdsRequest {
 export interface ConnectionMetaData {
   /** Target device information (if available) */
   deviceInfo?: AdsDeviceInfo,
-  /** Target device system manager state (if available) */
-  systemManagerState?: AdsState,
+  /** Target device TwinCAT system state (if available) */
+  tcSystemState?: AdsState,
   /** Target PLC runtime state (from target ADS port - if available) */
   plcRuntimeState?: AdsState,
   /** Target runtime symbol and datatype count/size information */

@@ -5,6 +5,7 @@
   "main": "./dist/ads-client.js",
   "scripts": {
     "test": "jest --runInBand",
+    "test-dev": "jest --runInBand --bail=true --verbose=false --summaryThreshold=1",
     "build": "tsc",
     "watch": "tsc -w"
   },
@@ -42,6 +43,7 @@
   "devDependencies": {
     "@tsconfig/node16": "^1.0.3",
     "@types/debug": "^4.1.7",
+    "@types/jest": "^29.5.11",
     "docdash": "^1.2.0",
     "jest": "^28.1.3",
     "jsdoc": "^3.6.7",

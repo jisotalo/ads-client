@@ -94,7 +94,7 @@ export class Client extends EventEmitter {
    */
   public metaData: ConnectionMetaData = {
     deviceInfo: undefined,
-    systemManagerState: undefined,
+    tcSystemState: undefined,
     plcRuntimeState: undefined,
     uploadInfo: undefined,
     symbolVersion: undefined,
@@ -132,9 +132,9 @@ export class Client extends EventEmitter {
   private reconnectionTimer: TimerObject = { id: 0 };
 
   /**
-   * Timer ID and handle of system manager state poller timer 
+   * Timer ID and handle of TwinCAT system state poller timer 
    */
-  private systemManagerStatePoller: TimerObject = { id: 0 };
+  private tcSystemStatePoller: TimerObject = { id: 0 };
 
   /**
    * Timer handle for port register timeout
@@ -183,36 +183,6 @@ export class Client extends EventEmitter {
   };
 
   /**
-   * Connects to the target AMS router and registers a new ADS port
-   */
-  public connect(): Promise<Required<AdsClientConnection>> {
-    return this.connectToTarget();
-  }
-
-  /**
-   * Sets client debug level
-   * 
-   *  - 0 = no debugging (default)
-   *  - 1 = basic debugging 
-   *    - same as $env:DEBUG='ads-client'
-   *  - 2 = detailed debugging
-   *    - same as $env:DEBUG='ads-client,ads-client:details'
-   *  - 3 = full debugging with raw I/O data
-   *    - same as $env:DEBUG='ads-client,ads-client:details,ads-client:raw-data'
-   * 
-   * @param level 0 = none, 1 = basic, 2 = detailed, 3 = detailed + raw data
-   */
-  setDebugLevel(level: number): void {
-    this.debugLevel_ = level;
-
-    this.debug.enabled = level >= 1;
-    this.debugD.enabled = level >= 2;
-    this.debugIO.enabled = level >= 3;
-
-    this.debug(`setDebugLevel(): Debug level set to ${level}`);
-  }
-
-  /**
    * Clears given timer if it's available and increases the id
    * @param timerObject Timer object
    */
@@ -223,6 +193,23 @@ export class Client extends EventEmitter {
 
     //Increasing timer id
     timerObject.id = timerObject.id < Number.MAX_SAFE_INTEGER ? timerObject.id + 1 : 0;
+  }
+
+  /**
+   * Returns target AMS address as a string in a format `amsNetId:port`.
+   * 
+   * Uses values from settings unless targetOpts fields are defined
+   * 
+   * @param targetOpts Optional target settings that override values in `settings`
+   * @returns 
+   */
+  private targetToString(targetOpts: Partial<AmsAddress> = {}): string {
+    let target: AmsAddress = {
+      amsNetId: targetOpts.amsNetId ?? this.settings.targetAmsNetId,
+      adsPort: targetOpts.adsPort ?? this.settings.targetAdsPort
+    };
+
+    return ADS.amsAddressToString(target);
   }
 
   /**
@@ -1591,8 +1578,8 @@ export class Client extends EventEmitter {
 
     //If we have a local connection, connection needs to be reinitialized
     if (this.connection.isLocal) {
-      //We should stop polling system manager, it will be reinitialized later
-      this.clearTimer(this.systemManagerStatePoller);
+      //We should stop polling TwinCAT system state, the poller will be reinitialized later
+      this.clearTimer(this.tcSystemStatePoller);
 
       this.debug("onRouterStateChanged(): Local loopback connection active, monitoring router state. Reconnecting when router is back running.");
 
@@ -2610,10 +2597,10 @@ export class Client extends EventEmitter {
         if (!enumEntry) {
           throw new ClientError(`Provided value "${value}"${pathInfo} is not a valid value for this ENUM. Allowed values are a number and any of the following: ${allowedEnumValuesStr}`);
         }
-      
+
       } else if (typeof value === 'object' && (value as AdsEnumInfoEntry).value !== undefined) {
         enumEntry = value as AdsEnumInfoEntry;
-        
+
       } else if (typeof value === 'object' && (value as AdsEnumInfoEntry).name !== undefined) {
         //Is this a valid enum value?
         enumEntry = dataType.enumInfos.find(entry => entry.name.trim().toLowerCase() === (value as AdsEnumInfoEntry).name.trim().toLowerCase());
@@ -2665,6 +2652,206 @@ export class Client extends EventEmitter {
 
     } else {
       return ADS.BASE_DATA_TYPES.toBuffer(dataType.type, value, buffer);
+    }
+  }
+
+  /**
+   * Connects to the target
+   */
+  public connect(): Promise<Required<AdsClientConnection>> {
+    return this.connectToTarget();
+  }
+
+  /**
+   * Disconnects from the target
+   * 
+   * @param force If true, connection is dropped immediately. Should be used only if a very fast exit is needed. (default: false)
+   */
+  public disconnect(force: boolean = false): Promise<void> {
+    return this.disconnectFromTarget(force);
+  }
+
+  /**
+   * Sets client debug level
+   * 
+   *  - 0 = no debugging (default)
+   *  - 1 = basic debugging 
+   *    - same as $env:DEBUG='ads-client'
+   *  - 2 = detailed debugging
+   *    - same as $env:DEBUG='ads-client,ads-client:details'
+   *  - 3 = full debugging with raw I/O data
+   *    - same as $env:DEBUG='ads-client,ads-client:details,ads-client:raw-data'
+   * 
+   * @param level 0 = none, 1 = basic, 2 = detailed, 3 = detailed + raw data
+   */
+  setDebugLevel(level: number): void {
+    this.debugLevel_ = level;
+
+    this.debug.enabled = level >= 1;
+    this.debugD.enabled = level >= 2;
+    this.debugIO.enabled = level >= 3;
+
+    this.debug(`setDebugLevel(): Debug level set to ${level}`);
+  }
+
+  /**
+   * Sends ADS Write Control command to the target
+   * 
+   * See Write Control ADS specification: https://infosys.beckhoff.com/content/1033/tc3_ads_intro/115879947.html?id=4720330147059483431
+   * 
+   * @param adsState Requested ADS state - see `ADS.ADS_STATE` object from `ads-commons.ts`. Can be a number or a valid string, such as `Config`
+   * @param deviceState  Requested device state (default: 0)
+   * @param data Additional data to send (if any)
+   * @param targetOpts Optional target settings that override values in `settings`
+   */
+  public async writeControl(adsState: keyof typeof ADS.ADS_STATE | number, deviceState: number = 0, data: Buffer = Buffer.alloc(0), targetOpts: Partial<AmsAddress> = {}): Promise<void> {
+    if (!this.connection.connected) {
+      throw new ClientError(`writeControl(): Client is not connected. Use connect() to connect to the target first.`);
+    }
+
+    if (typeof adsState === 'string') {
+      //This should be a valid string key for ADS.ADS_STATE
+      let key = Object.keys(ADS.ADS_STATE).find(k => k.toLowerCase() === (adsState as string).toLowerCase()) as typeof adsState;
+
+      if (!key) {
+        throw new ClientError(`writeControl(): Provided string value "${adsState}" is not a valid ADS_STATE. See ADS.ADS_STATE object for valid string values.`);
+      }
+
+      adsState = ADS.ADS_STATE[key] as number;
+    }
+
+    this.debug(`writeControl(): Sending an ADS Write Control command (adsState: ${adsState}, deviceState: ${deviceState}, data: ${data.byteLength} bytes) to ${this.targetToString(targetOpts)}`);
+
+    //Allocating bytes for request
+    const payload = Buffer.alloc(8 + data.byteLength);
+    let pos = 0;
+
+    //0..1 ADS state
+    payload.writeUInt16LE(adsState, pos);
+    pos += 2;
+
+    //2..3 Device state
+    payload.writeUInt16LE(deviceState, pos);
+    pos += 2;
+
+    //4..7 Data length
+    payload.writeUInt32LE(data.byteLength, pos);
+    pos += 4;
+
+    //7..n Data
+    data.copy(payload, pos);
+
+    try {
+      const res = await this.sendAdsCommand<AdsWriteControlResponse>({
+        adsCommand: ADS.ADS_COMMAND.WriteControl,
+        targetAmsNetId: targetOpts.amsNetId,
+        targetAdsPort: targetOpts.adsPort,
+        payload
+      });
+
+      this.debug(`writeControl(): Write control command sent to ${this.targetToString(targetOpts)}`);
+
+    } catch (err) {
+      this.debug(`writeControl(): Sending write control command to ${this.targetToString(targetOpts)} failed: %o`, err);
+      throw new ClientError(`writeControl(): Sending write control command to ${this.targetToString(targetOpts)} failed`, err);
+    }
+  }
+
+  /**
+   * Starts the PLC runtime (same as green play button in TwinCAT XAE)
+   * 
+   * @param targetOpts Optional target settings that override values in `settings`
+   */
+  public async startPlc(targetOpts: Partial<AmsAddress> = {}): Promise<void> {
+    if (!this.connection.connected) {
+      throw new ClientError(`startPlc(): Client is not connected. Use connect() to connect to the target first.`);
+    }
+
+    this.debug(`startPlc(): Starting PLC runtime at ${this.targetToString(targetOpts)}`);
+
+    try {
+      //Reading device state first as we don't want to change it (even though it's most probably 0)
+      const state = await this.readPlcRuntimeState(targetOpts);
+
+      await this.writeControl("Run", state.deviceState, undefined, targetOpts);
+
+      this.debug(`startPlc(): PLC runtime started at ${this.targetToString(targetOpts)}`);
+    } catch (err) {
+      this.debug(`startPlc(): Starting PLC runtime at ${this.targetToString(targetOpts)} failed: %o`, err);
+      throw new ClientError(`startPlc(): Starting PLC runtime at ${this.targetToString(targetOpts)} failed`, err);
+    }
+  }
+
+  /**
+   * Resets the PLC runtime (Same as reset cold in TwinCAT XAE)
+   * 
+   * @param targetOpts Optional target settings that override values in `settings`
+   */
+  public async resetPlc(targetOpts: Partial<AmsAddress> = {}): Promise<void> {
+    if (!this.connection.connected) {
+      throw new ClientError(`resetPlc(): Client is not connected. Use connect() to connect to the target first.`);
+    }
+
+    this.debug(`resetPlc(): Resetting PLC runtime at ${this.targetToString(targetOpts)}`);
+
+    try {
+      //Reading device state first as we don't want to change it (even though it's most probably 0)
+      const state = await this.readPlcRuntimeState(targetOpts);
+
+      await this.writeControl("Reset", state.deviceState, undefined, targetOpts);
+
+      this.debug(`resetPlc(): PLC runtime reset at ${this.targetToString(targetOpts)}`);
+    } catch (err) {
+      this.debug(`resetPlc(): Resetting PLC runtime at ${this.targetToString(targetOpts)} failed: %o`, err);
+      throw new ClientError(`resetPlc(): Resetting PLC runtime at ${this.targetToString(targetOpts)} failed`, err);
+    }
+  }
+
+  /**
+   * Stops the PLC runtime. Same as pressing the red stop button in TwinCAT XAE
+   * 
+   * @param targetOpts Optional target settings that override values in `settings`
+   */
+  public async stopPlc(targetOpts: Partial<AmsAddress> = {}): Promise<void> {
+    if (!this.connection.connected) {
+      throw new ClientError(`stopPlc(): Client is not connected. Use connect() to connect to the target first.`);
+    }
+
+    this.debug(`stopPlc(): Stopping PLC runtime at ${this.targetToString(targetOpts)}`);
+
+    try {
+      //Reading device state first as we don't want to change it (even though it's most probably 0)
+      const state = await this.readPlcRuntimeState(targetOpts);
+
+      await this.writeControl("Stop", state.deviceState, undefined, targetOpts);
+
+      this.debug(`stopPlc(): PLC runtime stopped at ${this.targetToString(targetOpts)}`);
+    } catch (err) {
+      this.debug(`stopPlc(): Stopping PLC runtime at ${this.targetToString(targetOpts)} failed: %o`, err);
+      throw new ClientError(`stopPlc(): Stopping PLC runtime at ${this.targetToString(targetOpts)} failed`, err);
+    }
+  }
+
+  /**
+   * Restarts the PLC runtime. Same as calling first `resetPlc()` and then `startPlc()`
+   * 
+   * @param targetOpts Optional target settings that override values in `settings`
+   */
+  public async restartPlc(targetOpts: Partial<AmsAddress> = {}): Promise<void> {
+    if (!this.connection.connected) {
+      throw new ClientError(`restartPlc(): Client is not connected. Use connect() to connect to the target first.`);
+    }
+
+    this.debug(`restartPlc(): Restarting PLC runtime at ${this.targetToString(targetOpts)}`);
+
+    try {
+      await this.resetPlc(targetOpts);
+      await this.startPlc(targetOpts);
+
+      this.debug(`restartPlc(): PLC runtime restarted at ${this.targetToString(targetOpts)}`);
+    } catch (err) {
+      this.debug(`restartPlc(): Restarting PLC runtime at ${this.targetToString(targetOpts)} failed: %o`, err);
+      throw new ClientError(`restartPlc(): Restarting PLC runtime at ${this.targetToString(targetOpts)} failed`, err);
     }
   }
 
@@ -2764,11 +2951,13 @@ export class Client extends EventEmitter {
     return dataType;
 
   }
+
   /**
     * Reads target PLC runtime state
+    * 
     * If original target, the state is also saved to the `metaData.plcRuntimeStatus`
     * 
-    * @param targetOpts Optional target settings that override values in `settings` (NOTE: If used, no caching is available -> worse performance)
+    * @param targetOpts Optional target settings that override values in `settings`
     */
   public async readPlcRuntimeState(targetOpts: Partial<AmsAddress> = {}): Promise<AdsState> {
     if (!this.connection.connected) {
@@ -2784,7 +2973,7 @@ export class Client extends EventEmitter {
         targetAdsPort: targetOpts.adsPort
       });
 
-      this.debug(`readPlcRuntimeState(): Device state read successfully. State is %o`, res.ads.payload);
+      this.debug(`readPlcRuntimeState(): Runtime state read successfully. State is %o`, res.ads.payload);
 
       if (!targetOpts.adsPort && !targetOpts.amsNetId) {
         //Target is not overridden -> save to metadata
@@ -2796,6 +2985,42 @@ export class Client extends EventEmitter {
     } catch (err) {
       this.debug(`readPlcRuntimeState(): Reading PLC runtime state failed: %o`, err);
       throw new ClientError(`readPlcRuntimeState(): Reading PLC runtime state failed`, err);
+    }
+  }
+
+  /**
+    * Reads target TwinCAT system state (usually `Run` or `Config`, ADS port 10000)
+    * 
+    * If original target, the state is also saved to the `metaData.tcSystemState`
+    * 
+    * @param targetOpts Optional target settings that override values in `settings`
+    */
+  public async readTcSystemState(targetOpts: Partial<AmsAddress> = {}): Promise<AdsState> {
+    if (!this.connection.connected) {
+      throw new ClientError(`readTcSystemState(): Client is not connected. Use connect() to connect to the target first.`);
+    }
+
+    try {
+      this.debug(`readTcSystemState(): Reading TwinCAT system state`);
+
+      const res = await this.sendAdsCommand<AdsReadStateResponse>({
+        adsCommand: ADS.ADS_COMMAND.ReadState,
+        targetAmsNetId: targetOpts.amsNetId,
+        targetAdsPort: targetOpts.adsPort ?? ADS.ADS_RESERVED_PORTS.SystemService
+      });
+
+      this.debug(`readTcSystemState(): TwinCAT system state read successfully. State is %o`, res.ads.payload);
+
+      if (!targetOpts.adsPort && !targetOpts.amsNetId) {
+        //Target is not overridden -> save to metadata
+        this.metaData.tcSystemState = res.ads.payload;
+      }
+
+      return res.ads.payload;
+
+    } catch (err) {
+      this.debug(`readTcSystemState(): Reading TwinCAT system state failed: %o`, err);
+      throw new ClientError(`readTcSystemState(): Reading TwinCAT system state failed`, err);
     }
   }
 
