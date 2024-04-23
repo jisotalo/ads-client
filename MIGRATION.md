@@ -5,6 +5,8 @@ This file contains detailed migration guide from migrating from ads-client major
 ## From version 1.x.x to 2.x.x
 
 ### Required
+* `readSymbol()`
+  * Result object `symbol` -> `symbolInfo`
 * `readRaw()`
   * Target setting parameters changed to new `targetOpts` format. Check if old format used.
 * `writeRaw()`
@@ -25,5 +27,6 @@ This file contains detailed migration guide from migrating from ads-client major
 * `readSystemManagerState()`
   * Renamed to `readTcSystemState()`
 * `metaData.systemManagerState` renamed to `metaData.tcSystemState`
+* `getEmptyPlcType()` -> `getDefaultPlcObject()`
 ### Optional  
 * Remove `disableBigInt` from settings 

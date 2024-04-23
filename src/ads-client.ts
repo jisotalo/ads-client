@@ -1,5 +1,5 @@
 import EventEmitter from "events";
-import type { ActiveAdsRequestContainer, ActiveSubscription, ActiveSubscriptionContainer, AdsClientConnection, AdsClientSettings, AdsCommandToSend, AdsDataTypeContainer, AdsSymbolInfoContainer, AdsUploadInfo, ConnectionMetaData, PlcPrimitiveType, SubscriptionCallback, SubscriptionData, SubscriptionOptions, ReadSymbolResult, TimerObject, ObjectToBufferConversionResult } from "./types/ads-client-types";
+import type { ActiveAdsRequestContainer, ActiveSubscription, ActiveSubscriptionContainer, AdsClientConnection, AdsClientSettings, AdsCommandToSend, AdsDataTypeContainer, AdsSymbolInfoContainer, AdsUploadInfo, ConnectionMetaData, PlcPrimitiveType, SubscriptionCallback, SubscriptionData, SubscriptionOptions, ReadSymbolResult, TimerObject, ObjectToBufferConversionResult, WriteSymbolResult } from "./types/ads-client-types";
 import { AdsAddNotificationResponse, AdsAddNotificationResponseData, AdsArrayInfoEntry, AdsAttributeEntry, AdsDataType, AdsDeleteNotificationResponse, AdsDeviceInfo, AdsEnumInfoEntry, AdsNotification, AdsNotificationResponse, AdsNotificationSample, AdsNotificationStamp, AdsRawInfo, AdsReadDeviceInfoResponse, AdsReadResponse, AdsReadStateResponse, AdsReadWriteResponse, AdsRequest, AdsResponse, AdsRpcMethodEntry, AdsRpcMethodParameterEntry, AdsState, AdsSymbolInfo, AdsWriteControlResponse, AdsWriteResponse, AmsAddress, AmsHeader, AmsPortRegisteredData, AmsRouterState, AmsRouterStateData, AmsTcpHeader, AmsTcpPacket, BaseAdsResponse, EmptyAdsResponse, UnknownAdsResponse } from "./types/ads-protocol-types";
 import {
   Socket,
@@ -102,7 +102,6 @@ export class Client extends EventEmitter {
     symbols: {},
     allDataTypesCached: false,
     dataTypes: {},
-    builtDataTypes: {},
     routerState: undefined
   };
 
@@ -781,7 +780,6 @@ export class Client extends EventEmitter {
       //Clear all cached symbol infos and data types etc.
       this.metaData.dataTypes = {};
       this.metaData.symbols = {};
-      this.metaData.builtDataTypes = {};
       this.metaData.uploadInfo = undefined;
 
       //Refreshing upload info
@@ -2324,18 +2322,6 @@ export class Client extends EventEmitter {
     try {
       this.debug(`buildDataType(): Building data type for "${name}"`);
 
-      //Is this built data type already cached? Skip check if we have different target
-      if (!this.settings.disableCaching
-        && !targetOpts.adsPort
-        && !targetOpts.amsNetId
-        && this.metaData.builtDataTypes[name.toLowerCase()]) {
-
-        this.debug(`buildDataType(): Built full data type declaration found from cache for "${name}"`);
-        return {
-          ...this.metaData.builtDataTypes[name.toLowerCase()]
-        };
-      }
-
       let dataType: AdsDataType | undefined;
 
       try {
@@ -2482,10 +2468,6 @@ export class Client extends EventEmitter {
         builtType.name = '';
       }
 
-      if (!this.settings.disableCaching && !targetOpts.adsPort && !targetOpts.amsNetId) {
-        this.metaData.builtDataTypes[name.toLowerCase()] = builtType;
-      }
-
       return builtType;
 
     } catch (err) {
@@ -2575,19 +2557,117 @@ export class Client extends EventEmitter {
   }
 
   private convertObjectToBuffer<T = any>(value: T, dataType: AdsDataType, objectPath: string = '', isArrayItem: boolean = false): ObjectToBufferConversionResult {
-    let rawValue = Buffer.alloc(dataType.size);//Buffer.alloc(0);
-    let missingProperty = '';
-    const pathInfo = objectPath === '' && dataType.name === '' ? '' : ` for ${objectPath}.${dataType.name}`;
+    let rawValue = Buffer.alloc(0);
+
+    const pathInfo = objectPath === '' && dataType.name === ''
+      ? ''
+      : ` for ${objectPath}.${dataType.name}`;
+
     const allowedEnumValuesStr = dataType.enumInfos.map(entry => entry.name).join(', ');
 
     if (dataType.subItems.length > 0 && (dataType.arrayInfos.length === 0 || isArrayItem)) {
-      //This is a struct or array item  
+      //This is a struct or array item
+      rawValue = Buffer.alloc(dataType.size);
+
+      for (const subItem of dataType.subItems) {
+        //Does that javascript object contain this field/subItem?
+        let key: undefined | string = undefined;
+
+        //First, try the easy way (5-20x times faster)
+        if ((value as Record<string, any>)[subItem.name] !== undefined) {
+          key = subItem.name;
+
+        } else {
+          //Not found, try case-insensitive way (this is slower -> only doing if needed)
+          try {
+            key = Object.keys(value as Record<string, any>).find(objKey => objKey.toLowerCase() === subItem.name.toLowerCase());
+
+          } catch (err) {
+            //value is null/ not an object/something else went wrong
+            key = undefined;
+          }
+        }
+
+        //If the field/subItem isn't found from object, this is an error (we need to have all fields)
+        if (key === undefined) {
+          return {
+            rawValue,
+            missingProperty: `${pathInfo}.${subItem.name}`
+          };
+        }
+
+        //Converting subItem
+        let res = this.convertObjectToBuffer((value as Record<string, any>)[key], subItem, `${pathInfo}.${subItem.name}`);
+
+        if (res.missingProperty) {
+          //We have a missing property somewhere -> quit
+          return res;
+        }
+
+        //Add the subitem data to the buffer
+        res.rawValue.copy(rawValue, subItem.offset);
+      }
 
     } else if (dataType.arrayInfos.length > 0 && !isArrayItem) {
       //This is an array
+      rawValue = Buffer.alloc(dataType.arrayInfos.reduce((total, dimension) => total + dimension.length * dataType.size, 0));
+
+      let pos = 0;
+      /**
+       * Helper function to recursively parse array dimensions.
+       * 
+       * Returns string if a index is missing from object.
+       * Returns undefined if no errors
+       * 
+       * @param value 
+       * @param dimension 
+       * @param path 
+       * @returns 
+       */
+      const parseArrayDimension = (value: any, dimension: number, path = ''): string | undefined => {
+        for (let child = 0; child < dataType.arrayInfos[dimension].length; child++) {
+          if (dataType.arrayInfos[dimension + 1]) {
+            //More array dimensions are available
+            const err = parseArrayDimension(value[child], dimension + 1, `${path}[${child}]`);
+
+            if (err) {
+              return err;
+            }
+
+          } else {
+            //This is the final array dimension
+            if (value[child] === undefined) {
+              return `${pathInfo}${path}[${child}]`;
+            }
+
+            //Converting array item
+            let res = this.convertObjectToBuffer((value as any[])[child], dataType, `${pathInfo}.${path}[${child}]`, true);
+
+            if (res.missingProperty) {
+              //We have a missing property somewhere -> quit
+              return res.missingProperty;
+            }
+
+            //Add the array item data to the buffer
+            res.rawValue.copy(rawValue, pos);
+            pos += dataType.size;
+          }
+        }
+      }
+
+      const err = parseArrayDimension(value, 0);
+
+      if (err) {
+        //Array index was missing
+        return {
+          rawValue,
+          missingProperty: err
+        };
+      }
 
     } else if (dataType.enumInfos.length > 0) {
       //This is an enumeration value (number, string or object)
+      rawValue = Buffer.alloc(dataType.size);
       let enumEntry: AdsEnumInfoEntry | undefined;
 
       if (typeof value === 'string') {
@@ -2624,6 +2704,8 @@ export class Client extends EventEmitter {
 
     } else if (dataType.size > 0) {
       //This is a normal non-empty variable
+      rawValue = Buffer.alloc(dataType.size);
+
       this.convertPrimitiveTypeToBuffer(value as PlcPrimitiveType, dataType, rawValue);
     }
 
@@ -2653,6 +2735,96 @@ export class Client extends EventEmitter {
     } else {
       return ADS.BASE_DATA_TYPES.toBuffer(dataType.type, value, buffer);
     }
+  }
+
+  /**
+   * Merges objects recursively. 
+   * 
+   * Used for example in `writeSymbol()` when `autoFill` is used 
+   * to merge active values (missing properties) and user-defined properties.
+   * 
+   * This is based on https://stackoverflow.com/a/34749873/8140625 
+   * and https://stackoverflow.com/a/49727784/8140625 but with some changes.
+   * 
+   * @param caseSensitive If true, property keys are handled as case-sensitive (as they normally are). In TwinCAT, they are case-insensitive --> using `false`.
+   * @param target Target object where to merge source objects (the value provide by user)
+   * @param sources One or more source object, which keys are merged to target if target is missing them
+   */
+  private deepMergeObjects(caseSensitive: boolean, target: any, ...sources: any[]): any {
+    if (!sources.length) {
+      return target;
+    }
+
+    const isObjectOrArray = (item: any) => {
+      return (!!item) && ((item.constructor === Object) || Array.isArray(item));
+    }
+
+    const keyExists = (obj: Record<string, any>, key: string, caseSensitive: boolean) => {
+      if (caseSensitive) {
+        return obj[key] !== undefined;
+      } else {
+        return !!Object.keys(obj).find(k => k.toLowerCase() === key.toLowerCase());
+      }
+    }
+
+    const getObjectKeyValue = (obj: Record<string, any>, key: string, caseSensitive: boolean) => {
+      if (caseSensitive) {
+        return obj[key];
+      } else {
+        const found = Object.keys(obj).find(k => k.toLowerCase() === key.toLowerCase());
+        return found === undefined ? undefined : obj[found];
+      }
+    }
+
+    //Sets object value (case-sensitive or insensitive key)
+    const setObjectKeyValue = (obj: Record<string, any>, key: string, value: any, caseSensitive: boolean) => {
+      if (caseSensitive) {
+        //Case-sensitive is easy
+        obj[key] = value;
+
+      } else {
+        const found = Object.keys(obj).find(k => k.toLowerCase() === key.toLowerCase());
+
+        //Note: It should <be> found always, as it was already checked by keyExists()
+        if (found) {
+          obj[found] = value;
+        }
+      }
+    }
+
+    const source = sources.shift();
+
+    if (isObjectOrArray(target) && isObjectOrArray(source)) {
+      for (const key in source) {
+        if (isObjectOrArray(source[key])) {
+          //Source is object or array
+          if (keyExists(target, key, caseSensitive)) {
+            //Target has this key, copy value
+            setObjectKeyValue(target, key, Object.assign({}, target[key]), caseSensitive);
+
+          } else {
+            //Target doesn't have this key, add it)
+            Object.assign(target, { [key]: {} });
+          }
+
+          //As this is an object, go through it recursively
+          this.deepMergeObjects(caseSensitive, getObjectKeyValue(target, key, false), source[key]);
+
+        } else {
+          //Source is primitive type
+          if (keyExists(target, key, caseSensitive)) {
+            //Target has this key, copy value
+            setObjectKeyValue(target, key, source[key], caseSensitive);
+
+          } else {
+            //Target doesn't have this key, add it
+            Object.assign(target, { [key]: source[key] });
+          }
+        }
+      }
+    }
+
+    return this.deepMergeObjects(caseSensitive, target, ...sources);
   }
 
   /**
@@ -3592,8 +3764,6 @@ export class Client extends EventEmitter {
         payload: data
       });
 
-      die(res);
-
       this.debug(`writeRaw(): Writing raw data (${JSON.stringify({ indexGroup, indexOffset })}) done (${value.byteLength} bytes)`);
 
     } catch (err) {
@@ -3685,7 +3855,7 @@ export class Client extends EventEmitter {
    * 
    * @template T Typescript data type of the PLC data, for example `writeSymbol<number>(...)` or `writeSymbol<ST_TypedStruct>(...)`
    */
-  public async writeSymbol<T = any>(path: string, value: T, autoFill: boolean = false, targetOpts: Partial<AmsAddress> = {}): Promise<void> {
+  public async writeSymbol<T = any>(path: string, value: T, autoFill: boolean = false, targetOpts: Partial<AmsAddress> = {}): Promise<WriteSymbolResult<T>> {
     if (!this.connection.connected) {
       throw new ClientError(`writeSymbol(): Client is not connected. Use connect() to connect to the target first.`);
     }
@@ -3715,6 +3885,177 @@ export class Client extends EventEmitter {
     }
 
     //Creating raw data from object
+    let rawValue: Buffer;
+    try {
+      let res = this.convertObjectToBuffer(value, dataType);
+
+      if (res.missingProperty && autoFill) {
+        //Some fields are missing and autoFill is used -> try to auto fill missing values
+        this.debug(`writeSymbol(): Autofilling missing fields with active values`);
+
+        this.debugD(`writeSymbol(): Reading active value`);
+        const valueNow = await this.readSymbol(path, targetOpts);
+
+        this.debugD(`writeSymbol(): Merging objects (adding missing fields)`);
+        value = this.deepMergeObjects(false, valueNow.value, value);
+
+        //Try conversion again - should work now
+        res = this.convertObjectToBuffer(value, dataType);
+
+        if (res.missingProperty) {
+          //This shouldn't really happen
+          //However, if it happened, the merge isn't working as it should
+          throw new ClientError(`writeSymbol(): Converting object to raw value for ${path} failed. The object is missing key/value for "${res.missingProperty}". NOTE: autoFill failed - please report an issue at GitHub`);
+        }
+
+      } else if (res.missingProperty) {
+        //Some fields are missing and no autoFill -> failed
+        throw new ClientError(`writeSymbol(): Converting object to raw value for ${path} failed. The object is missing key/value for "${res.missingProperty}". Hint: Use autoFill parameter to add missing fields automatically`);
+      }
+
+      //We are here -> success!
+      rawValue = res.rawValue;
+
+    } catch (err) {
+      //We can pass our own errors to keep the message on top
+      if (err instanceof ClientError) {
+        throw err;
+      }
+
+      this.debug(`writeSymbol(): Converting object to raw value for ${path} failed: %o`, err);
+      throw new ClientError(`writeSymbol(): Converting object to raw value for ${path} failed`, err);
+    }
+
+    //Writing value by the symbol address
+    try {
+      this.debugD(`writeSymbol(): Writing raw value for ${path}`);
+      await this.writeRaw(symbolInfo.indexGroup, symbolInfo.indexOffset, rawValue, targetOpts);
+
+    } catch (err) {
+      this.debug(`writeSymbol(): Writing raw value for ${path} failed: %o`, err);
+      throw new ClientError(`writeSymbol(): Writing raw value for ${path} failed`, err);
+    }
+
+    this.debug(`writeSymbol(): Writing symbol for ${path} done`);
+
+    return {
+      value,
+      rawValue,
+      dataType,
+      symbolInfo
+    };
+  }
+
+  /**
+   * Returns a default (empty) Javascript object representing provided PLC data type.
+   * 
+   * @param dataType Data type name in the PLC as string (such as `ST_Struct`) or `AdsDataType` object 
+   * @param targetOpts Optional target settings that override values in `settings` 
+   * @returns 
+   * 
+   * @template T Typescript data type of the PLC data, for example `readSymbol<number>(...)` or `readSymbol<ST_TypedStruct>(...)`
+   */
+  public async getDefaultPlcObject<T = any>(dataType: string | AdsDataType, targetOpts: Partial<AmsAddress> = {}): Promise<T> {
+    if (!this.connection.connected) {
+      throw new ClientError(`getDefaultPlcObject(): Client is not connected. Use connect() to connect to the target first.`);
+    }
+
+    this.debug(`getDefaultPlcObject(): Creating empty default object for ${typeof dataType === 'string' ? dataType : dataType.type}`);
+
+    //Getting data type information, unless given as parameter
+    if (typeof dataType === 'string') {
+      try {
+        this.debugD(`getDefaultPlcObject(): Getting data type for ${dataType}`);
+        dataType = await this.buildDataType(dataType, targetOpts);
+
+      } catch (err) {
+        this.debug(`getDefaultPlcObject(): Getting data type information for ${dataType} failed: %o`, err);
+        throw new ClientError(`getDefaultPlcObject(): Getting data type information for ${dataType} failed`, err);
+      }
+    }
+
+    //Converting raw byte data to Javascript object
+    let value: T = await this.convertFromRaw(Buffer.alloc(dataType.size), dataType, targetOpts);
+
+    this.debug(`getDefaultPlcObject(): Empty default object created for ${dataType.type}`);
+    return value;
+  }
+
+  /**
+   * Converts a raw byte value to a Javascript object.
+   * 
+   * @param data Raw PLC data as Buffer (read for example with `readRaw()`)
+   * @param dataType Data type name in the PLC as string (such as `ST_Struct`) or `AdsDataType` object
+   * @param targetOpts Optional target settings that override values in `settings`
+   * @returns 
+   * 
+   * @template T Typescript data type of the PLC data, for example `convertFromRaw<number>(...)` or `convertFromRaw<ST_TypedStruct>(...)`
+   */
+  public async convertFromRaw<T = any>(data: Buffer, dataType: string | AdsDataType, targetOpts: Partial<AmsAddress> = {}): Promise<T> {
+    if (!this.connection.connected) {
+      throw new ClientError(`convertFromRaw(): Client is not connected. Use connect() to connect to the target first.`);
+    }
+
+    this.debug(`convertFromRaw(): Converting ${data.byteLength} bytes of data to ${typeof dataType === 'string' ? dataType : dataType.type}`);
+
+    //Getting data type information, unless given as parameter
+    if (typeof dataType === 'string') {
+      try {
+        this.debugD(`convertFromRaw(): Getting data type for ${dataType}`);
+        dataType = await this.buildDataType(dataType, targetOpts);
+
+      } catch (err) {
+        this.debug(`convertFromRaw(): Getting data type information for ${dataType} failed: %o`, err);
+        throw new ClientError(`convertFromRaw(): Getting data type information for ${dataType} failed`, err);
+      }
+    }
+
+    //Converting raw byte data to Javascript object
+    let value: T;
+    try {
+      this.debugD(`convertFromRaw(): Converting raw value to object for ${dataType.type}`);
+      value = await this.convertBufferToObject<T>(data, dataType);
+
+    } catch (err) {
+      this.debug(`convertFromRaw(): Converting raw value to object for ${dataType.type} failed: %o`, err);
+      throw new ClientError(`convertFromRaw(): Converting raw value to object for ${dataType.type} failed`, err);
+    }
+
+    this.debug(`convertFromRaw(): Converted ${data.byteLength} bytes of data to ${dataType.type} successfully`);
+    return value;
+  }
+
+  /**
+   * Converts a Javascript object to raw byte data.
+   * 
+   * @param value Javascript object that represents the `dataType´ in target system
+   * @param dataType Data type name in the PLC as string (such as `ST_Struct`) or `AdsDataType` object
+   * @param autoFill If true and data type is a container (`STRUCT`, `FUNCTION_BLOCK` etc.), missing properties are automatically **set to default values** (usually `0` or `''`) 
+   * @param targetOpts Optional target settings that override values in `settings`
+   * @returns 
+   * 
+   * @template T Typescript data type of the PLC data, for example `convertFromRaw<number>(...)` or `convertFromRaw<ST_TypedStruct>(...)`
+   */
+  public async convertToRaw(value: any, dataType: string | AdsDataType, autoFill: boolean = false, targetOpts: Partial<AmsAddress> = {}): Promise<Buffer> {
+    if (!this.connection.connected) {
+      throw new ClientError(`convertToRaw(): Client is not connected. Use connect() to connect to the target first.`);
+    }
+
+    this.debug(`convertToRaw(): Converting object to ${typeof dataType === 'string' ? dataType : dataType.type}`);
+
+    //Getting data type information, unless given as parameter
+    if (typeof dataType === 'string') {
+      try {
+        this.debugD(`convertToRaw(): Getting data type for ${dataType}`);
+        dataType = await this.buildDataType(dataType, targetOpts);
+
+      } catch (err) {
+        this.debug(`convertToRaw(): Getting data type information for ${dataType} failed: %o`, err);
+        throw new ClientError(`convertToRaw(): Getting data type information for ${dataType} failed`, err);
+      }
+    }
+
+    //Converting Javascript object to raw byte data
     try {
       let { rawValue, missingProperty } = this.convertObjectToBuffer(value, dataType);
 
@@ -3725,54 +4066,21 @@ export class Client extends EventEmitter {
 
         if (missingProperty) {
           //This shouldn't happen ever
-          throw new ClientError(`writeSymbol(): Converting object to raw value for ${path} failed (failed to autoFill missing values)`);
+          throw new ClientError(`convertToRaw(): Converting object to raw value for ${dataType.type} failed (failed to autoFill missing values)`);
         }
 
       } else if (missingProperty) {
         //Not using autoFill -> failed
-        throw new ClientError(`writeSymbol(): Converting object to raw value for ${path} failed and autoFill parameter is false. ${missingProperty}`);
+        throw new ClientError(`convertToRaw(): Converting object to raw value for ${dataType.type} failed and autoFill parameter is false. ${missingProperty}`);
       }
 
-      console.log("Converted:", rawValue);
-
-
-    } catch (err) {
-      this.debug(`writeSymbol(): Converting object to raw value for ${path} failed: %o`, err);
-      throw new ClientError(`writeSymbol(): Converting object to raw value for ${path} failed`, err);
-    }
-
-    /*
-    //Reading value by the symbol address
-    let rawValue: Buffer;
-    try {
-      this.debugD(`readSymbol(): Reading raw value for ${path}`);
-      rawValue = await this.readRaw(symbolInfo.indexGroup, symbolInfo.indexOffset, symbolInfo.size, targetOpts);
+      //Success
+      this.debug(`convertToRaw(): Converted object to ${dataType.type} successfully`);
+      return rawValue;
 
     } catch (err) {
-      this.debug(`readSymbol(): Reading raw value for ${path} failed: %o`, err);
-      throw new ClientError(`readSymbol(): Reading raw value for ${path} failed`, err);
+      this.debug(`convertToRaw(): Converting object to raw value for ${dataType.type} failed: %o`, err);
+      throw new ClientError(`convertToRaw(): Converting object to raw value for ${dataType.type} failed`, err);
     }
-
-    //Converting byte data to javascript object
-    let value: T;
-    try {
-      this.debugD(`readSymbol(): Converting raw value to object for ${path}`);
-      value = await this.convertBufferToObject<T>(rawValue, dataType);
-
-    } catch (err) {
-      this.debug(`readSymbol(): Converting raw value to object for ${path} failed: %o`, err);
-      throw new ClientError(`readSymbol(): Converting raw value to object for ${path} failed`, err);
-    }
-
-    this.debug(`readSymbol(): Reading symbol for ${path} done`);
-
-    return {
-      value,
-      rawValue,
-      dataType,
-      symbolInfo
-    };*/
   }
-
-
 }
