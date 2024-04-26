@@ -3773,6 +3773,65 @@ export class Client extends EventEmitter {
   }
 
   /**
+   * Reads raw byte data from the target system by symbol path.
+   * 
+   * Supports also reading POINTER and REFERENCE values by using deference operator in path (`^`)
+   * 
+   * This uses the `READ_SYMVAL_BYNAME` command under the hood
+   *  
+   * @param path Variable path in the PLC to read (such as `GVL_Test.ExampleStruct`)
+   * @param targetOpts Optional target settings that override values in `settings`
+   * @returns Data read
+   */
+  public async readRawByName(path: string, targetOpts: Partial<AmsAddress> = {}): Promise<Buffer> {
+    if (!this.connection.connected) {
+      throw new ClientError(`readRawByName(): Client is not connected. Use connect() to connect to the target first.`);
+    }
+    path = path.trim();
+    this.debug(`readRawByName(): Reading raw data (${path})`);
+
+    //Allocating bytes for request
+    const data = Buffer.alloc(16 + path.length + 1);
+    let pos = 0;
+
+    //0..3 IndexGroup 
+    data.writeUInt32LE(ADS.ADS_RESERVED_INDEX_GROUPS.SymbolValueByName, pos);
+    pos += 4;
+
+    //4..7 IndexOffset
+    data.writeUInt32LE(0, pos);
+    pos += 4;
+
+    //8..11 Read data length
+    data.writeUInt32LE(0xFFFFFFFF, pos); //Seems to work OK (we don't know the size)
+    pos += 4;
+
+    //12..15 Write data length
+    data.writeUInt32LE(path.length + 1, pos); 
+    pos += 4;
+
+    //16..n Data
+    ADS.encodeStringToPlcStringBuffer(path).copy(data, pos);
+    pos += path.length + 1;
+
+    try {
+      const res = await this.sendAdsCommand<AdsReadWriteResponse>({
+        adsCommand: ADS.ADS_COMMAND.ReadWrite,
+        targetAmsNetId: targetOpts.amsNetId,
+        targetAdsPort: targetOpts.adsPort,
+        payload: data
+      });
+
+      this.debug(`readRawByName(): Reading raw data (${path}) done (${res.ads.length} bytes)`);
+      return res.ads.payload;
+
+    } catch (err) {
+      this.debug(`readRawByName(): Reading raw data (${path}) failed: %o`, err);
+      throw new ClientError(`readRawByName(): Reading raw data (${path}) failed`, err);
+    }
+  }
+
+  /**
    * Reads a PLC symbol value by symbol path and converts the value to a Javascript object.
    * 
    * Returns the converted value, the raw value, the symbol data type and the symbol information object.

@@ -577,7 +577,7 @@ describe('reading values using readSymbol()', () => {
 
   test('reading STRUCT', async () => {
     const res = await client.readSymbol('GVL_ReadingAndWriting.StructValue');
-    expect(res.value).toMatchObject({
+    expect(res.value).toStrictEqual({
       SomeText: 'Hello ads-client',
       SomeReal: expect.closeTo(3.14159274),
       SomeDate: new Date('2020-04-13T12:25:33.000Z')
@@ -738,7 +738,6 @@ describe('reading values using readSymbol()', () => {
 
   test('reading FUNCTION_BLOCK (Tc2_DataExchange.FB_ReadAdsSymByName)', async () => {
     const res = await client.readSymbol('GVL_ReadingAndWriting.AdsReadBlock');
-    console.log(res.value);
     expect(res.value).toStrictEqual({
       bRead: false,
       sNetId: '',
@@ -821,7 +820,7 @@ describe('reading values using readSymbol()', () => {
 
   test(`reading STRUCT with pragma: {attribute 'pack_mode' := '1'}`, async () => {
     const res = await client.readSymbol('GVL_ReadingAndWriting.StructPackMode1');
-    
+
     expect(res.dataType.attributes).toStrictEqual([{
       name: 'pack_mode',
       value: '1'
@@ -860,7 +859,7 @@ describe('reading values using readSymbol()', () => {
 
   test(`reading STRUCT with pragma: {attribute 'pack_mode' := '8'}`, async () => {
     const res = await client.readSymbol('GVL_ReadingAndWriting.StructPackMode8');
-    
+
     expect(res.dataType.attributes).toStrictEqual([{
       name: 'pack_mode',
       value: '8'
@@ -898,12 +897,10 @@ describe('reading values using readSymbol()', () => {
   });
 });
 
-describe('reading values using readRaw() and converting to objects using convertFromRaw()', () => {
+describe('reading values using readRaw() + convertFromRaw()', () => {
   test('reading INT', async () => {
     const symbolInfo = await client.getSymbolInfo('GVL_ReadingAndWriting.IntValue');
-
     const res = await client.readRaw(symbolInfo.indexGroup, symbolInfo.indexOffset, symbolInfo.size);
-
     expect(res.byteLength).toBe(symbolInfo.size);
     expect(res.toString('hex')).toBe('d204');
 
@@ -913,9 +910,7 @@ describe('reading values using readRaw() and converting to objects using convert
 
   test('reading STRING', async () => {
     const symbolInfo = await client.getSymbolInfo('GVL_ReadingAndWriting.StringValue');
-
     const res = await client.readRaw(symbolInfo.indexGroup, symbolInfo.indexOffset, symbolInfo.size);
-
     expect(res.byteLength).toBe(symbolInfo.size);
     expect(ADS.decodePlcStringBuffer(res)).toBe('Hello this is a test string');
 
@@ -925,13 +920,10 @@ describe('reading values using readRaw() and converting to objects using convert
 
   test('reading STRUCT', async () => {
     const symbolInfo = await client.getSymbolInfo('GVL_ReadingAndWriting.StructValue');
-
     const res = await client.readRaw(symbolInfo.indexGroup, symbolInfo.indexOffset, symbolInfo.size);
-
     expect(res.byteLength).toBe(symbolInfo.size);
 
     const value = await client.convertFromRaw(res, symbolInfo.type);
-
     expect(value).toStrictEqual({
       SomeText: 'Hello ads-client',
       SomeReal: expect.closeTo(3.14159274),
@@ -939,18 +931,302 @@ describe('reading values using readRaw() and converting to objects using convert
     });
   });
 
-  test('--> TODO: add same as in readSymbol()? <--', () => { });
+  test('reading TIME_OF_DAY', async () => {
+    const symbolInfo = await client.getSymbolInfo('GVL_ReadingAndWriting.TodValue');
+    const res = await client.readRaw(symbolInfo.indexGroup, symbolInfo.indexOffset, symbolInfo.size);
+    expect(res.byteLength).toBe(symbolInfo.size);
+
+    const value = await client.convertFromRaw(res, symbolInfo.type);
+    expect(value).toBe(55800000);
+    expect(value / 1000 / 60 / 60).toBeCloseTo(15.5);
+  });
+
+  test('reading ENUM (object)', async () => {
+    const symbolInfo = await client.getSymbolInfo('GVL_ReadingAndWriting.EnumValue');
+    const res = await client.readRaw(symbolInfo.indexGroup, symbolInfo.indexOffset, symbolInfo.size);
+    expect(res.byteLength).toBe(symbolInfo.size);
+
+    const value = await client.convertFromRaw(res, symbolInfo.type);
+    expect(value).toStrictEqual({
+      name: 'Running',
+      value: 100
+    });
+  });
+
+  test('reading ENUM (number)', async () => {
+    client.settings.objectifyEnumerations = false;
+
+    const symbolInfo = await client.getSymbolInfo('GVL_ReadingAndWriting.EnumValue');
+    const res = await client.readRaw(symbolInfo.indexGroup, symbolInfo.indexOffset, symbolInfo.size);
+    expect(res.byteLength).toBe(symbolInfo.size);
+
+    const value = await client.convertFromRaw(res, symbolInfo.type);
+    expect(value).toBe(100);
+
+    client.settings.objectifyEnumerations = true;
+  });
+
+  test('eading UNION value (STRING)', async () => {
+    const symbolInfo = await client.getSymbolInfo('GVL_ReadingAndWriting.UnionValueStr');
+    const res = await client.readRaw(symbolInfo.indexGroup, symbolInfo.indexOffset, symbolInfo.size);
+    expect(res.byteLength).toBe(symbolInfo.size);
+
+    const value = await client.convertFromRaw(res, symbolInfo.type);
+    expect(Object.keys(value)).toStrictEqual(Object.keys({
+      BoolValue: false,
+      IntValue: 8257,
+      UdintValue: 1702109249,
+      RealValue: 7.205327508588529e+22,
+      StringValue: 'A test string ääöö!!@@'
+    }));
+    expect(value.BoolValue).toBe(false);
+    expect(value.IntValue).toBe(8257);
+    expect(value.UdintValue).toBe(1702109249);
+    expect(value.RealValue).toBeCloseTo(7.205327508588529e+22);
+    expect(value.StringValue).toBe('A test string ääöö!!@@');
+  });
+
+  test('Reading UNION value (REAL)', async () => {
+    const symbolInfo = await client.getSymbolInfo('GVL_ReadingAndWriting.UnionValueReal');
+    const res = await client.readRaw(symbolInfo.indexGroup, symbolInfo.indexOffset, symbolInfo.size);
+    expect(res.byteLength).toBe(symbolInfo.size);
+
+    const value = await client.convertFromRaw(res, symbolInfo.type);
+    expect(Object.keys(value)).toStrictEqual(Object.keys({
+      BoolValue: false,
+      IntValue: 1611,
+      UdintValue: 1067320907,
+      RealValue: 1.2345670461654663,
+      StringValue: 'K\x06ž?'
+    }));
+    expect(value.BoolValue).toBe(false); //In TC3 it is <Value of the expression cannot be retrieved.>, however should be false here(?)
+    expect(value.IntValue).toBe(1611);
+    expect(value.UdintValue).toBe(1067320907);
+    expect(value.RealValue).toBeCloseTo(1.234567);
+    expect(value.StringValue).toBe('K\x06ž?');
+  });
+
+  test('reading ARRAY [0..4] OF INT', async () => {
+    const symbolInfo = await client.getSymbolInfo('GVL_ReadingAndWriting.IntArray');
+    const res = await client.readRaw(symbolInfo.indexGroup, symbolInfo.indexOffset, symbolInfo.size);
+    expect(res.byteLength).toBe(symbolInfo.size);
+
+    const value = await client.convertFromRaw(res, symbolInfo.type);
+    expect(value).toBeInstanceOf(Array);
+    expect(value).toHaveLength(5);
+    expect(value).toEqual([0, 10, 200, 3000, 4000]);
+  });
+
+  test('reading ARRAY [0..4] OF STRUCT', async () => {
+    const symbolInfo = await client.getSymbolInfo('GVL_ReadingAndWriting.StructArray');
+    const res = await client.readRaw(symbolInfo.indexGroup, symbolInfo.indexOffset, symbolInfo.size);
+    expect(res.byteLength).toBe(symbolInfo.size);
+
+    const value = await client.convertFromRaw(res, symbolInfo.type);
+    expect(value).toBeInstanceOf(Array);
+    expect(value).toHaveLength(5);
+
+    expect(value).toStrictEqual([{
+      SomeText: 'Just for demo purposes',
+      SomeReal: expect.closeTo(3.14159274),
+      SomeDate: new Date('2020-04-13T12:25:33.000Z')
+    },
+    {
+      SomeText: 'Hello ads-client',
+      SomeReal: expect.closeTo(3.14159274),
+      SomeDate: new Date('2020-04-13T12:25:33.000Z')
+    },
+    {
+      SomeText: 'Hello ads-client',
+      SomeReal: expect.closeTo(3.14159274),
+      SomeDate: new Date('2020-04-13T12:25:33.000Z')
+    },
+    {
+      SomeText: 'Hello ads-client',
+      SomeReal: expect.closeTo(3.14159274),
+      SomeDate: new Date('2020-04-13T12:25:33.000Z')
+    },
+    {
+      SomeText: 'Hello ads-client',
+      SomeReal: expect.closeTo(3.14159274),
+      SomeDate: new Date('2020-04-13T12:25:33.000Z')
+    }
+    ]);
+  });
+
+  test('reading ARRAY[-100..100] OF LREAL', async () => {
+    const symbolInfo = await client.getSymbolInfo('GVL_ReadingAndWriting.NegativeIndexArray');
+    const res = await client.readRaw(symbolInfo.indexGroup, symbolInfo.indexOffset, symbolInfo.size);
+    expect(res.byteLength).toBe(symbolInfo.size);
+
+    const value = await client.convertFromRaw(res, symbolInfo.type);
+    expect(value).toBeInstanceOf(Array);
+    expect(value).toHaveLength(201);
+    expect(value[0]).toBeCloseTo(1.11);
+    expect(value[100]).toBeCloseTo(5.55);
+    expect(value[200]).toBeCloseTo(9.99);
+  });
+
+  test('reading ARRAY[1..3, 1..2] OF BYTE', async () => {
+    const symbolInfo = await client.getSymbolInfo('GVL_ReadingAndWriting.MultiDimArray');
+    const res = await client.readRaw(symbolInfo.indexGroup, symbolInfo.indexOffset, symbolInfo.size);
+    expect(res.byteLength).toBe(symbolInfo.size);
+
+    const value = await client.convertFromRaw(res, symbolInfo.type);
+    expect(value).toBeInstanceOf(Array);
+    expect(value).toHaveLength(3);
+    expect(value).toStrictEqual([[1, 2], [3, 4], [5, 6]]);
+  });
+
+  test('reading ARRAY[1..3] OF ARRAY[1..2] OF SINT', async () => {
+    const symbolInfo = await client.getSymbolInfo('GVL_ReadingAndWriting.ArrayOfArrays');
+    const res = await client.readRaw(symbolInfo.indexGroup, symbolInfo.indexOffset, symbolInfo.size);
+    expect(res.byteLength).toBe(symbolInfo.size);
+
+    const value = await client.convertFromRaw(res, symbolInfo.type);
+    expect(value).toBeInstanceOf(Array);
+    expect(value).toHaveLength(3);
+    expect(value).toStrictEqual([[-1, -2], [-3, -4], [-5, -6]]);
+  });
+
+  test('reading FUNCTION_BLOCK (TON)', async () => {
+    const symbolInfo = await client.getSymbolInfo('GVL_ReadingAndWriting.TimerBlock');
+    const res = await client.readRaw(symbolInfo.indexGroup, symbolInfo.indexOffset, symbolInfo.size);
+    expect(res.byteLength).toBe(symbolInfo.size);
+
+    const value = await client.convertFromRaw(res, symbolInfo.type);
+    expect(value).toStrictEqual({
+      ET: 0,
+      IN: false,
+      M: false,
+      PT: 2500,
+      Q: false,
+      StartTime: 0
+    });
+  });
+
+  test('reading FUNCTION_BLOCK (TC2_System.FB_CreateDir)', async () => {
+    const symbolInfo = await client.getSymbolInfo('GVL_ReadingAndWriting.CreateDirBlock');
+    const res = await client.readRaw(symbolInfo.indexGroup, symbolInfo.indexOffset, symbolInfo.size);
+    expect(res.byteLength).toBe(symbolInfo.size);
+
+    const value = await client.convertFromRaw(res, symbolInfo.type);
+    expect(value).toStrictEqual({
+      sNetId: '',
+      sPathName: '',
+      ePath: {
+        name: 'PATH_GENERIC',
+        value: 1
+      },
+      bExecute: false,
+      tTimeout: 5000,
+      bBusy: false,
+      bError: false,
+      nErrId: 0
+    });
+  });
   
+  test('reading FUNCTION_BLOCK (Tc2_DataExchange.FB_ReadAdsSymByName)', async () => {
+    const symbolInfo = await client.getSymbolInfo('GVL_ReadingAndWriting.AdsReadBlock');
+    const res = await client.readRaw(symbolInfo.indexGroup, symbolInfo.indexOffset, symbolInfo.size);
+    expect(res.byteLength).toBe(symbolInfo.size);
+
+    const value = await client.convertFromRaw(res, symbolInfo.type);
+    expect(value).toStrictEqual({
+      bRead: false,
+      sNetId: '',
+      nPort: 851,
+      sVarName: '',
+      nDestAddr: 0n,
+      nLen: 0,
+      tTimeout: 5000,
+      eComMode: { name: 'eAdsComModeSecureCom', value: 0 },
+      bClearOnError: true,
+      bBusy: false,
+      bError: false,
+      nErrorId: 0,
+      sVarName_Int: '',
+      sNetId_Int: '',
+      nPort_Int: 801,
+      fbGetHandle: {
+        NETID: '',
+        PORT: 0,
+        IDXGRP: 0,
+        IDXOFFS: 0,
+        WRITELEN: 0,
+        READLEN: 0,
+        SRCADDR: 0n,
+        DESTADDR: 0n,
+        WRTRD: false,
+        TMOUT: 5000,
+        BUSY: false,
+        ERR: false,
+        ERRID: 0
+      },
+      fbReleaseHandle: {
+        NETID: '',
+        PORT: 0,
+        IDXGRP: 0,
+        IDXOFFS: 0,
+        LEN: 0,
+        SRCADDR: 0n,
+        WRITE: false,
+        TMOUT: 5000,
+        BUSY: false,
+        ERR: false,
+        ERRID: 0
+      },
+      fbReadByHandle: {
+        NETID: '',
+        PORT: 0,
+        IDXGRP: 0,
+        IDXOFFS: 0,
+        LEN: 0,
+        DESTADDR: 0n,
+        READ: false,
+        TMOUT: 5000,
+        BUSY: false,
+        ERR: false,
+        ERRID: 0
+      },
+      trigRead: { CLK: false, Q: false, M: false },
+      iStep: 0,
+      iNextStep: 0,
+      nSymbolHandle: 0
+    });
+  });
+
+  test('reading POINTER (memory address)', async () => {
+    //Note: Deferenced pointer value is not possible to read using readRaw() - we only get memory address
+    const symbolInfo = await client.getSymbolInfo('GVL_ReadingAndWriting.PointerValue');
+    const res = await client.readRaw(symbolInfo.indexGroup, symbolInfo.indexOffset, symbolInfo.size);
+    expect(res.byteLength).toBe(symbolInfo.size);
+    expect(symbolInfo.type).toBe("POINTER TO ST_Struct");
+
+    const value = await client.convertFromRaw(res, symbolInfo.type);
+    expect(typeof value).toBe("bigint");
+  });
+
+  test('reading REFERENCE (memory address)', async () => {
+    //Note: Deferenced reference value is not possible to read using readRaw() - we only get memory address
+    const symbolInfo = await client.getSymbolInfo('GVL_ReadingAndWriting.ReferenceValue');
+    const res = await client.readRaw(symbolInfo.indexGroup, symbolInfo.indexOffset, symbolInfo.size);
+    expect(res.byteLength).toBe(symbolInfo.size);
+    expect(symbolInfo.type).toBe("REFERENCE TO ST_Struct");
+
+    const value = await client.convertFromRaw(res, symbolInfo.type);
+    expect(typeof value).toBe("bigint");
+  });
 
   test(`reading STRUCT with pragma: {attribute 'pack_mode' := '1'}`, async () => {
     const symbolInfo = await client.getSymbolInfo('GVL_ReadingAndWriting.StructPackMode1');
-    
+
     const res = await client.readRaw(symbolInfo.indexGroup, symbolInfo.indexOffset, symbolInfo.size);
 
     expect(res.byteLength).toBe(symbolInfo.size);
-    
+
     const value = await client.convertFromRaw(res, symbolInfo.type);
-    
+
     expect(symbolInfo.size).toBe(594);
     expect(res.byteLength).toBe(594);
     expect(value).toStrictEqual({
@@ -985,13 +1261,13 @@ describe('reading values using readRaw() and converting to objects using convert
 
   test(`reading STRUCT with pragma: {attribute 'pack_mode' := '8'}`, async () => {
     const symbolInfo = await client.getSymbolInfo('GVL_ReadingAndWriting.StructPackMode8');
-    
+
     const res = await client.readRaw(symbolInfo.indexGroup, symbolInfo.indexOffset, symbolInfo.size);
 
     expect(res.byteLength).toBe(symbolInfo.size);
-    
+
     const value = await client.convertFromRaw(res, symbolInfo.type);
-    
+
     expect(symbolInfo.size).toBe(600);
     expect(res.byteLength).toBe(600);
     expect(value).toStrictEqual({
@@ -1025,6 +1301,37 @@ describe('reading values using readRaw() and converting to objects using convert
   });
 });
 
+describe('reading POINTER and REFERENCE values using readRawByName() + convertFromRaw()', () => {
+  test('reading POINTER (actual value)', async () => {
+    const symbolInfo = await client.getSymbolInfo('GVL_ReadingAndWriting.PointerValue^');
+    const res = await client.readRawByName('GVL_ReadingAndWriting.PointerValue^');
+    expect(res.byteLength).toBe(symbolInfo.size);
+    expect(symbolInfo.type).toBe("ST_Struct");
+
+    const value = await client.convertFromRaw(res, symbolInfo.type);
+    expect(value).toStrictEqual({
+      SomeText: 'Hello ads-client',
+      SomeReal: expect.closeTo(3.14159274),
+      SomeDate: new Date('2020-04-13T12:25:33.000Z')
+    });
+  });
+
+  test('reading REFERENCE (actual value)', async () => {
+    const symbolInfo = await client.getSymbolInfo('GVL_ReadingAndWriting.ReferenceValue');
+    const dataType = await client.getDataType(symbolInfo.type.replace('REFERENCE TO ', ''));
+    const res = await client.readRawByName('GVL_ReadingAndWriting.ReferenceValue');
+    expect(res.byteLength).toBe(dataType.size);
+    expect(dataType.type).toBe("ST_Struct");
+
+    const value = await client.convertFromRaw(res, dataType);
+    expect(value).toStrictEqual({
+      SomeText: 'Hello ads-client',
+      SomeReal: expect.closeTo(3.14159274),
+      SomeDate: new Date('2020-04-13T12:25:33.000Z')
+    });
+  });
+});
+
 describe('writing values using writeRaw()', () => {
 
   test('writing INT', async () => {
@@ -1035,7 +1342,7 @@ describe('writing values using writeRaw()', () => {
       let res = await client.readSymbol('GVL_ReadingAndWriting.IntValue');
       expect(res.value).toBe(4685);
     }
-  
+
     {
       await client.writeSymbol('GVL_ReadingAndWriting.IntValue', -32768);
       let res = await client.readSymbol('GVL_ReadingAndWriting.IntValue');
