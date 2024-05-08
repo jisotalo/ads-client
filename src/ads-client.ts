@@ -2727,7 +2727,9 @@ export class Client extends EventEmitter {
     }
 
     if (dataType.adsDataType === ADS.ADS_DATA_TYPES.ADST_STRING) {
-      ADS.encodeStringToPlcStringBuffer(value as string).copy(buffer);
+      //If string is too long for target data type, truncate it
+      const length = Math.min(dataType.size - 1, (value as string).length);
+      ADS.encodeStringToPlcStringBuffer(value as string).copy(buffer, 0, 0, length);
 
     } else if (dataType.adsDataType === ADS.ADS_DATA_TYPES.ADST_WSTRING) {
       ADS.encodeStringToPlcWstringBuffer(value as string).copy(buffer);

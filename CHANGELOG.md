@@ -14,6 +14,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added optional `targetOpts` argument in all methods
   - Possible to provide different AmsNetId and/or AdsPort than specified in the settings
   - Symbol and data type caching not used when using `targetOpts` (only for target provided in settings)
+- Writing a `STRING` or `WSTRING` value that is longer than the target data type causes the string to be truncated.
+  - Previously the string end character was lost, which caused "never ending string" and `<Value of the expression cannot be retrieved` in PLC online view.
+  - E.g. writing 85 bytes of string to `STRING(80)` variable
 
 ### Breaking changes
 - `unsubscribe()` no longer accepts numerical notification handle (only subscription object)
