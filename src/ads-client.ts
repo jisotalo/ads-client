@@ -2457,6 +2457,7 @@ export class Client extends EventEmitter {
         //This is final form (no need to go deeper)
         builtType = { ...dataType };
 
+
       } else {
         //This is not the final data type -> continue recursively
         builtType = await this.buildDataType(dataType.type, targetOpts, false);
@@ -2484,10 +2485,12 @@ export class Client extends EventEmitter {
    * @returns 
    */
   private convertBufferToPrimitiveType(buffer: Buffer, dataType: AdsDataType): PlcPrimitiveType {
+    /* TODO this should not be needed anymore
     if (dataType.size === 0) {
       return {};
     }
-
+    */
+    
     if (dataType.adsDataType === ADS.ADS_DATA_TYPES.ADST_STRING) {
       return ADS.decodePlcStringBuffer(buffer);
     } else if (dataType.adsDataType === ADS.ADS_DATA_TYPES.ADST_WSTRING) {
@@ -2546,6 +2549,18 @@ export class Client extends EventEmitter {
           name: '',
           value: enumValue
         } as AdsEnumInfoEntry;
+      }
+
+    } else if (dataType.adsDataType === ADS.ADS_DATA_TYPES.ADST_BIGTYPE && dataType.subItems.length === 0) {
+      if (dataType.size === 0) {
+        //Empty STRUCT
+        result = {};
+
+      } else {
+        //Empty FUNCTION_BLOCK or INTERFACE
+        //They are handled similarly as pointers (as in TwinCAT.Ads.dll) 
+        //so empty FB is not { } as we can't detect interface and empty FB from each other
+        result = ADS.BASE_DATA_TYPES.fromBuffer(ADS.BASE_DATA_TYPES.getTypeByPseudoType('PVOID', dataType.size)!, data.subarray(dataType.offset, dataType.offset + dataType.size), this.settings.convertDatesToJavascript);
       }
 
     } else {
@@ -2610,7 +2625,7 @@ export class Client extends EventEmitter {
 
     } else if (dataType.arrayInfos.length > 0 && !isArrayItem) {
       //This is an array
-      rawValue = Buffer.alloc(dataType.arrayInfos.reduce((total, dimension) => total + dimension.length * dataType.size, 0));
+      rawValue = Buffer.alloc(dataType.arrayInfos.reduce((total, dimension) => total * dimension.length * dataType.size, 1));
 
       let pos = 0;
       /**
@@ -2697,16 +2712,38 @@ export class Client extends EventEmitter {
         };
 
       } else {
-        throw new ClientError(`Provided value "${JSON.stringify(value)}"${pathInfo} is not valid value for this ENUM. Allowed values are a number and any of the following: ${allowedEnumValuesStr}`);
+        throw new ClientError(`Provided value ${JSON.stringify(value)}${pathInfo} is not valid value for this ENUM. Allowed values are a number and any of the following: ${allowedEnumValuesStr}`);
       }
 
       this.convertPrimitiveTypeToBuffer(enumEntry.value, dataType, rawValue);
 
-    } else if (dataType.size > 0) {
-      //This is a normal non-empty variable
+    } else if (ADS.BASE_DATA_TYPES.isKnownType(dataType.type)) {
       rawValue = Buffer.alloc(dataType.size);
-
       this.convertPrimitiveTypeToBuffer(value as PlcPrimitiveType, dataType, rawValue);
+
+    } else if (dataType.adsDataType === ADS.ADS_DATA_TYPES.ADST_BIGTYPE && dataType.subItems.length === 0) {
+      //If size is 0, then it's empty struct -> rawValue is already OK
+      if (dataType.size > 0) {
+        //Empty FUNCTION_BLOCK or INTERFACE
+        //They are handled similarly as pointers (as in TwinCAT.Ads.dll) 
+        rawValue = Buffer.alloc(dataType.size);
+        
+        if (typeof value === 'bigint' || typeof value === 'number') {
+          ADS.BASE_DATA_TYPES.toBuffer(ADS.BASE_DATA_TYPES.getTypeByPseudoType('PVOID', dataType.size)!, value as PlcPrimitiveType, rawValue);
+
+        } else if (typeof value === 'object' && Object.keys(value as {}).length === 0) {
+          //Value is {} - this is a special case. With FBs, it should work ok to write just zeroes
+          //However, with intefaces it causes interface to be 0 --> null pointer possibility
+          //Let it be user's problem if they really provide {} - helps writing empty FBs
+          ;
+        } else {
+          throw new ClientError(`Provided value ${JSON.stringify(value)}${pathInfo} is not valid value for this data type (${dataType.type})`);
+        }
+      }
+    
+    
+    } else {
+      throw new ClientError(`Data type is not known (TODO): ${dataType.type}`);
     }
 
     return {
@@ -3809,7 +3846,7 @@ export class Client extends EventEmitter {
     pos += 4;
 
     //12..15 Write data length
-    data.writeUInt32LE(path.length + 1, pos); 
+    data.writeUInt32LE(path.length + 1, pos);
     pos += 4;
 
     //16..n Data
@@ -3910,8 +3947,11 @@ export class Client extends EventEmitter {
    * 
    * Returns the converted value, the raw value, the symbol data type and the symbol information object.
    * 
+   * **NOTE:** Do not use `autoFill` for `UNION` types, it works without errors but the result isn't probably the desired one
+   * 
    * @param path Variable path in the PLC to read (such as `GVL_Test.ExampleStruct`)
    * @param targetOpts Optional target settings that override values in `settings`
+   * @param autoFill If true and data type is a container (`STRUCT`, `FUNCTION_BLOCK` etc.), missing properties are automatically **set to default values** (usually `0` or `''`) 
    * @returns 
    * 
    * @template T Typescript data type of the PLC data, for example `writeSymbol<number>(...)` or `writeSymbol<ST_TypedStruct>(...)`
@@ -4088,6 +4128,8 @@ export class Client extends EventEmitter {
 
   /**
    * Converts a Javascript object to raw byte data.
+   * 
+   * **NOTE:** Do not use `autoFill` for `UNION` types, it works without errors but the result isn't probably the desired one
    * 
    * @param value Javascript object that represents the `dataType´ in target system
    * @param dataType Data type name in the PLC as string (such as `ST_Struct`) or `AdsDataType` object

@@ -8,8 +8,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Version 2
 ### Changed
 - `disableBigInt` setting removed, BigInt is now used always if available
-- Built data types (full data type trees of data types with subitems, such as structures) are now cached as well
-  - Huge impact on performance when handling structured data types
 - Added new setting `disableCaching` to disable all symbol and data type caching
 - Added optional `targetOpts` argument in all methods
   - Possible to provide different AmsNetId and/or AdsPort than specified in the settings
@@ -40,7 +38,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - If read ENUM has a value that has no corresponding string, an object of type `{name: '', value}` is returned instead of name being `null`
 
 ### Added
-- `resetPlc()`
+- Added support for reading/writing `INTERFACE` data types
+- Added support for reading/writing empty `FUNCTION_BLOCK`s
 
 
 ## [1.14.1] - 13.09.2022

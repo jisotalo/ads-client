@@ -731,7 +731,21 @@ export const ADS_DATA_TYPE_FLAGS = {
   /**    data type used for persistent variables -&gt; should be saved with persistent data (ADSDATATYPEFLAG_PERSIST_DT,0x00200000) */
   PersistantDatatype: 2097152, // 0x00200000
   /**   Persistent data will not restored after reset (cold) (ADSDATATYPEFLAG_INITONRESET,0x00400000) */
-  InitOnResult: 4194304, // 0x00400000
+  InitOnReset: 4194304, // 0x00400000
+  /** TODO: Comment */
+  PlcPointerType: 8388608, // 0x00800000
+  /** TODO: Comment */
+  RefactorInfo: 16777216, // 0x01000000
+  /** TODO: Comment */
+  HideSubItems: 33554432, // 0x02000000
+  /** TODO: Comment */
+  Incomplete: 67108864, // 0x04000000
+  /** TODO: Comment */
+  ContainsOnlineChangePtrRef: 134217728, // 0x08000000
+  /** TODO: Comment */
+  Variant: 268435456, // 0x10000000
+  /** TODO: Comment */
+  ExtendedFlags: 2147483648, // 0x80000000
   /**  None / No Flag set */
   None: 0,
 
@@ -929,10 +943,9 @@ export const BASE_DATA_TYPES = {
   /**
    * Writes given value to given or new buffer
    * 
-   * @param {object} settings Reference to AdsClient settings
-   * @param {string} name Data type name
-   * @param {any} value Value to write
-   * @param {Buffer} [buffer] Optional - Buffer to write to. If not given, new Buffer is allocated
+   * @param name Data type name
+   * @param value Value to write
+   * @param buffer Optional - Buffer to write to. If not given, new Buffer is allocated
    */
   toBuffer: function (name: string, value: PlcPrimitiveType | Date, buffer?: Buffer) {
     const type = this.find(name);

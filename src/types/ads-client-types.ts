@@ -205,7 +205,8 @@ export interface SubscriptionOptions<T = any> {
 }
 
  
-export type PlcPrimitiveType = string | boolean | number | Buffer | Date | {};
+//TODO: remove {} if not needed anymore
+export type PlcPrimitiveType = string | boolean | number | Buffer | Date | BigInt/* | {}*/;
 
 export interface ReadSymbolResult<T = any> {
   value: T,
