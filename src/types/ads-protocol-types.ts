@@ -282,7 +282,7 @@ export interface AdsRawInfo {
   /** Address indexOffset */
   indexOffset: number,
   /** Size (bytes) */
-  size: number
+  size?: number
 }
 
 export interface AdsSymbolInfo {

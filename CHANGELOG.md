@@ -17,6 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - E.g. writing 85 bytes of string to `STRING(80)` variable
 
 ### Breaking changes
+- `subscribe()` parameters changed
 - `unsubscribe()` no longer accepts numerical notification handle (only subscription object)
 - Subscription data `timeStamp`->`timestamp`
 - Removed nameLength, typeLength, commentLength and attributeCount from symbol info object

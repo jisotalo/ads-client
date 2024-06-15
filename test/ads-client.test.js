@@ -2656,9 +2656,174 @@ describe('writing values', () => {
 });
 
 describe('subscriptions (ADS notifications)', () => {
-  test('TODO', () => {
-    throw new Error('TODO');
+  test('subscribing and unsubscribing successfully', async () => {
+    await new Promise(async (resolve, reject) => {
+      let startTime = Date.now();
+
+      await client.subscribe({
+        target: 'GVL_Subscription.Numericvalue_Constant',
+        maxDelay: 2000,
+        callback: async (data, subscription) => {
+          await subscription.unsubscribe();
+
+          const timeDiff = Date.now() - startTime;
+
+          expect(data.value).toBe(12245);
+
+          //First value should be received after 2000ms at earliest
+          if (timeDiff >= 2000) {
+            resolve();
+          } else {
+            reject(`Failed - value was received after ${timeDiff} ms (should be after 2000 ms)`);
+          }
+
+        }
+      });
+    });
   });
+
+  test('subscribing to a changing value (10 ms) with default cycle time', async () => {
+    await new Promise(async (resolve, reject) => {
+      //Idea is to check that count has not changed since unsubscription
+      let count = 0;
+
+      await client.subscribe({
+        target: 'GVL_Subscription.NumericValue_1000ms',
+        callback: async (data, subscription) => {
+          count++;
+
+          if (count >= 2) {
+            await subscription.unsubscribe();
+
+            setTimeout(() => {
+              if (count === 2) {
+                //success
+                resolve()
+
+              } else {
+                reject('Unsubscribing failed')
+              }
+            }, 2000)
+          }
+        }
+      });
+    });
+  });
+
+  test('subscribing to a changing value (10 ms) with 10 ms cycle time', async () => {
+    let subscription = null;
+
+    await new Promise(async (resolve, reject) => {
+      let firstData = null;
+
+      subscription = await client.subscribe({
+        target: 'GVL_Subscription.NumericValue_10ms',
+        cycleTime: 10,
+        callback: async (data, subscription) => {
+          if (!firstData) {
+            firstData = data;
+
+          } else {
+            const timeDiff = data.timestamp.getTime() - firstData.timestamp.getTime();
+
+            if (data.value === firstData.value + 1 && timeDiff > 5 && timeDiff < 15) {
+              resolve();
+            } else {
+              reject(`Failed - received value of ${data.value} with ${timeDiff} ms time difference. Expected was ${firstData.value + 1} with time difference between 5...15 ms`);
+            }
+          }
+        }
+      });
+    });
+
+    await subscription.unsubscribe();
+  });
+
+  test('subscribing to a constant value with maximum delay of 2000 ms', async () => {
+    let subscription = null;
+
+    await new Promise(async (resolve, reject) => {
+      let startTime = Date.now();
+
+      subscription = await client.subscribe({
+        target: 'GVL_Subscription.Numericvalue_Constant',
+        maxDelay: 2000,
+        callback: async (data, subscription) => {
+          const timeDiff = Date.now() - startTime;
+
+          expect(data.value).toBe(12245);
+
+          //First value should be received after 2000ms at earliest
+          if (timeDiff >= 2000 && timeDiff < 2300) {
+            resolve();
+          } else {
+            reject(`Failed - value was received after ${timeDiff} ms (target 2000...2300)`);
+          }
+        }
+      });
+    });
+
+    await subscription.unsubscribe();
+  });
+
+  test('subscribing to a raw ADS address', async () => {
+
+    let subscription = null;
+
+    await new Promise(async (resolve, reject) => {
+      const symbolInfo = await client.getSymbolInfo('GVL_Subscription.NumericValue_100ms');
+
+      let startTime = Date.now();
+
+      subscription = await client.subscribe({
+        target: {
+          indexGroup: symbolInfo.indexGroup,
+          indexOffset: symbolInfo.indexOffset,
+          size: symbolInfo.size
+        },
+        maxDelay: 2000,
+        callback: async (data, subscription) => {
+          expect(Buffer.isBuffer(data.value)).toBe(true);
+          resolve();
+        }
+      });
+    });
+
+    await subscription.unsubscribe();
+  });
+});
+
+describe('issue specific tests', () => {
+  describe('issue 103 (https://github.com/jisotalo/ads-client/issues/103)', () => {
+    test('calling unsubscribeAll() multiple times (should not crash to unhandled exception)', async () => {
+
+      const target = {
+        target: 'GVL_Subscription.Numericvalue_Constant',
+        callback: () => { }
+      };
+
+      await client.subscribe(target);
+      await client.subscribe(target);
+      await client.subscribe(target);
+      await client.subscribe(target);
+      await client.subscribe(target);
+
+      //calling multiple times
+      const promises = [
+        client.unsubscribeAll(),
+        client.unsubscribeAll(),
+        client.unsubscribeAll(),
+        client.unsubscribeAll()
+      ]
+
+      try {
+        await Promise.all(promises)
+      } catch { }
+
+      //If we are here, there was no unhandled exception -> issue OK
+      expect(true).toBe(true)
+    })
+  })
 });
 
 describe('finalizing', () => {

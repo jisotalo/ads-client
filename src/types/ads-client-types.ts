@@ -83,8 +83,8 @@ export interface TargetActiveSubscriptionContainer {
 
 /** Object containing information for an active subscription */
 export interface ActiveSubscription<T = any> {
-  /** Options for this subscription */
-  options: SubscriptionOptions<T>,
+  /** Settings for this subscription */
+  settings: SubscriptionSettings<T>,
   /** True = This subscription is ads-client internal, not created by user */
   internal: boolean,
   /** Remote AMS address and port */
@@ -191,22 +191,46 @@ export interface AdsCommandToSend {
  */
 export type SubscriptionCallback<T = any> = (data: SubscriptionData<T>, subscription: ActiveSubscription<T>) => void;
 
-export interface SubscriptionOptions<T = any> {
-  /** Target of the subscription (variable name or raw address) */
+export interface SubscriptionSettings<T = any> {
+  /** 
+   * Subscription target (variable name as string or raw ADS address). 
+   * 
+   * Such as such as `GVL_Test.ExampleStruct` or `{indexGroup, indexOffset, size}` object 
+   */
   target: AdsRawInfo | string,
-  /** Callback that is called when new data has arrived */
+  /** Callback function that is called when new value is received */
   callback: SubscriptionCallback<T>,
-  /** How often the notification is sent at max (milliseconds) */
+  /** 
+   * Cycle time for subscription (default: `200 ms`)
+   * 
+   * If `sendOnChange` is `true` (default), PLC checks if value has changed with `cycleTime` interval. 
+   * If the value has changed, a new value is sent.
+   * 
+   * If `sendOnChange` is `false`, PLC constantly sends the value with `cycleTime` interval. 
+   */
   cycleTime?: number,
-  /** If true, PLC sends the notification only when value has changed. Otherwise sent intervally */
+  /** Should the notification be sent only when the value changes? (default: `true`)
+   * 
+   * If `false`, the value is sent with `cycleTime` interval (even if it doesn't change).
+   * 
+   * If `true` (default), the value is checked every `cycleTime` and sent only if it has changed.
+   * 
+   * NOTE: When subscribing, the value is always sent once.
+   */
   sendOnChange?: boolean,
-  /** How long the PLC waits before sending the value */
-  initialDelay?: number,
+  /** 
+   * How long the PLC waits before sending the values at maximum? (default: 0 ms --> maximum delay is off)
+   * 
+   * If value is not changing, the first notification with active value after subscribing is sent after `maxDelay`.
+   * 
+   * If the value is changing, the PLC sends one or more notifications every `maxDelay`. 
+   * So if `cycleTime` is 100 ms, `maxDelay` is 1000 ms and value changes every 100 ms, the PLC sends 10 notifications every 1000 ms.
+   * This can be useful for throttling.
+   */
+  maxDelay?: number,
 }
 
- 
-//TODO: remove {} if not needed anymore
-export type PlcPrimitiveType = string | boolean | number | Buffer | Date | BigInt/* | {}*/;
+export type PlcPrimitiveType = string | boolean | number | Buffer | Date | BigInt;
 
 export interface ReadSymbolResult<T = any> {
   value: T,

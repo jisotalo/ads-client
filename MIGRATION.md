@@ -5,6 +5,9 @@ This file contains detailed migration guide from migrating from ads-client major
 ## From version 1.x.x to 2.x.x
 
 ### Required
+* `subscribe()`
+  * Change old `subscribe()` calls to use new parameter format
+  * New default cycleTime is 200 ms instead of 10 ms (similar to Bechoff's .NET library)
 * `readSymbol()`
   * Result object `symbol` -> `symbolInfo`
 * `readRaw()`

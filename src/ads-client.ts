@@ -1,5 +1,5 @@
 import EventEmitter from "events";
-import type { ActiveAdsRequestContainer, ActiveSubscription, ActiveSubscriptionContainer, AdsClientConnection, AdsClientSettings, AdsCommandToSend, AdsDataTypeContainer, AdsSymbolInfoContainer, AdsUploadInfo, ConnectionMetaData, PlcPrimitiveType, SubscriptionCallback, SubscriptionData, SubscriptionOptions, ReadSymbolResult, TimerObject, ObjectToBufferConversionResult, WriteSymbolResult } from "./types/ads-client-types";
+import type { ActiveAdsRequestContainer, ActiveSubscription, ActiveSubscriptionContainer, AdsClientConnection, AdsClientSettings, AdsCommandToSend, AdsDataTypeContainer, AdsSymbolInfoContainer, AdsUploadInfo, ConnectionMetaData, PlcPrimitiveType, SubscriptionCallback, SubscriptionData, SubscriptionSettings, ReadSymbolResult, TimerObject, ObjectToBufferConversionResult, WriteSymbolResult } from "./types/ads-client-types";
 import { AdsAddNotificationResponse, AdsAddNotificationResponseData, AdsArrayInfoEntry, AdsAttributeEntry, AdsDataType, AdsDeleteNotificationResponse, AdsDeviceInfo, AdsEnumInfoEntry, AdsNotification, AdsNotificationResponse, AdsNotificationSample, AdsNotificationStamp, AdsRawInfo, AdsReadDeviceInfoResponse, AdsReadResponse, AdsReadStateResponse, AdsReadWriteResponse, AdsRequest, AdsResponse, AdsRpcMethodEntry, AdsRpcMethodParameterEntry, AdsState, AdsSymbolInfo, AdsWriteControlResponse, AdsWriteResponse, AmsAddress, AmsHeader, AmsPortRegisteredData, AmsRouterState, AmsRouterStateData, AmsTcpHeader, AmsTcpPacket, BaseAdsResponse, EmptyAdsResponse, UnknownAdsResponse } from "./types/ads-protocol-types";
 import {
   Socket,
@@ -457,6 +457,14 @@ export class Client extends EventEmitter {
         return resolve();
       }
 
+      let disconnectError = null;
+
+      try {
+        await this.removeSubscriptions(true)
+      } catch (err) {
+        disconnectError = err;
+      }
+
       try {
         await this.unregisterAdsPort();
 
@@ -474,6 +482,8 @@ export class Client extends EventEmitter {
         return resolve();
 
       } catch (err) {
+        disconnectError = err;
+
         //Force socket close
         this.socket?.removeAllListeners();
         this.socket?.destroy();
@@ -485,7 +495,7 @@ export class Client extends EventEmitter {
 
         this.debug(`disconnectFromTarget(): Connection closing failed, connection was forced to close`);
         this.emit("disconnect");
-        return reject(new ClientError(`disconnect(): Disconnected with errors: ${(err as Error).message}`, err));
+        return reject(new ClientError(`disconnect(): Disconnected with errors: ${(disconnectError as Error).message}`, err));
       }
     })
   }
@@ -1518,14 +1528,14 @@ export class Client extends EventEmitter {
             const subscription = this.activeSubscriptions[key][sample.notificationHandle];
 
             if (subscription) {
-              this.debug(`onAdsCommandReceived(): Notification received from ${key} for handle ${sample.notificationHandle} (%o)`, subscription.options.target)
+              this.debug(`onAdsCommandReceived(): Notification received from ${key} for handle ${sample.notificationHandle} (%o)`, subscription.settings.target)
 
               subscription.parseNotification(sample.payload, stamp.timestamp)
                 .then(data => {
                   subscription.latestData = data;
 
                   try {
-                    subscription.options.callback && subscription.options.callback(subscription.latestData, subscription);
+                    subscription.settings.callback && subscription.settings.callback(subscription.latestData, subscription);
                   } catch (err) {
                     this.debug(`onAdsCommandReceived(): Calling user callback for notification failed: %o`, err);
                   }
@@ -1656,15 +1666,15 @@ export class Client extends EventEmitter {
    * @param settings 
    * @param targetOpts Optional target settings that override values in `settings` (NOTE: If used, no caching is available -> worse performance)
    */
-  private async addSubscription<T = any>(options: SubscriptionOptions<T>, internal: boolean, targetOpts: Partial<AmsAddress> = {}): Promise<ActiveSubscription<T>> {
-    this.debugD(`addSubscription(): Subscribing %o (internal: ${internal})`, options);
+  private async addSubscription<T = any>(settings: SubscriptionSettings<T>, internal: boolean, targetOpts: Partial<AmsAddress> = {}): Promise<ActiveSubscription<T>> {
+    this.debugD(`addSubscription(): Subscribing %o (internal: ${internal})`, settings);
 
     let targetAddress = {} as AdsRawInfo;
     let symbolInfo: AdsSymbolInfo | undefined = undefined;
 
-    if (typeof options.target === "string") {
+    if (typeof settings.target === "string") {
       try {
-        symbolInfo = await this.getSymbolInfo(options.target, targetOpts);
+        symbolInfo = await this.getSymbolInfo(settings.target, targetOpts);
 
         //Read symbol datatype to cache -> It's cached when we start getting notifications
         //Otherwise with large structs and fast cycle times there might be some issues
@@ -1680,16 +1690,16 @@ export class Client extends EventEmitter {
         };
 
       } catch (err) {
-        throw new ClientError(`addSubscription(): Getting symbol and data type info for ${options.target} failed`, err);
+        throw new ClientError(`addSubscription(): Getting symbol and data type info for ${settings.target} failed`, err);
       }
     } else {
-      if (options.target.indexGroup === undefined || options.target.indexOffset === undefined) {
+      if (settings.target.indexGroup === undefined || settings.target.indexOffset === undefined) {
         throw new ClientError(`addSubscription(): Target is missing indexGroup or indexOffset`);
 
-      } else if (options.target.size === undefined) {
-        options.target.size = 0xFFFFFFFF;
+      } else if (settings.target.size === undefined) {
+        settings.target.size = 0xFFFFFFFF;
       }
-      targetAddress = options.target;
+      targetAddress = settings.target;
     }
 
     //Allocating bytes for request
@@ -1705,19 +1715,19 @@ export class Client extends EventEmitter {
     pos += 4;
 
     //8..11 Data length
-    data.writeUInt32LE(targetAddress.size, pos);
+    data.writeUInt32LE(targetAddress.size!, pos);
     pos += 4;
 
     //12..15 Transmission mode
-    data.writeUInt32LE(options.sendOnChange === undefined || options.sendOnChange ? ADS.ADS_TRANS_MODE.OnChange : ADS.ADS_TRANS_MODE.Cyclic, pos);
+    data.writeUInt32LE(settings.sendOnChange === undefined || settings.sendOnChange ? ADS.ADS_TRANS_MODE.OnChange : ADS.ADS_TRANS_MODE.Cyclic, pos);
     pos += 4
 
-    //16..19 Maximum delay (ms) - When subscribing, a notification is sent after this time even if no changes 
-    data.writeUInt32LE(options.initialDelay === undefined ? 0 : options.initialDelay * 10000, pos);
+    //16..19 Maximum delay (ms) - PLC will wait `maximuMDelay` before sending a notification
+    data.writeUInt32LE(settings.maxDelay === undefined ? 0 : settings.maxDelay * 10000, pos);
     pos += 4;
 
     //20..23 Cycle time (ms) - How often the PLC checks for value changes (minimum value: Task 0 cycle time)
-    data.writeUInt32LE(options.cycleTime === undefined ? 100 * 10000 : options.cycleTime * 10000, pos);
+    data.writeUInt32LE(settings.cycleTime === undefined ? 200 * 10000 : settings.cycleTime * 10000, pos);
     pos += 4;
 
     //24..40 reserved
@@ -1730,12 +1740,12 @@ export class Client extends EventEmitter {
         payload: data
       });
 
-      this.debugD(`addSubscription(): Subscribed to %o`, options.target);
+      this.debugD(`addSubscription(): Subscribed to %o`, settings.target);
 
       const clientRef = this;
 
       const subscription: ActiveSubscription<T> = {
-        options,
+        settings,
         internal,
         remoteAddress: res.ams.sourceAmsAddress,
         notificationHandle: res.ads.payload.notificationHandle,
@@ -1773,8 +1783,55 @@ export class Client extends EventEmitter {
       return subscription;
 
     } catch (err) {
-      this.debug(`addSubscription(): Subscribing to %o failed: %o`, options.target, err);
-      throw new ClientError(`addSubscription(): Subscribing to ${JSON.stringify(options.target)} failed`, err);
+      this.debug(`addSubscription(): Subscribing to %o failed: %o`, settings.target, err);
+      throw new ClientError(`addSubscription(): Subscribing to ${JSON.stringify(settings.target)} failed`, err);
+    }
+  }
+
+  /**
+   * Unsubscribes from all active subscriptions
+   * 
+   * @param internals If true, also internal subscriptions are unsubscribed
+   */
+  private async removeSubscriptions(internals: boolean): Promise<void> {
+    if (!this.connection.connected) {
+      throw new ClientError(`removeSubscriptions(): Client is not connected. Use connect() to connect to the target first.`);
+    }
+
+    try {
+      this.debug(`removeSubscriptions(): Unsubscribing from all active subscriptions (also internals: ${internals})`);
+
+      let successCount = 0;
+      let errorCount = 0;
+      let error = null;
+
+      for (const targetName in this.activeSubscriptions) {
+        for (const subscriptionHandle in this.activeSubscriptions[targetName]) {
+          const subscription = this.activeSubscriptions[targetName][subscriptionHandle];
+
+          if (!subscription.internal || internals) {
+            try {
+              await subscription.unsubscribe();
+              successCount++;
+
+            } catch (err) {
+              errorCount++;
+              error = err;
+            }
+          }
+        }
+      }
+
+      if (errorCount === 0) {
+        this.debug(`removeSubscriptions(): Unsubscribed from all ${successCount} subscriptions successfully`);
+      } else {
+        this.debug(`removeSubscriptions(): Unsubscribed from ${successCount} subscriptions, failed to unsubscribe from ${errorCount} subscriptions`);
+        throw error;
+      }
+      
+    } catch (err) {
+      this.debug(`unsubscribeAll(): Unsubscribing all failed - some subscriptions were not unsubscribed: %o`, err);
+      throw new ClientError(`unsubscribeAll(): Unsubscribing all failed - some subscriptions were not unsubscribed`, err);
     }
   }
 
@@ -2485,12 +2542,6 @@ export class Client extends EventEmitter {
    * @returns 
    */
   private convertBufferToPrimitiveType(buffer: Buffer, dataType: AdsDataType): PlcPrimitiveType {
-    /* TODO this should not be needed anymore
-    if (dataType.size === 0) {
-      return {};
-    }
-    */
-    
     if (dataType.adsDataType === ADS.ADS_DATA_TYPES.ADST_STRING) {
       return ADS.decodePlcStringBuffer(buffer);
     } else if (dataType.adsDataType === ADS.ADS_DATA_TYPES.ADST_WSTRING) {
@@ -2727,7 +2778,7 @@ export class Client extends EventEmitter {
         //Empty FUNCTION_BLOCK or INTERFACE
         //They are handled similarly as pointers (as in TwinCAT.Ads.dll) 
         rawValue = Buffer.alloc(dataType.size);
-        
+
         if (typeof value === 'bigint' || typeof value === 'number') {
           ADS.BASE_DATA_TYPES.toBuffer(ADS.BASE_DATA_TYPES.getTypeByPseudoType('PVOID', dataType.size)!, value as PlcPrimitiveType, rawValue);
 
@@ -2740,8 +2791,8 @@ export class Client extends EventEmitter {
           throw new ClientError(`Provided value ${JSON.stringify(value)}${pathInfo} is not valid value for this data type (${dataType.type})`);
         }
       }
-    
-    
+
+
     } else {
       throw new ClientError(`Data type is not known (TODO): ${dataType.type}`);
     }
@@ -3235,101 +3286,30 @@ export class Client extends EventEmitter {
     }
   }
 
+
   /**
-   * **NOTE: Consider using new variant `subscribeAny()`**
+   * Subscribes to variable or raw ADS address value change notifications (ADS notifications).
    * 
-   * Subscribes to variable value change notifications (ADS notifications)
-   * Callback is called with latest value when changed
+   * Callback is called with latest value when changed or when cycle time has passed, depending on settings.
    * 
-   * @param target - Variable name in the PLC (full path, any type) - example: "MAIN.SomeStruct"
-   * @param callback - Callback function that is called when a new value (notification) is received
-   * @param cycleTime - How often (milliseconds) the PLC checks for value changes (default: 100 ms)
-   * @param onChange - If true, PLC sends the notification only when value has changed. If false, the value is sent every cycleTime milliseconds (default: true)
-   * @param initialDelay - How long the PLC waits for sending the value - default 0 ms (immediately)
+   * @param options - Subscription options
    * @param targetOpts Optional target settings that override values in `settings` (NOTE: If used, no caching is available -> worse performance)
    * 
-   * @template T Typescript data type of the PLC data, for example `subscribe<number>(...)` or `subscripe<ST_TypedStruct>(...)`
+   * @template T Typescript data type of the PLC data, for example `subscribe<number>(...)` or `subscribe<ST_TypedStruct>(...)`. If target is raw address, use `subscribe<Buffer>`
    */
-  public subscribe<T = any>(target: string, callback: SubscriptionCallback<T>, cycleTime: number = 100, sendOnChange: boolean = true, initialDelay: number = 0, targetOpts: Partial<AmsAddress> = {}): Promise<ActiveSubscription<T>> {
+  public subscribe<T = any>(options: SubscriptionSettings<T>, targetOpts: Partial<AmsAddress> = {}): Promise<ActiveSubscription<T>> {
     if (!this.connection.connected) {
       throw new ClientError(`subscribe(): Client is not connected. Use connect() to connect to the target first.`);
     }
 
     try {
-      this.debug(`subscribe(): Subscribing to "%o"`, target);
-
-      return this.addSubscription<T>({
-        target,
-        callback,
-        cycleTime,
-        sendOnChange,
-        initialDelay
-      }, false, targetOpts);
-
-    } catch (err) {
-      this.debug(`subscribe(): Subscribing to "${target}" failed: %o`, err);
-      throw new ClientError(`subscribe(): Subscribing to "${target}" failed`, err);
-    }
-  }
-
-  /**
-   * Subscribes to variable or raw address value change notifications (ADS notifications)
-   * Callback is called with latest value when changed
-   * 
-   * @param options - Subscription options
-   * @param targetOpts Optional target settings that override values in `settings` (NOTE: If used, no caching is available -> worse performance)
-   * 
-   * @template T Typescript data type of the PLC data, for example `subscribe<number>(...)` or `subscripe<ST_TypedStruct>(...)`
-   */
-  public subscribeAny<T = any>(options: SubscriptionOptions<T>, targetOpts: Partial<AmsAddress> = {}): Promise<ActiveSubscription<T>> {
-    if (!this.connection.connected) {
-      throw new ClientError(`subscribeAny(): Client is not connected. Use connect() to connect to the target first.`);
-    }
-
-    try {
-      this.debug(`subscribeAny(): Subscribing to "%o"`, options.target);
+      this.debug(`subscribe(): Subscribing to "%o"`, options.target);
 
       return this.addSubscription<T>(options, false, targetOpts);
 
     } catch (err) {
       this.debug(`subscribe(): Subscribing to "${options.target}" failed: %o`, err);
       throw new ClientError(`subscribe(): Subscribing to "${options.target}" failed`, err);
-    }
-  }
-
-  /**
-   * **NOTE: Consider using new variant `subscribeAny<Buffer>()`**
-   * 
-   * Subscribes to raw address value change notifications (ADS notifications)
-   * Callback is called with latest value when changed
-   * 
-   * @param target - Variable address in the PLC
-   * @param callback - Callback function that is called when a new value (notification) is received
-   * @param cycleTime - How often (milliseconds) the PLC checks for value changes (default: 100 ms)
-   * @param onChange - If true, PLC sends the notification only when value has changed. If false, the value is sent every cycleTime milliseconds (default: true)
-   * @param initialDelay - How long the PLC waits for sending the value - default 0 ms (immediately)
-   * @param targetOpts Optional target settings that override values in `settings` (NOTE: If used, no caching is available -> worse performance)
-   * 
-   */
-  public subscribeRaw(target: AdsRawInfo, callback: SubscriptionCallback<Buffer>, cycleTime: number = 100, sendOnChange: boolean = true, initialDelay: number = 0, targetOpts: Partial<AmsAddress> = {}): Promise<ActiveSubscription<Buffer>> {
-    if (!this.connection.connected) {
-      throw new ClientError(`subscribeRaw(): Client is not connected. Use connect() to connect to the target first.`);
-    }
-
-    try {
-      this.debug(`subscribeRaw(): Subscribing to "%o"`, target);
-
-      return this.addSubscription<Buffer>({
-        target,
-        callback,
-        cycleTime,
-        sendOnChange,
-        initialDelay
-      }, false, targetOpts);
-
-    } catch (err) {
-      this.debug(`subscribeRaw(): Subscribing to "${target}" failed: %o`, err);
-      throw new ClientError(`subscribeRaw(): Subscribing to "${target}" failed`, err);
     }
   }
 
@@ -3372,6 +3352,27 @@ export class Client extends EventEmitter {
     } catch (err) {
       this.debug(`unsubscribe(): Unsubscribing failed: %o`, err);
       throw new ClientError(`unsubscribe(): Unsubscribing failed`, err);
+    }
+  }
+
+  /**
+   * Unsubscribes from all active subscriptions
+   */
+  public async unsubscribeAll(): Promise<void> {
+    if (!this.connection.connected) {
+      throw new ClientError(`unsubscribeAll(): Client is not connected. Use connect() to connect to the target first.`);
+    }
+
+    try {
+      this.debug(`unsubscribeAll(): Unsubscribing from all active subscriptions`);
+
+      await this.removeSubscriptions(false);
+
+      this.debug(`unsubscribeAll(): All subscriptions unsubscribed successfully`);
+
+    } catch (err) {
+      this.debug(`unsubscribeAll(): Unsubscribing all failed: %o`, err);
+      throw new ClientError(`unsubscribeAll(): Unsubscribing all failed`, err);
     }
   }
 
@@ -4159,6 +4160,50 @@ export class Client extends EventEmitter {
     }
 
     //Converting Javascript object to raw byte data
+    
+    let rawValue: Buffer;
+    try {
+      let res = this.convertObjectToBuffer(value, dataType);
+
+      if (res.missingProperty && autoFill) {
+        //Some fields are missing and autoFill is used -> try to auto fill missing values
+        this.debug(`convertToRaw(): Autofilling missing fields with default/zero values`);
+
+        this.debugD(`convertToRaw(): Creating default object`);
+        const defaultValue = await this.getDefaultPlcObject(dataType, targetOpts);
+
+        this.debugD(`convertToRaw(): Merging objects (adding missing fields)`);
+        value = this.deepMergeObjects(false, defaultValue, value);
+
+        //Try conversion again - should work now
+        res = this.convertObjectToBuffer(value, dataType);
+
+        if (res.missingProperty) {
+          //This shouldn't really happen
+          //However, if it happened, the merge isn't working as it should
+          throw new ClientError(`convertToRaw(): Converting object to raw value for ${dataType.type} failed. The object is missing key/value for "${res.missingProperty}". NOTE: autoFill failed - please report an issue at GitHub`);
+        }
+
+      } else if (res.missingProperty) {
+        //Some fields are missing and no autoFill -> failed
+        throw new ClientError(`convertToRaw(): Converting object to raw value for ${dataType.type} failed. The object is missing key/value for "${res.missingProperty}". Hint: Use autoFill parameter to add missing fields automatically`);
+      }
+
+      //We are here -> success!
+      rawValue = res.rawValue;
+
+    } catch (err) {
+      //We can pass our own errors to keep the message on top
+      if (err instanceof ClientError) {
+        throw err;
+      }
+
+      this.debug(`writeSymbol(): Converting object to raw value for ${dataType.type} failed: %o`, err);
+      throw new ClientError(`writeSymbol(): Converting object to raw value for ${dataType.type} failed`, err);
+    }
+
+
+
     try {
       let { rawValue, missingProperty } = this.convertObjectToBuffer(value, dataType);
 
