@@ -4851,7 +4851,7 @@ async function _parseDataType(data) {
       pos += 4
 
       //27..30 Flags (AdsDataTypeFlags)
-      method.flags = data.readUInt16LE(pos)
+      method.flags = data.readUInt32LE(pos)
       method.flagsStr = ADS.ADS_DATA_TYPE_FLAGS.toStringArray(method.flags)
       pos += 4
 
