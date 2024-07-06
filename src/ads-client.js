@@ -4819,6 +4819,7 @@ async function _parseDataType(data) {
 
       //Get method length
       let len = data.readUInt32LE(pos)
+      const methodFinalPos = pos + len;
       pos += 4
 
       //4..7 Version
@@ -4955,6 +4956,7 @@ async function _parseDataType(data) {
         method.parameters.push(param)
       }
 
+      pos = methodFinalPos;
       dataType.rpcMethods.push(method)
     }
   }
