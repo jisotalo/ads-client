@@ -250,3 +250,10 @@ export interface ObjectToBufferConversionResult {
   rawValue: Buffer,
   missingProperty?: string
 }
+
+export interface VariableHandle {
+  handle: number,
+  size: number,
+  typeDecoration: number,
+  dataType: string
+}

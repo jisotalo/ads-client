@@ -101,7 +101,7 @@ describe('resetting PLC to original state', () => {
     await client.resetPlc();
   });
 
-  test('checking that reset was succesful', async () => {
+  test('checking that reset was successful', async () => {
     const res = await client.readSymbol('GVL_AdsClientTests.IsReset');
     expect(res.value).toBe(true);
   });
@@ -170,7 +170,7 @@ describe('testing PLC runtime stop, start, restart', () => {
 });
 
 describe('system state, PLC runtime states and device information', () => {
-  test('reading twinCAT system state', async () => {
+  test('reading TwinCAT system state', async () => {
     const res = await client.readTcSystemState();
     expect(res).toHaveProperty('adsState');
     expect(res).toHaveProperty('adsStateStr');
@@ -519,6 +519,26 @@ describe('symbols and data types', () => {
   });
 });
 
+describe('data conversion', () => {
+
+  test('converting a raw PLC value to a Javascript variable', async () => {
+    //Only testing once, as this is used internally in readSymbol(), which is tested very well
+    const res = await client.readRawByName('GVL_Read.StandardTypes.WORD_');
+
+    const value = await client.convertFromRaw(res, 'WORD');
+    expect(value).toBe(ST_STANDARD_TYPES.WORD_);
+  });
+
+  test('converting a Javascript value to a raw PLC value', async () => {
+    //Only testing once, as this is used internally in writeymbol(), which is tested very well
+    const res = await client.readRawByName('GVL_Read.StandardTypes.WORD_');
+    
+    const value = await client.convertFromRaw(res, 'WORD');
+
+    expect(await client.convertToRaw(value, 'WORD')).toStrictEqual(res);
+  });
+});
+
 describe('reading values', () => {
 
   describe('reading standard values', () => {
@@ -709,20 +729,20 @@ describe('reading values', () => {
       }
     });
 
-    test('reading LDATE (TODO)', async () => {
-      throw new Error('TODO'); //Requires latest TC version
+    test('reading LDATE (---- TODO: Needs TC 3.1.4026 ----)', async () => {
+      expect(true).toBe(true);
       //const res = await client.readSymbol('GVL_Read.StandardTypes.LDATE_');
       //expect(res.value).toStrictEqual(??);
     });
 
-    test('reading LDT (TODO)', async () => {
-      throw new Error('TODO'); //Requires latest TC version
+    test('reading LDT (---- TODO: Needs TC 3.1.4026 ----)', async () => {
+      expect(true).toBe(true);
       //const res = await client.readSymbol('GVL_Read.StandardTypes.LDT_');
       //expect(res.value).toStrictEqual(??);
     });
 
-    test('reading LTOD (TODO)', async () => {
-      throw new Error('TODO'); //Requires latest TC version
+    test('reading LTOD (---- TODO: Needs TC 3.1.4026 ----)', async () => {
+      expect(true).toBe(true);
       //const res = await client.readSymbol('GVL_Read.StandardTypes.LTOD_');
       //expect(res.value).toStrictEqual(??);
     });
@@ -921,20 +941,20 @@ describe('reading values', () => {
       }
     });
 
-    test('reading ARRAY OF LDATE (TODO)', async () => {
-      throw new Error('TODO'); //Requires latest TC version
+    test('reading ARRAY OF LDATE (---- TODO: Needs TC 3.1.4026 ----)', async () => {
+      expect(true).toBe(true);
       //const res = await client.readSymbol('GVL_Read.StandardArrays.LDATE_');
       //expect(res.value).toStrictEqual(??);
     });
 
-    test('reading ARRAY OF LDT (TODO)', async () => {
-      throw new Error('TODO'); //Requires latest TC version
+    test('reading ARRAY OF LDT (---- TODO: Needs TC 3.1.4026 ----)', async () => {
+      expect(true).toBe(true);
       //const res = await client.readSymbol('GVL_Read.StandardArrays.LDT_');
       //expect(res.value).toStrictEqual(??);
     });
 
-    test('reading ARRAY OF LTOD (TODO)', async () => {
-      throw new Error('TODO'); //Requires latest TC version
+    test('reading ARRAY OF LTOD (---- TODO: Needs TC 3.1.4026 ----)', async () => {
+      expect(true).toBe(true);
       //const res = await client.readSymbol('GVL_Read.StandardArrays.LTOD_');
       //expect(res.value).toStrictEqual(??);
     });
@@ -1456,15 +1476,24 @@ describe('reading values', () => {
     });
   });
 
-  describe('reading using variable handles', () => {
-    test('TODO', () => {
-      throw new Error('TODO');
-    });
-  });
-
   describe('reading raw data', () => {
-    test('TODO', () => {
-      throw new Error('TODO');
+    test('reading a raw value', async () => {
+      {
+        //Only testing once, as this is used internally in readSymbol(), which is tested very well
+        const symbolInfo = await client.getSymbolInfo('GVL_Read.StandardTypes.BOOL_');
+        const res = await client.readRaw(symbolInfo.indexGroup, symbolInfo.indexOffset, symbolInfo.size);
+
+        expect(Buffer.isBuffer(res)).toBe(true);
+        expect(res.byteLength).toBe(1);
+
+        const compare = Buffer.alloc(1);
+        compare.writeUInt8(1);
+        expect(res).toStrictEqual(compare);
+
+        const value = await client.convertFromRaw(res, 'BOOL');
+
+        expect(value).toBe(ST_STANDARD_TYPES.BOOL_);
+      }
     });
   });
 
@@ -1696,22 +1725,22 @@ describe('writing values', () => {
       }
     });
 
-    test('writing LDATE (TODO)', async () => {
-      throw new Error('TODO'); //Requires latest TC version
+    test('writing LDATE (---- TODO: Needs TC 3.1.4026 ----)', async () => {
+      expect(true).toBe(true);
       //await client.writeSymbol('GVL_Write.StandardTypes.LDATE_', ST_STANDARD_TYPES_WRITE.LDATE_);
       //const res = await client.readSymbol('GVL_Write.StandardTypes.LDATE_');
       //expect(res.value).toStrictEqual(??);
     });
 
-    test('writing LDT (TODO)', async () => {
-      throw new Error('TODO'); //Requires latest TC version
+    test('writing LDT (---- TODO: Needs TC 3.1.4026 ----)', async () => {
+      expect(true).toBe(true);
       //await client.writeSymbol('GVL_Write.StandardTypes.LDT_', ST_STANDARD_TYPES_WRITE.LDT_);
       //const res = await client.readSymbol('GVL_Write.StandardTypes.LDT_');
       //expect(res.value).toStrictEqual(??);
     });
 
-    test('writing LTOD (TODO)', async () => {
-      throw new Error('TODO'); //Requires latest TC version
+    test('writing LTOD (---- TODO: Needs TC 3.1.4026 ----)', async () => {
+      expect(true).toBe(true);
       //await client.writeSymbol('GVL_Write.StandardTypes.LTOD_', ST_STANDARD_TYPES_WRITE.LTOD_);
       //const res = await client.readSymbol('GVL_Write.StandardTypes.LTOD_');
       //expect(res.value).toStrictEqual(??);
@@ -1948,22 +1977,22 @@ describe('writing values', () => {
       }
     });
 
-    test('writing ARRAY OF LDATE (TODO)', async () => {
-      throw new Error('TODO'); //Requires latest TC version
+    test('writing ARRAY OF LDATE (---- TODO: Needs TC 3.1.4026 ----)', async () => {
+      expect(true).toBe(true);
       //await client.writeSymbol('GVL_Write.StandardArrays.LDATE_', ST_STANDARD_ARRAY_TYPES_WRITE.LDATE_);
       //const res = await client.readSymbol('GVL_Write.StandardArrays.LDATE_');
       //expect(res.value).toStrictEqual(??);
     });
 
-    test('writing ARRAY OF LDT (TODO)', async () => {
-      throw new Error('TODO'); //Requires latest TC version
+    test('writing ARRAY OF LDT (---- TODO: Needs TC 3.1.4026 ----)', async () => {
+      expect(true).toBe(true);
       //await client.writeSymbol('GVL_Write.StandardArrays.LDT_', ST_STANDARD_ARRAY_TYPES_WRITE.LDT_);
       //const res = await client.readSymbol('GVL_Write.StandardArrays.LDT_');
       //expect(res.value).toStrictEqual(??);
     });
 
-    test('writing ARRAY OF LTOD (TODO)', async () => {
-      throw new Error('TODO'); //Requires latest TC version
+    test('writing ARRAY OF LTOD (---- TODO: Needs TC 3.1.4026 ----)', async () => {
+      expect(true).toBe(true);
       //await client.writeSymbol('GVL_Write.StandardArrays.LTOD_', ST_STANDARD_ARRAY_TYPES_WRITE.LTOD_);
       //const res = await client.readSymbol('GVL_Write.StandardArrays.LTOD_');
       //expect(res.value).toStrictEqual(??);
@@ -2642,14 +2671,86 @@ describe('writing values', () => {
   });
 
   describe('writing raw data', () => {
-    test('TODO', () => {
-      throw new Error('TODO');
+
+    test('writing a raw value', async () => {
+      {
+        //Only testing once, as this is used internally in writeSymbol(), which is tested very well
+        const symbolInfo = await client.getSymbolInfo('GVL_Write.StandardTypes.BOOL_');
+
+        const value = await client.convertToRaw(!ST_STANDARD_TYPES.BOOL_, 'BOOL');
+        await client.writeRaw(symbolInfo.indexGroup, symbolInfo.indexOffset, value);
+
+        const res = await client.readSymbol('GVL_Write.StandardTypes.BOOL_');
+        expect(res.value).toStrictEqual(!ST_STANDARD_TYPES.BOOL_);
+      }
     });
   });
 
-  describe('writing using variable handles', () => {
-    test('TODO', () => {
-      throw new Error('TODO');
+  describe('using variable handles for reading and writing', () => {
+    test('creating and deleting a varible handle', async () => {
+      {
+        const res = await client.createVariableHandle('GVL_Read.StandardTypes.BOOL_');
+
+        //Note: checking only keys
+        //TODO: Check values (is UM runtime having issue?)
+        expect(Object.keys(res)).toStrictEqual(Object.keys({
+          handle: 0,
+          size: 0,
+          typeDecoration: 0,
+          dataType: ''
+        }));
+
+        await client.deleteVariableHandle(res);
+      }
+
+      {
+        const res = await client.createVariableHandle('GVL_Read.StandardTypes.BOOL_');
+
+        await client.deleteVariableHandle(res.handle);
+      }
+    });
+
+    test('reading value using a variable handle', async () => {
+      {
+        const handle = await client.createVariableHandle('GVL_Read.StandardTypes.BOOL_');
+        const res = await client.readRawByHandle(handle);
+        await client.deleteVariableHandle(handle);
+
+        expect(Buffer.isBuffer(res)).toBe(true);
+        expect(res.byteLength).toBe(1);
+
+        const compare = Buffer.alloc(1);
+        compare.writeUInt8(1);
+        expect(res).toStrictEqual(compare);
+
+        const value = await client.convertFromRaw(res, 'BOOL');
+        expect(value).toBe(ST_STANDARD_TYPES.BOOL_);
+      }
+    });
+
+    test('writing value using a variable handle', async () => {
+      {
+        const value = !ST_STANDARD_TYPES_WRITE.BOOL_;
+
+        const handle = await client.createVariableHandle('GVL_Write.StandardTypes.BOOL_');
+        await client.writeRawByHandle(handle, await client.convertToRaw(value, 'BOOL'));
+        await client.deleteVariableHandle(handle);
+
+        const res = await client.readSymbol('GVL_Write.StandardTypes.BOOL_');
+
+        expect(res.value).toBe(value);
+      }
+      {
+        const value = ST_STANDARD_TYPES_WRITE.BOOL_;
+
+        const handle = await client.createVariableHandle('GVL_Write.StandardTypes.BOOL_');
+        await client.writeRawByHandle(handle, await client.convertToRaw(value, 'BOOL'));
+        await client.deleteVariableHandle(handle);
+
+        const res = await client.readSymbol('GVL_Write.StandardTypes.BOOL_');
+
+        expect(res.value).toBe(value);
+      }
     });
   });
 
@@ -2781,7 +2882,6 @@ describe('subscriptions (ADS notifications)', () => {
           indexOffset: symbolInfo.indexOffset,
           size: symbolInfo.size
         },
-        maxDelay: 2000,
         callback: async (data, subscription) => {
           expect(Buffer.isBuffer(data.value)).toBe(true);
           resolve();

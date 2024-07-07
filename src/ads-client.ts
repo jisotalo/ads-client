@@ -1,5 +1,5 @@
 import EventEmitter from "events";
-import type { ActiveAdsRequestContainer, ActiveSubscription, ActiveSubscriptionContainer, AdsClientConnection, AdsClientSettings, AdsCommandToSend, AdsDataTypeContainer, AdsSymbolInfoContainer, AdsUploadInfo, ConnectionMetaData, PlcPrimitiveType, SubscriptionCallback, SubscriptionData, SubscriptionSettings, ReadSymbolResult, TimerObject, ObjectToBufferConversionResult, WriteSymbolResult } from "./types/ads-client-types";
+import type { ActiveAdsRequestContainer, ActiveSubscription, ActiveSubscriptionContainer, AdsClientConnection, AdsClientSettings, AdsCommandToSend, AdsDataTypeContainer, AdsSymbolInfoContainer, AdsUploadInfo, ConnectionMetaData, PlcPrimitiveType, SubscriptionCallback, SubscriptionData, SubscriptionSettings, ReadSymbolResult, TimerObject, ObjectToBufferConversionResult, WriteSymbolResult, VariableHandle } from "./types/ads-client-types";
 import { AdsAddNotificationResponse, AdsAddNotificationResponseData, AdsArrayInfoEntry, AdsAttributeEntry, AdsDataType, AdsDeleteNotificationResponse, AdsDeviceInfo, AdsEnumInfoEntry, AdsNotification, AdsNotificationResponse, AdsNotificationSample, AdsNotificationStamp, AdsRawInfo, AdsReadDeviceInfoResponse, AdsReadResponse, AdsReadStateResponse, AdsReadWriteResponse, AdsRequest, AdsResponse, AdsRpcMethodEntry, AdsRpcMethodParameterEntry, AdsState, AdsSymbolInfo, AdsWriteControlResponse, AdsWriteResponse, AmsAddress, AmsHeader, AmsPortRegisteredData, AmsRouterState, AmsRouterStateData, AmsTcpHeader, AmsTcpPacket, BaseAdsResponse, EmptyAdsResponse, UnknownAdsResponse } from "./types/ads-protocol-types";
 import {
   Socket,
@@ -962,9 +962,9 @@ export class Client extends EventEmitter {
           delete this.activeAdsRequests[packet.ams.invokeId];
 
           if (res.ams.error) {
-            return reject(new ClientError(`sendAdsCommand(): Response with AMS error received`, res.ams));
+            return reject(new ClientError(`sendAdsCommand(): Response with AMS error received (error ${res.ams.errorCode} - ${res.ams.errorStr})`, res.ams));
           } else if (res.ads.error) {
-            return reject(new ClientError(`sendAdsCommand(): Response with ADS error received`, res.ads));
+            return reject(new ClientError(`sendAdsCommand(): Response with ADS error received (error ${res.ads.errorCode} - ${res.ads.errorStr})`, res.ads));
           }
 
           return resolve(res as AmsTcpPacket<T>);
@@ -1828,7 +1828,7 @@ export class Client extends EventEmitter {
         this.debug(`removeSubscriptions(): Unsubscribed from ${successCount} subscriptions, failed to unsubscribe from ${errorCount} subscriptions`);
         throw error;
       }
-      
+
     } catch (err) {
       this.debug(`unsubscribeAll(): Unsubscribing all failed - some subscriptions were not unsubscribed: %o`, err);
       throw new ClientError(`unsubscribeAll(): Unsubscribing all failed - some subscriptions were not unsubscribed`, err);
@@ -3775,7 +3775,7 @@ export class Client extends EventEmitter {
     if (!this.connection.connected) {
       throw new ClientError(`writeRaw(): Client is not connected. Use connect() to connect to the target first.`);
     }
-    this.debug(`readRaw(): Writing raw data to (${JSON.stringify({ indexGroup, indexOffset })})`);
+    this.debug(`readRaw(): Writing raw data to ${JSON.stringify({ indexGroup, indexOffset })}`);
 
     //Allocating bytes for request
     const data = Buffer.alloc(12 + value.byteLength);
@@ -4160,7 +4160,7 @@ export class Client extends EventEmitter {
     }
 
     //Converting Javascript object to raw byte data
-    
+
     let rawValue: Buffer;
     try {
       let res = this.convertObjectToBuffer(value, dataType);
@@ -4202,8 +4202,6 @@ export class Client extends EventEmitter {
       throw new ClientError(`writeSymbol(): Converting object to raw value for ${dataType.type} failed`, err);
     }
 
-
-
     try {
       let { rawValue, missingProperty } = this.convertObjectToBuffer(value, dataType);
 
@@ -4229,6 +4227,196 @@ export class Client extends EventEmitter {
     } catch (err) {
       this.debug(`convertToRaw(): Converting object to raw value for ${dataType.type} failed: %o`, err);
       throw new ClientError(`convertToRaw(): Converting object to raw value for ${dataType.type} failed`, err);
+    }
+  }
+
+  /**
+   * Creates a variable handle for a PLC symbol by given variable path
+   * 
+   * Variable value can be accessed by using the handle `readRawByHandle()`/`writeRawByHandle()`
+   * 
+   * @param path Full variable path in the PLC (such as `GVL_Test.ExampleStruct`)
+   * @param targetOpts Optional target settings that override values in `settings` (NOTE: If used, no caching is available -> worse performance)
+   */
+  public async createVariableHandle(path: string, targetOpts: Partial<AmsAddress> = {}): Promise<VariableHandle> {
+    if (!this.connection.connected) {
+      throw new ClientError(`createVariableHandle(): Client is not connected. Use connect() to connect to the target first.`);
+    }
+    this.debug(`createVariableHandle(): Creating variable handle to ${path}`);
+
+    //Allocating bytes for request
+    const data = Buffer.alloc(16 + path.length + 1);
+    let pos = 0;
+
+    //0..3 IndexGroup 
+    data.writeUInt32LE(ADS.ADS_RESERVED_INDEX_GROUPS.SymbolHandleByName, pos);
+    pos += 4;
+
+    //4..7 IndexOffset
+    data.writeUInt32LE(0, pos);
+    pos += 4;
+
+    //8..11 Read data length
+    data.writeUInt32LE(0xFFFFFFFF, pos); //Seems to work OK (we don't know the size)
+    pos += 4;
+
+    //12..15 Write data length
+    data.writeUInt32LE(path.length + 1, pos);
+    pos += 4;
+
+    //16..n Data
+    ADS.encodeStringToPlcStringBuffer(path).copy(data, pos);
+    pos += path.length + 1;
+
+    try {
+      const res = await this.sendAdsCommand<AdsReadWriteResponse>({
+        adsCommand: ADS.ADS_COMMAND.ReadWrite,
+        targetAmsNetId: targetOpts.amsNetId,
+        targetAdsPort: targetOpts.adsPort,
+        payload: data
+      });
+
+      const result = {} as VariableHandle;
+
+      let pos = 0;
+      const response = res.ads.payload;
+
+      //0..3 Variable handle
+      result.handle = response.readUInt32LE(pos);
+      pos += 4;
+
+      //4..7 Size
+      result.size = response.readUInt32LE(pos);
+      pos += 4;
+
+      //8..11 "type decoration"
+      result.typeDecoration = response.readUInt32LE(pos);
+      pos += 4;
+
+      //8..9 Data type length
+      let dataTypeLength = response.readUInt16LE(pos);
+      pos += 2;
+
+      //10..n Data type
+      result.dataType = ADS.decodePlcStringBuffer(response.subarray(pos, pos + dataTypeLength + 1));
+
+      this.debug(`createVariableHandle(): Variable handle created to ${path}`);
+
+      return result;
+
+    } catch (err) {
+      this.debug(`createVariableHandle(): Creating variable handle to ${path} failed: %o`, err);
+      throw new ClientError(`createVariableHandle(): Creating variable handle to ${path} failed`, err);
+    }
+  }
+
+  /**
+   * Deletes a variable handle that was previously created using `createVariableHandle()`
+   * 
+   * @param handle Variable handle
+   * @param targetOpts Optional target settings that override values in `settings` (NOTE: If used, no caching is available -> worse performance)
+   */
+  public async deleteVariableHandle(handle: VariableHandle | number, targetOpts: Partial<AmsAddress> = {}): Promise<void> {
+    if (!this.connection.connected) {
+      throw new ClientError(`deleteVariableHandle(): Client is not connected. Use connect() to connect to the target first.`);
+    }
+
+    const handleNumber = typeof handle === 'number' ? handle : handle.handle;
+
+    this.debug(`deleteVariableHandle(): Deleting a variable handle ${handleNumber}`);
+
+    //Allocating bytes for request
+    const data = Buffer.alloc(16);
+    let pos = 0;
+
+    //0..3 IndexGroup 
+    data.writeUInt32LE(ADS.ADS_RESERVED_INDEX_GROUPS.SymbolReleaseHandle, pos);
+    pos += 4;
+
+    //4..7 IndexOffset
+    data.writeUInt32LE(0, pos);
+    pos += 4;
+
+    //8..11 Write data length
+    data.writeUInt32LE(4, pos);
+    pos += 4;
+
+    //12..15 Handle
+    data.writeUInt32LE(handleNumber, pos);
+    pos += 4;
+
+    try {
+      const res = await this.sendAdsCommand<AdsWriteResponse>({
+        adsCommand: ADS.ADS_COMMAND.Write,
+        targetAmsNetId: targetOpts.amsNetId,
+        targetAdsPort: targetOpts.adsPort,
+        payload: data
+      });
+
+      this.debug(`deleteVariableHandle(): Variable handle ${handleNumber} deleted`);
+
+    } catch (err) {
+      this.debug(`deleteVariableHandle(): Deleting variable handle ${handleNumber} failed: %o`, err);
+      throw new ClientError(`deleteVariableHandle(): Deleting variable handle ${handleNumber} failed`, err);
+    }
+  }
+
+  /**
+   * Reads raw byte data from the target system by previously created variable handle
+   * 
+   * @param handle Variable handle
+   * @param size Optional data length to read (bytes) - as default, size in handle is used if available. Uses 0xFFFFFFFF as fallback.
+   * @param targetOpts Optional target settings that override values in `settings` (NOTE: If used, no caching is available -> worse performance)
+   */
+  public async readRawByHandle(handle: VariableHandle | number, size?: number, targetOpts: Partial<AmsAddress> = {}): Promise<Buffer> {
+    if (!this.connection.connected) {
+      throw new ClientError(`readRawByHandle(): Client is not connected. Use connect() to connect to the target first.`);
+    }
+    const handleNumber = typeof handle === 'number' ? handle : handle.handle;
+
+    this.debug(`readRawByHandle(): Reading raw data by handle ${handleNumber}`);
+
+    try {
+      const dataSize = typeof handle === 'object' && handle.size !== undefined
+        ? handle.size
+        : size !== undefined
+          ? size
+          : 0xFFFFFFFF;
+      
+      const res = await this.readRaw(ADS.ADS_RESERVED_INDEX_GROUPS.SymbolValueByHandle, handleNumber, dataSize, targetOpts);
+
+      this.debug(`readRawByHandle(): Reading raw data by handle ${handleNumber} done (${res.byteLength} bytes)`);
+      return res;
+
+    } catch (err) {
+      this.debug(`readRawByHandle(): Reading raw data by handle ${handleNumber} failed: %o`, err);
+      throw new ClientError(`readRawByHandle(): Reading raw data by handle ${handleNumber} failed`, err);
+    }
+  }
+
+  /**
+   * Writes raw byte data to the target system by previously created variable handle
+   * 
+   * @param handle Variable handle
+   * @param value Data to write
+   * @param targetOpts Optional target settings that override values in `settings` (NOTE: If used, no caching is available -> worse performance)
+   */
+  public async writeRawByHandle(handle: VariableHandle | number, value: Buffer, targetOpts: Partial<AmsAddress> = {}): Promise<void> {
+    if (!this.connection.connected) {
+      throw new ClientError(`writeRawByHandle(): Client is not connected. Use connect() to connect to the target first.`);
+    }
+    const handleNumber = typeof handle === 'number' ? handle : handle.handle;
+
+    this.debug(`writeRawByHandle(): Writing raw data by handle ${handleNumber} (${value.byteLength} bytes)`);
+
+    try {      
+      const res = await this.writeRaw(ADS.ADS_RESERVED_INDEX_GROUPS.SymbolValueByHandle, handleNumber, value, targetOpts);
+
+      this.debug(`writeRawByHandle(): Writing raw data by handle ${handleNumber} done (${value.byteLength} bytes)`);
+      
+    } catch (err) {
+      this.debug(`writeRawByHandle(): Writing raw data by handle ${handleNumber} failed: %o`, err);
+      throw new ClientError(`writeRawByHandle(): Writing raw data by handle ${handleNumber} failed`, err);
     }
   }
 }
