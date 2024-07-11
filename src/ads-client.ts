@@ -1,4 +1,4 @@
-import EventEmitter from "events";
+import { TypedEmitter } from 'tiny-typed-emitter';
 import type { ActiveAdsRequestContainer, ActiveSubscription, ActiveSubscriptionContainer, AdsClientConnection, AdsClientSettings, AdsCommandToSend, AdsDataTypeContainer, AdsSymbolInfoContainer, AdsUploadInfo, ConnectionMetaData, PlcPrimitiveType, SubscriptionCallback, SubscriptionData, SubscriptionSettings, ReadSymbolResult, TimerObject, ObjectToBufferConversionResult, WriteSymbolResult, VariableHandle } from "./types/ads-client-types";
 import { AdsAddNotificationResponse, AdsAddNotificationResponseData, AdsArrayInfoEntry, AdsAttributeEntry, AdsDataType, AdsDeleteNotificationResponse, AdsDeviceInfo, AdsEnumInfoEntry, AdsNotification, AdsNotificationResponse, AdsNotificationSample, AdsNotificationStamp, AdsRawInfo, AdsReadDeviceInfoResponse, AdsReadResponse, AdsReadStateResponse, AdsReadWriteResponse, AdsRequest, AdsResponse, AdsRpcMethodEntry, AdsRpcMethodParameterEntry, AdsState, AdsSymbolInfo, AdsWriteControlResponse, AdsWriteResponse, AmsAddress, AmsHeader, AmsPortRegisteredData, AmsRouterState, AmsRouterStateData, AmsTcpHeader, AmsTcpPacket, BaseAdsResponse, EmptyAdsResponse, UnknownAdsResponse } from "./types/ads-protocol-types";
 import {
@@ -20,7 +20,18 @@ const die = (...args: any) => {
   process.exit();
 }
 
-export class Client extends EventEmitter {
+interface ClientEvents {
+  'connect': (connection: AdsClientConnection) => void;
+  'disconnect': () => void;
+  'connectionLost': () => void;
+  'reconnect': () => void;
+  'symbolVersionChange': (version: number) => void;
+  'plcRuntimeStateChange': (state: AdsState) => void;
+  'routerStateChange': (state: AmsRouterState) => void;
+  'ads-client-error': (error: ClientError) => void;
+}
+
+export class Client extends TypedEmitter<ClientEvents> {
   private debug = Debug("ads-client");
   private debugD = Debug(`ads-client:details`);
   private debugIO = Debug(`ads-client:raw-data`);

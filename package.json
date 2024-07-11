@@ -40,7 +40,8 @@
     "@types/node": "^18.16.2",
     "debug": "^4.3.3",
     "iconv-lite": "^0.6.3",
-    "long": "^5.2.0"
+    "long": "^5.2.0",
+    "tiny-typed-emitter": "^2.1.0"
   },
   "devDependencies": {
     "@tsconfig/node16": "^1.0.3",
