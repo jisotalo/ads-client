@@ -532,7 +532,7 @@ describe('data conversion', () => {
   test('converting a Javascript value to a raw PLC value', async () => {
     //Only testing once, as this is used internally in writeymbol(), which is tested very well
     const res = await client.readRawByName('GVL_Read.StandardTypes.WORD_');
-    
+
     const value = await client.convertFromRaw(res, 'WORD');
 
     expect(await client.convertToRaw(value, 'WORD')).toStrictEqual(res);
@@ -1030,24 +1030,12 @@ describe('reading values', () => {
       }
     });
 
-    test('reading POINTER', async () => {
+    test('reading POINTER (address)', async () => {
       //Note: dereferenced pointer value is not possible to read using readSymbol() - we only get memory address
       const res = await client.readSymbol('GVL_Read.ComplexTypes.POINTER_');
 
       expect(typeof res.value).toBe("bigint");
       expect(res.symbolInfo.type).toBe("POINTER TO ST_StandardTypes");
-    });
-
-    test('reading REFERENCE (----TODO----)', async () => {
-      //TODO - why this isn't working
-
-      //Note: dereferenced reference value is not possible to read using readSymbol() - we only get memory address
-      expect(true).toBe(true);
-      return;
-      const res = await client.readSymbol('GVL_Read.ComplexTypes.REFERENCE_');
-
-      expect(typeof res.value).toBe("bigint");
-      expect(res.symbolInfo.type).toBe("REFERENCE TO ST_StandardTypes");
     });
 
     test('reading SUBRANGE', async () => {
@@ -1250,7 +1238,7 @@ describe('reading values', () => {
       }
     });
 
-    test('reading ARRAY OF POINTER', async () => {
+    test('reading ARRAY OF POINTER (address)', async () => {
       //Note: dereferenced pointer value is not possible to read using readSymbol() - we only get memory address
       const res = await client.readSymbol('GVL_Read.ComplexArrayTypes.POINTER_');
 
@@ -1455,7 +1443,7 @@ describe('reading values', () => {
   });
 
   describe('reading dereferenced POINTER and REFERENCE values', () => {
-    test('reading POINTER', async () => {
+    test('reading POINTER (value)', async () => {
       const symbolInfo = await client.getSymbolInfo('GVL_Read.ComplexTypes.POINTER_^');
       const res = await client.readRawByName('GVL_Read.ComplexTypes.POINTER_^');
       expect(res.byteLength).toBe(symbolInfo.size);
@@ -1465,7 +1453,7 @@ describe('reading values', () => {
       expect(value).toStrictEqual(ST_STANDARD_TYPES);
     });
 
-    test('reading REFERENCE', async () => {
+    test('reading REFERENCE (value)', async () => {
       const symbolInfo = await client.getSymbolInfo('GVL_Read.ComplexTypes.REFERENCE_');
       const res = await client.readRawByName('GVL_Read.ComplexTypes.REFERENCE_');
       expect(res.byteLength).toBe(symbolInfo.size);
@@ -2083,25 +2071,13 @@ describe('writing values', () => {
       }
     });
 
-    test('writing POINTER', async () => {
+    test('writing POINTER (address)', async () => {
       //Note: This writes pointer address, not dereferenced value
       const { value } = await client.readSymbol('GVL_Read.ComplexTypes.POINTER_');
       await client.writeSymbol('GVL_Write.ComplexTypes.POINTER_', value);
 
       const res = await client.readSymbol('GVL_Write.ComplexTypes.POINTER_');
       expect(res.value).toStrictEqual(value);
-    });
-
-    test('writing REFERENCE (----TODO----)', async () => {
-      //TODO - why this isn't working
-
-      //Note: dereferenced reference value is not possible to read using readSymbol() - we only get memory address
-      expect(true).toBe(true);
-      return;
-      const res = await client.readSymbol('GVL_Write.ComplexTypes.REFERENCE_');
-
-      expect(typeof res.value).toBe("bigint");
-      expect(res.symbolInfo.type).toBe("REFERENCE TO ST_StandardTypes");
     });
 
     test('writing SUBRANGE', async () => {
@@ -2423,7 +2399,7 @@ describe('writing values', () => {
       }
     });
 
-    test('writing ARRAY OF POINTER', async () => {
+    test('writing ARRAY OF POINTER (address)', async () => {
       //Note: This writes pointer address, not dereferenced value
       const { value } = await client.readSymbol('GVL_Read.ComplexTypes.POINTER_');
 
@@ -2661,12 +2637,26 @@ describe('writing values', () => {
   });
 
   describe('writing dereferenced POINTER and REFERENCE values', () => {
-    test('writing POINTER - TODO', async () => {
-      throw new Error('TODO');
+    test('writing POINTER (value)', async () => {
+      const value = await client.convertToRaw(ST_STANDARD_TYPES_WRITE, 'ST_StandardTypes');
+
+      const handle = await client.createVariableHandle('GVL_Write.ComplexTypes.POINTER_^');
+      await client.writeRawByHandle(handle, value);
+      const res = await client.readRawByHandle(handle);
+      await client.deleteVariableHandle(handle);
+
+      expect(value).toStrictEqual(res);
     });
 
-    test('writing REFERENCE - TODO', async () => {
-      throw new Error('TODO');
+    test('writing REFERENCE (value)', async () => {
+      const value = await client.convertToRaw(ST_STANDARD_TYPES_WRITE, 'ST_StandardTypes');
+
+      const handle = await client.createVariableHandle('GVL_Write.ComplexTypes.REFERENCE_');
+      await client.writeRawByHandle(handle, value);
+      const res = await client.readRawByHandle(handle);
+      await client.deleteVariableHandle(handle);
+
+      expect(value).toStrictEqual(res);
     });
   });
 
