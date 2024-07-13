@@ -907,7 +907,7 @@ export class Client extends EventEmitter {
    * 
    * @template T ADS response type. If omitted, generic AdsResponse is used
    */
-  private async sendAdsCommand<T = AdsResponse>(command: AdsCommandToSend) {
+  async sendAdsCommand<T = AdsResponse>(command: AdsCommandToSend) {
     return new Promise<AmsTcpPacket<T>>(async (resolve, reject) => {
 
       if (this.nextInvokeId >= ADS.ADS_INVOKE_ID_MAX_VALUE) {
