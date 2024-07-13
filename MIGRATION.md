@@ -8,6 +8,7 @@ This file contains detailed migration guide from migrating from ads-client major
 * `subscribe()`
   * Change old `subscribe()` calls to use new parameter format
   * New default cycleTime is 200 ms instead of 10 ms (similar to Bechoff's .NET library)
+* `subscribeRaw()` -> use `subscribe()` instead
 * `readSymbol()`
   * Result object `symbol` -> `symbolInfo`
 * `readRaw()`
@@ -27,9 +28,12 @@ This file contains detailed migration guide from migrating from ads-client major
 * `writeControl()`
   * Parameters and their order changed
   * Target setting parameters changed to new `targetOpts` format. Check if old format used.
-* `readSystemManagerState()`
-  * Renamed to `readTcSystemState()`
-* `metaData.systemManagerState` renamed to `metaData.tcSystemState`
+* `readSystemManagerState()` -> `readTcSystemState()`
+* `metaData.systemManagerState` -> `metaData.tcSystemState`
 * `getEmptyPlcType()` -> `getDefaultPlcObject()`
+* `readAndCacheSymbols()` -> `cacheSymbolInfos()` and `getSymbolInfos()`
+* `readAndCacheDataTypes()` -> `cacheDataTypes()` and `getDataTypes()`
+*  `settings.checkStateInterval` -> `settings.connectionCheckInterval`
+* Event `systemManagerStateChange` -> `tcSystemStateChange` and payload value changed to AdsState object instead of state number
 ### Optional  
 * Remove `disableBigInt` from settings 

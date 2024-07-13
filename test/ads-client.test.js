@@ -67,7 +67,7 @@ describe('connection', () => {
     expect(client.settings.targetAdsPort).toBe(851);
   });
 
-  test('connecting to target', async () => {
+  test('connecting to the target', async () => {
     try {
       const res = await client.connect();
 
@@ -75,7 +75,7 @@ describe('connection', () => {
       expect(res.connected).toBe(true);
 
     } catch (err) {
-      throw new Error(`connecting localhost failed (${err.message}`, err);
+      throw new Error(`connecting failed (${err.message}`, err);
     }
   });
 
@@ -93,6 +93,18 @@ describe('connection', () => {
   test('checking that test PLC project version is correct', async () => {
     const res = await client.readSymbol('GVL_AdsClientTests.VERSION');
     expect(res.value).toBe(PLC_PROJECT_VERSION);
+  });
+
+  test('reconnecting', async () => {
+    try {
+      const res = await client.reconnect();
+
+      expect(res).toHaveProperty('connected');
+      expect(res.connected).toBe(true);
+
+    } catch (err) {
+      throw new Error(`reconnecting failed (${err.message}`, err);
+    }
   });
 });
 
@@ -530,12 +542,26 @@ describe('data conversion', () => {
   });
 
   test('converting a Javascript value to a raw PLC value', async () => {
-    //Only testing once, as this is used internally in writeymbol(), which is tested very well
-    const res = await client.readRawByName('GVL_Read.StandardTypes.WORD_');
+    //Only doing small tests, as the convertObjectToBuffer() used is also used by writeymbol(), which is tested very well
+    {
+      const res = await client.readRawByName('GVL_Read.StandardTypes.WORD_');
+      const value = await client.convertFromRaw(res, 'WORD');
 
-    const value = await client.convertFromRaw(res, 'WORD');
+      expect(await client.convertToRaw(value, 'WORD')).toStrictEqual(res);
+    } {
+      const obj = { ...ST_STANDARD_TYPES_WRITE };
+      delete obj.INT_;
 
-    expect(await client.convertToRaw(value, 'WORD')).toStrictEqual(res);
+      //This should fail (no autoFill)
+      expect(client.convertToRaw(obj, 'ST_StandardTypes')).rejects.toThrow();
+
+      //This should success
+      const res = await client.convertToRaw(obj, 'ST_StandardTypes', true);
+
+      //When converting back to object, INT_ should exist but with value of 0
+      const converted = await client.convertFromRaw(res, 'ST_StandardTypes');
+      expect(converted).toStrictEqual({ ...obj, INT_: 0 });
+    }
   });
 });
 

@@ -10,15 +10,8 @@ import Long from "long";
 
 import * as ADS from './ads-commons';
 import ClientError from "./client-error";
+import { count } from "console";
 export * as ADS from './ads-commons';
-
-//TODO: Remove this (only for v2 development use)
-const die = (...args: any) => {
-
-  const util = require("util");
-  console.log(util.inspect(args, false, 999, true));
-  process.exit();
-}
 
 export class Client extends EventEmitter {
   private debug = Debug("ads-client");
@@ -64,7 +57,7 @@ export class Client extends EventEmitter {
     readAndCacheDataTypes: false,
     disableSymbolVersionMonitoring: false,
     hideConsoleWarnings: false,
-    checkStateInterval: 1000,
+    connectionCheckInterval: 1000,
     connectionDownDelay: 5000,
     allowHalfOpen: false,
     bareClient: false,
@@ -90,9 +83,9 @@ export class Client extends EventEmitter {
   private amsTcpCallback?: ((packet: AmsTcpPacket) => void);
 
   /**
-   * Connection metadata
+   * Default empty connection metadata
    */
-  public metaData: ConnectionMetaData = {
+  private defaultMetaData: ConnectionMetaData = {
     deviceInfo: undefined,
     tcSystemState: undefined,
     plcRuntimeState: undefined,
@@ -104,6 +97,11 @@ export class Client extends EventEmitter {
     dataTypes: {},
     routerState: undefined
   };
+
+  /**
+   * Connection metadata
+   */
+  public metaData: ConnectionMetaData = { ...this.defaultMetaData };
 
   /**
    * Received data buffer
@@ -133,7 +131,7 @@ export class Client extends EventEmitter {
   /**
    * Timer ID and handle of TwinCAT system state poller timer 
    */
-  private tcSystemStatePoller: TimerObject = { id: 0 };
+  private tcSystemStatePollerTimer: TimerObject = { id: 0 };
 
   /**
    * Timer handle for port register timeout
@@ -141,9 +139,14 @@ export class Client extends EventEmitter {
   private portRegisterTimeoutTimer?: NodeJS.Timeout = undefined;
 
   /**
-   * Active subsriptions created using subscribe()
+   * Active subscriptions created using subscribe()
    */
   private activeSubscriptions: ActiveSubscriptionContainer = {};
+
+  /**
+   * Backed up / previous subscriptions before reconnecting or after symbol version change
+   */
+  private previousSubscriptions?: ActiveSubscriptionContainer = undefined;
 
   /**
    * Active ADS requests that are waiting for responses
@@ -154,6 +157,12 @@ export class Client extends EventEmitter {
    * Next invoke ID to be used for ADS requests
    */
   private nextInvokeId: number = 0;
+
+  /**
+   * If > 0, epoch timestamp when the connection to target failed for the first time (reading TwinCAT system state failed)
+   * This is used to detect if connection has been down for long enough.
+   */
+  private connectionDownSince: number = 0;
 
   /**
    * Creates a new ADS client instance.
@@ -367,7 +376,20 @@ export class Client extends EventEmitter {
             //Initialize PLC connection (some subscriptions, pollers etc.)
             await this.setupPlcConnection();
           } catch (err) {
-            return reject(new ClientError(`connectToTarget(): Connection failed - failed to set PLC connection (see setting "bareClient"): ${(err as ClientError).message}`, err));
+            if (!this.settings.allowHalfOpen) {
+              return reject(new ClientError(`connectToTarget(): Connection failed - failed to set PLC connection. If target is not PLC runtime, use setting "bareClient". If system is in config mode or there is no PLC software yet, you might want to use setting "allowHalfOpen". Error: ${(err as ClientError).message}`, err));
+            }
+
+            //allowHalfOpen allows this, but show some warnings..
+            if (!this.metaData.tcSystemState) {
+              !this.settings.hideConsoleWarnings && console.log(`WARNING: "allowHalfOpen" setting is active. Target is connected but no connection to TwinCAT system. If target is not PLC runtime, use setting "bareClient" instead of "allowHalfOpen".`);
+
+            } else if (this.metaData.tcSystemState.adsState !== ADS.ADS_STATE.Run) {
+              !this.settings.hideConsoleWarnings && console.log(`WARNING: "allowHalfOpen" setting is active. Target is connected but TwinCAT system is in ${this.metaData.tcSystemState.adsStateStr} instead of run mode. No connection to PLC runtime.`);
+        
+            } else {
+              !this.settings.hideConsoleWarnings && console.log(`WARNING: "allowHalfOpen" setting is active. No connection to PLC runtime. Check "targetAdsPort" setting and PLC status`);
+            }
           }
         }
 
@@ -442,12 +464,15 @@ export class Client extends EventEmitter {
 
       //Clear other timers
       clearTimeout(this.portRegisterTimeoutTimer);
+      this.clearTimer(this.tcSystemStatePollerTimer);
 
       //If forced, then just destroy the socket
       if (forceDisconnect) {
         this.connection = {
           connected: false
         };
+
+        this.metaData = { ...this.defaultMetaData };
 
         this.socket?.removeAllListeners();
         this.socket?.destroy();
@@ -473,6 +498,8 @@ export class Client extends EventEmitter {
           connected: false
         };
 
+        this.metaData = { ...this.defaultMetaData };
+
         this.socket?.removeAllListeners();
         this.socket?.destroy();
         this.socket = undefined;
@@ -493,6 +520,8 @@ export class Client extends EventEmitter {
           connected: false
         };
 
+        this.metaData = { ...this.defaultMetaData };
+
         this.debug(`disconnectFromTarget(): Connection closing failed, connection was forced to close`);
         this.emit("disconnect");
         return reject(new ClientError(`disconnect(): Disconnected with errors: ${(disconnectError as Error).message}`, err));
@@ -508,14 +537,31 @@ export class Client extends EventEmitter {
    */
   private reconnectToTarget(forceDisconnect = false, isReconnecting = false) {
     return new Promise<AdsClientConnection>(async (resolve, reject) => {
+
+      //Backup subscriptions but do not unsubscribe (disconnect should handle that)
+      await this.backupSubscriptions(false);
+
       if (this.socket) {
         this.debug(`reconnectToTarget(): Trying to disconnect`);
         await this.disconnectFromTarget(forceDisconnect, isReconnecting).catch();
       }
       this.debug(`reconnectToTarget(): Trying to connect...`);
       return this.connectToTarget(true)
-        .then(res => {
+        .then(async (res) => {
           this.debug(`reconnectToTarget(): Connected!`);
+
+          //Trying to subscribe to previous subscriptions again
+          const failures = await this.restoreSubscriptions();
+
+          if (!failures.length) {
+            isReconnecting && !this.settings.hideConsoleWarnings && console.log(`Reconnected and all subscriptions were restored!`);
+            this.debug(`reconnectToTarget(): Reconnected and all subscriptions were restored!`);
+
+          } else {
+            !this.settings.hideConsoleWarnings && console.log(`WARNING: Reconnected but failed to restore following subscriptions:\n - ${failures.join('\n - ')}`);
+            this.debug(`reconnectToTarget(): Reconnected but failed to restore following subscriptions: ${failures.join(', ')}`);
+          }
+
           this.emit('reconnect');
           resolve(res);
         })
@@ -686,6 +732,12 @@ export class Client extends EventEmitter {
    * 
    */
   private async setupPlcConnection() {
+    //Read system state
+    this.readTcSystemState();
+
+    //Start system state poller
+    this.startTcSystemStatePoller();
+
     //Subscribe to runtime state changes (detect PLC run/stop etc.)
     await this.addSubscription<Buffer>({
       target: {
@@ -723,6 +775,93 @@ export class Client extends EventEmitter {
     if (this.settings.readAndCacheDataTypes || this.metaData.allDataTypesCached) {
       await this.cacheDataTypes();
     }
+  }
+
+  /**
+   * Starts a poller that will check TwinCAT system state every x milliseconds
+   * to detect if connection is working or if system state has changed
+   */
+  private startTcSystemStatePoller() {
+    this.clearTimer(this.tcSystemStatePollerTimer);
+
+    this.tcSystemStatePollerTimer.timer = setTimeout(
+      () => this.checkTcSystemState(this.tcSystemStatePollerTimer.id),
+      this.settings.connectionCheckInterval
+    );
+  }
+
+  /**
+   * Function that is called from TwinCAT system state poller
+   * Reads active TwinCAT system state and detects if it has changed (or if connection is down)
+   * 
+   * Starts the timer again
+   */
+  private async checkTcSystemState(timerId: number) {
+    //If the timer has changed, quit here (to prevent multiple timers)
+    if (timerId !== this.tcSystemStatePollerTimer.id) {
+      return;
+    }
+
+    let startTimer = true;
+
+    try {
+      let oldState = this.metaData.tcSystemState !== undefined
+        ? { ...this.metaData.tcSystemState }
+        : undefined;
+
+      const state = await this.readTcSystemState();
+
+      this.connectionDownSince = 0;
+
+      if (!oldState || state.adsState !== oldState.adsState) {
+        this.debug(`checkTcSystemState(): TwinCAT system state has changed from ${oldState?.adsStateStr} to ${state.adsStateStr}`)
+        this.emit('tcSystemStateChange', state);
+
+        //If system is not in run mode, we have lost the connection (such as config mode)
+        if (state.adsState !== ADS.ADS_STATE.Run) {
+          this.debug(`checkTcSystemState(): TwinCAT system state is in ${state.adsStateStr} mode instead of Run -> connection lost`);
+
+          startTimer = false;
+          this.onConnectionLost();
+
+        } else if (state.adsState === ADS.ADS_STATE.Run && !this.reconnectionTimer.timer) {
+          //If system change from config/stop/etc. to run while we aren't reconnecting, we should reconnect
+          //This can only happen when using allowHalfOpen and connecting to a system that's initially in config mode
+          this.debug(`checkTcSystemState(): TwinCAT system state is now in ${state.adsStateStr} mode -> reconnecting`);
+
+          startTimer = false;
+          this.onConnectionLost();
+        }
+      }
+
+    } catch (err) {
+      //Reading state failed. 
+      //If this happens for long enough, connection is determined to be down
+      if (!this.connectionDownSince) {
+        this.connectionDownSince = Date.now();
+      }
+
+      const time = Date.now() - this.connectionDownSince;
+
+      if (time >= this.settings.connectionDownDelay) {
+        this.debug(`checkTcSystemState(): No connection for longer than ${this.settings.connectionDownDelay} ms. Connection is lost.`)
+
+        startTimer = false;
+        this.onConnectionLost();
+      }
+    }
+
+
+    //If this is still a valid timer, start over again
+    if (startTimer && this.tcSystemStatePollerTimer.id === timerId) {
+      //Creating a new timer with the same id
+      this.tcSystemStatePollerTimer.timer = setTimeout(
+        () => this.checkTcSystemState(timerId),
+        this.settings.connectionCheckInterval
+      );
+    }
+
+
   }
 
   /**
@@ -821,7 +960,14 @@ export class Client extends EventEmitter {
       }
 
       //Resubscribing all subscriptions as they might be broken now
-      //this.reInitializeSubscriptions();
+      try {
+        await this.backupSubscriptions(true);
+        await this.restoreSubscriptions();
+
+      } catch (err) {
+        !this.settings.hideConsoleWarnings && console.log(`WARNING: Target PLC symbol version changed and all subscriptions were not restored (data might be lost from now on). Error info: ${JSON.stringify(err)}`);
+        this.debug(`onSymbolVersionChanged(): Failed to restore all subscriptions. Error: %o`, err);
+      }
     }
 
     this.metaData.symbolVersion = symbolVersion;
@@ -832,7 +978,7 @@ export class Client extends EventEmitter {
    * Event listener for socket errors
    */
   private onSocketError(err: Error) {
-    !this.settings.hideConsoleWarnings && console.log(`WARNING: Socket connection to target closes to an an error, disconnecting: ${JSON.stringify(err)}`);
+    !this.settings.hideConsoleWarnings && console.log(`WARNING: Socket connection to target closed to an an error, disconnecting: ${JSON.stringify(err)}`);
     this.onConnectionLost(true);
   }
 
@@ -1571,7 +1717,7 @@ export class Client extends EventEmitter {
 
   /**
    * Called when local AMS router status has changed (Router notification received)
-   * For example router state changes when local TwinCAT switches from Config to Run state and vice-versa
+   * For example router state changes when local TwinCAT system switches from Config to Run state and vice-versa
    * 
    * @param state New router state
    */
@@ -1585,15 +1731,16 @@ export class Client extends EventEmitter {
     this.emit('routerStateChange', this.metaData.routerState);
 
     //If we have a local connection, connection needs to be reinitialized
-    if (this.connection.isLocal) {
+    if (true || this.connection.isLocal) {
       //We should stop polling TwinCAT system state, the poller will be reinitialized later
-      this.clearTimer(this.tcSystemStatePoller);
+      this.clearTimer(this.tcSystemStatePollerTimer);
 
       this.debug("onRouterStateChanged(): Local loopback connection active, monitoring router state. Reconnecting when router is back running.");
 
       if (this.metaData.routerState.state === ADS.AMS_ROUTER_STATE.START) {
         !this.settings.hideConsoleWarnings && console.log(`WARNING: Local AMS router state has changed to ${this.metaData.routerState.stateStr}. Reconnecting...`);
         this.onConnectionLost();
+
       } else {
         //Nothing to do, just wait until router has started again..
         !this.settings.hideConsoleWarnings && console.log(`WARNING: Local AMS router state has changed to ${this.metaData.routerState.stateStr}. Connection and active subscriptions might have been lost. Waiting router to start again.`);
@@ -1833,6 +1980,100 @@ export class Client extends EventEmitter {
       this.debug(`unsubscribeAll(): Unsubscribing all failed - some subscriptions were not unsubscribed: %o`, err);
       throw new ClientError(`unsubscribeAll(): Unsubscribing all failed - some subscriptions were not unsubscribed`, err);
     }
+  }
+
+  /**
+   * Backups active subscriptions for resubscribing.
+   * 
+   * Returns number of backed up subscriptions.
+   * 
+   * @param unsubscribe If true, unsubscribeAll() is also called 
+   */
+  private async backupSubscriptions(unsubscribe: boolean) {
+    let count = 0;
+
+    if (this.previousSubscriptions !== undefined) {
+      return;
+    }
+
+    this.previousSubscriptions = {};
+
+    for (const targetName in this.activeSubscriptions) {
+      for (const subscriptionHandle in this.activeSubscriptions[targetName]) {
+        const subscription = this.activeSubscriptions[targetName][subscriptionHandle];
+
+        if (subscription.internal) {
+          continue;
+        }
+
+        if (!this.previousSubscriptions[targetName]) {
+          this.previousSubscriptions[targetName] = {};
+        }
+
+        //Copy
+        this.previousSubscriptions[targetName][subscription.notificationHandle] = { ...subscription };
+
+        count++;
+      }
+    }
+
+    if (unsubscribe) {
+      try {
+        await this.unsubscribeAll();
+      } catch (err) {
+        this.debug(`backupSubscriptions(): Unsubscribing existing subscriptions failed. Error: %o`, err);
+      }
+    }
+
+    this.debug(`backupSubscriptions(): Total of ${count} subcriptions backupped for restoring`);
+
+    return count;
+  }
+
+  /**
+   * Restores all previously backed up subscriptions
+   * 
+   * Returns array of failed subscriptions, empty array if all were successful
+   */
+  private async restoreSubscriptions() {
+    let failedTargets: string[] = [];
+    let totalCount = 0;
+    let successCount = 0;
+
+    if (!this.previousSubscriptions) {
+      this.debug(`restoreSubscriptions(): No previous subscriptions to restore`);
+      return failedTargets;
+    }
+
+    this.debug(`restoreSubscriptions(): Starting to restore previously saved subscriptions`);
+
+    for (const targetName in this.previousSubscriptions) {
+      for (const subscriptionHandle in this.previousSubscriptions[targetName]) {
+        const subscription = this.previousSubscriptions[targetName][subscriptionHandle];
+
+        if (subscription.internal) {
+          continue;
+        }
+
+        try {
+          totalCount++;
+          await this.subscribe({ ...subscription.settings }, subscription.targetOpts);
+          successCount++;
+
+        } catch (err: any) {
+          const target = typeof subscription.settings.target === 'string'
+            ? subscription.settings.target
+            : JSON.stringify(subscription.settings.target);
+
+          this.debug(`restoreSubscriptions(): Subscribing existing subscription ${target} failed. Error: %o`, err)
+          failedTargets.push(target);
+        }
+      }
+    }
+    this.previousSubscriptions = undefined;
+    this.debug(`restoreSubscriptions(): Restored ${successCount}/${totalCount} subscriptions`);
+
+    return failedTargets;
   }
 
   /**
@@ -2785,7 +3026,7 @@ export class Client extends EventEmitter {
         } else if (typeof value === 'object' && Object.keys(value as {}).length === 0) {
           //Value is {} - this is a special case. With FBs, it should work ok to write just zeroes
           //However, with intefaces it causes interface to be 0 --> null pointer possibility
-          //Let it be user's problem if they really provide {} - helps writing empty FBs
+          //Let it be user's problem if they really provide {} - helps writing empty FBs  
           ;
         } else {
           throw new ClientError(`Provided value ${JSON.stringify(value)}${pathInfo} is not valid value for this data type (${dataType.type})`);
@@ -2794,7 +3035,7 @@ export class Client extends EventEmitter {
 
 
     } else {
-      throw new ClientError(`Data type is not known (TODO): ${dataType.type}`);
+      throw new ClientError(`Data type is not known: ${dataType.type}`);
     }
 
     return {
@@ -2931,6 +3172,17 @@ export class Client extends EventEmitter {
    */
   public disconnect(force: boolean = false): Promise<void> {
     return this.disconnectFromTarget(force);
+  }
+
+  /**
+   * Reconnects to the target
+   * 
+   * Saves existing subscriptions, disconnects, connects and then subscribes again.
+   * 
+   * @param forceDisconnect If true, connection is dropped immediately. Should be used only if a very fast exit is needed. (default: false)
+   */
+  public reconnect(forceDisconnect: boolean = false): Promise<Required<AdsClientConnection>> {
+    return this.reconnectToTarget(forceDisconnect) as Promise<Required<AdsClientConnection>>;
   }
 
   /**
@@ -3904,7 +4156,7 @@ export class Client extends EventEmitter {
     let dataType: AdsDataType;
     try {
       this.debugD(`readSymbol(): Getting data type for ${path}`);
-      dataType = await this.buildDataType(symbolInfo.type, targetOpts); //TODO change type -> dataType?
+      dataType = await this.buildDataType(symbolInfo.type, targetOpts);
 
     } catch (err) {
       this.debug(`readSymbol(): Getting symbol information for ${path} failed: %o`, err);
@@ -3979,7 +4231,7 @@ export class Client extends EventEmitter {
     let dataType: AdsDataType;
     try {
       this.debugD(`writeSymbol(): Getting data type for ${path}`);
-      dataType = await this.buildDataType(symbolInfo.type, targetOpts); //TODO change type -> dataType?
+      dataType = await this.buildDataType(symbolInfo.type, targetOpts);
 
     } catch (err) {
       this.debug(`writeSymbol(): Getting symbol information for ${path} failed: %o`, err);
@@ -4160,7 +4412,6 @@ export class Client extends EventEmitter {
     }
 
     //Converting Javascript object to raw byte data
-
     let rawValue: Buffer;
     try {
       let res = this.convertObjectToBuffer(value, dataType);
@@ -4192,39 +4443,15 @@ export class Client extends EventEmitter {
       //We are here -> success!
       rawValue = res.rawValue;
 
+      this.debug(`convertToRaw(): Converted object to ${dataType.type} successfully`);
+      return rawValue;
+
     } catch (err) {
       //We can pass our own errors to keep the message on top
       if (err instanceof ClientError) {
         throw err;
       }
 
-      this.debug(`writeSymbol(): Converting object to raw value for ${dataType.type} failed: %o`, err);
-      throw new ClientError(`writeSymbol(): Converting object to raw value for ${dataType.type} failed`, err);
-    }
-
-    try {
-      let { rawValue, missingProperty } = this.convertObjectToBuffer(value, dataType);
-
-      if (missingProperty && autoFill) {
-        //Some fields are missing and autoFill is used -> try to auto fill missing values
-        //TODO: Read value, assign object and then try again
-        ({ rawValue, missingProperty } = this.convertObjectToBuffer(value, dataType));
-
-        if (missingProperty) {
-          //This shouldn't happen ever
-          throw new ClientError(`convertToRaw(): Converting object to raw value for ${dataType.type} failed (failed to autoFill missing values)`);
-        }
-
-      } else if (missingProperty) {
-        //Not using autoFill -> failed
-        throw new ClientError(`convertToRaw(): Converting object to raw value for ${dataType.type} failed and autoFill parameter is false. ${missingProperty}`);
-      }
-
-      //Success
-      this.debug(`convertToRaw(): Converted object to ${dataType.type} successfully`);
-      return rawValue;
-
-    } catch (err) {
       this.debug(`convertToRaw(): Converting object to raw value for ${dataType.type} failed: %o`, err);
       throw new ClientError(`convertToRaw(): Converting object to raw value for ${dataType.type} failed`, err);
     }
@@ -4382,7 +4609,7 @@ export class Client extends EventEmitter {
         : size !== undefined
           ? size
           : 0xFFFFFFFF;
-      
+
       const res = await this.readRaw(ADS.ADS_RESERVED_INDEX_GROUPS.SymbolValueByHandle, handleNumber, dataSize, targetOpts);
 
       this.debug(`readRawByHandle(): Reading raw data by handle ${handleNumber} done (${res.byteLength} bytes)`);
@@ -4409,11 +4636,11 @@ export class Client extends EventEmitter {
 
     this.debug(`writeRawByHandle(): Writing raw data by handle ${handleNumber} (${value.byteLength} bytes)`);
 
-    try {      
+    try {
       const res = await this.writeRaw(ADS.ADS_RESERVED_INDEX_GROUPS.SymbolValueByHandle, handleNumber, value, targetOpts);
 
       this.debug(`writeRawByHandle(): Writing raw data by handle ${handleNumber} done (${value.byteLength} bytes)`);
-      
+
     } catch (err) {
       this.debug(`writeRawByHandle(): Writing raw data by handle ${handleNumber} failed: %o`, err);
       throw new ClientError(`writeRawByHandle(): Writing raw data by handle ${handleNumber} failed`, err);

@@ -38,13 +38,13 @@ export interface AdsClientSettings extends ConnectionSettings {
   disableSymbolVersionMonitoring?: boolean,
   /** Optional: If true, no warnings are written to console using console.log() (default: false)*/
   hideConsoleWarnings?: boolean,
-  /** Optional: Time (milliseconds) how often target PLC system manager status is read to detect connection state (default: 1000ms)*/
-  checkStateInterval?: number,
-  /** Optional: Time (milliseconds) how long after the target PLC system manager is not available the connection is determined to be lost (default: 5000ms) */
+  /** Optional: Time (milliseconds) how often connection is checked by reading target TwinCAT system state - only when `bareClient` is false (default: 1000ms)*/
+  connectionCheckInterval?: number,
+  /** Optional: Time (milliseconds) how long after the target TwinCAT system is not available the connection is determined to be lost (default: 5000ms) */
   connectionDownDelay?: number,
-  /** Optional: If true, the connect() will success even no targer runtime is found (but system manager is available) - For example if PLC software is not yet downloaded but we want to connect in advance. (default: false) */
+  /** Optional: If true, the connect() will success even when target PLC runtime is not available or TwinCAT system is not in run mode. For example if PLC software is not yet downloaded but we want to connect in advance.(default: false) */
   allowHalfOpen?: boolean,
-  /** Optional: If true, only direct ADS connection is established to target. Can be used to connect to system without system manager etc. (non-TwinCAT or direct I/O) (default: false) */
+  /** Optional: If true, only direct raw ADS connection is established to target. Can be used to connect to system without TwinCAT system / PLC etc. (non-TwinCAT or direct I/O) (default: false) */
   bareClient?: boolean,
   /** Optional: If true, symbols and data types are not cached. Descriptions are read every time from target and built (slows communication but data is guaranteed to be up-to-date) (default: false) */
   disableCaching?: boolean
