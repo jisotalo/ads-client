@@ -12,7 +12,7 @@ import * as ADS from './ads-commons';
 import ClientError from "./client-error";
 export * as ADS from './ads-commons';
 export type { AdsClientSettings } from "./types/ads-client-types";
-export type { AdsState, AmsRouterState } from "./types/ads-protocol-types";
+export type { AdsState, AmsRouterState, AdsResponse, EmptyAdsResponse, UnknownAdsResponse, AdsReadResponse, AdsReadWriteResponse, AdsWriteResponse, AdsReadDeviceInfoResponse, AdsNotificationResponse, AdsAddNotificationResponse, AdsDeleteNotificationResponse, AdsWriteControlResponse } from "./types/ads-protocol-types";
 
 //TODO: Remove this (only for v2 development use)
 const die = (...args: any) => {
