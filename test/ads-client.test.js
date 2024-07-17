@@ -2942,11 +2942,58 @@ describe('issue specific tests', () => {
   })
 });
 
-describe('finalizing', () => {
-  test('disconnecting', async () => {
+describe('disconnecting', () => {
+  test('disconnecting client', async () => {
     if (client?.connection.connected) {
       const task = client.disconnect()
       expect(task).resolves.toBeUndefined()
     }
   })
-})
+});
+
+
+describe('controlling TwinCAT system service', () => {
+  const sysClient = new Client({
+    targetAmsNetId: AMS_NET_ID,
+    targetAdsPort: 10000,
+    bareClient: true
+  });
+
+  test('connecting', async () => {
+    await sysClient.connect();
+  });
+
+  test('setting TwinCAT system to config', async () => {
+    let state = await sysClient.readTcSystemState();
+    expect(state.adsState).toBe(ADS.ADS_STATE.Run);
+
+    await sysClient.setTcSystemToConfig();
+
+    //Some delay as system was just started
+    await delay(2000);
+
+    state = await sysClient.readTcSystemState();
+    expect(state.adsState).toBe(ADS.ADS_STATE.Config);
+  });
+  
+  test('setting TwinCAT system to run', async () => {
+    let state = await sysClient.readTcSystemState();
+    expect(state.adsState).toBe(ADS.ADS_STATE.Config);
+
+    await sysClient.setTcSystemToRun(false); //false -> we don't want to reconnect
+
+    //Some delay as system was just started
+    await delay(2000);
+
+    state = await sysClient.readTcSystemState();
+    expect(state.adsState).toBe(ADS.ADS_STATE.Run);
+  });
+
+  test('disconnecting', async () => {
+    if (sysClient?.connection.connected) {
+      const task = sysClient.disconnect()
+      expect(task).resolves.toBeUndefined()
+    }
+  })
+  
+});

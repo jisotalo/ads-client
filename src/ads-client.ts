@@ -386,7 +386,7 @@ export class Client extends EventEmitter {
 
             } else if (this.metaData.tcSystemState.adsState !== ADS.ADS_STATE.Run) {
               !this.settings.hideConsoleWarnings && console.log(`WARNING: "allowHalfOpen" setting is active. Target is connected but TwinCAT system is in ${this.metaData.tcSystemState.adsStateStr} instead of run mode. No connection to PLC runtime.`);
-        
+
             } else {
               !this.settings.hideConsoleWarnings && console.log(`WARNING: "allowHalfOpen" setting is active. No connection to PLC runtime. Check "targetAdsPort" setting and PLC status`);
             }
@@ -733,10 +733,10 @@ export class Client extends EventEmitter {
    */
   private async setupPlcConnection() {
     //Read system state
-    this.readTcSystemState();
+    await this.readTcSystemState();
 
     //Start system state poller
-    this.startTcSystemStatePoller();
+    await this.startTcSystemStatePoller();
 
     //Subscribe to runtime state changes (detect PLC run/stop etc.)
     await this.addSubscription<Buffer>({
@@ -1731,7 +1731,7 @@ export class Client extends EventEmitter {
     this.emit('routerStateChange', this.metaData.routerState);
 
     //If we have a local connection, connection needs to be reinitialized
-    if (true || this.connection.isLocal) {
+    if (this.connection.isLocal) {
       //We should stop polling TwinCAT system state, the poller will be reinitialized later
       this.clearTimer(this.tcSystemStatePollerTimer);
 
@@ -3367,6 +3367,85 @@ export class Client extends EventEmitter {
       this.debug(`restartPlc(): Restarting PLC runtime at ${this.targetToString(targetOpts)} failed: %o`, err);
       throw new ClientError(`restartPlc(): Restarting PLC runtime at ${this.targetToString(targetOpts)} failed`, err);
     }
+  }
+
+  /**
+   * Sets TwinCAT system to run mode
+   * 
+   * NOTE: As default, restarts also the ads-client connection
+   * 
+   * @param reconnect If true (default), ads-client connection is reconnected after restarting (to restore subscriptions etc.)
+   * @param targetOpts Optional target settings that override values in `settings`
+   */
+  public async setTcSystemToRun(reconnect: boolean = true, targetOpts: Partial<AmsAddress> = {}): Promise<void> {
+    if (!this.connection.connected) {
+      throw new ClientError(`setTcSystemToRun(): Client is not connected. Use connect() to connect to the target first.`);
+    }
+
+    this.debug(`setTcSystemToRun(): Setting TwinCAT system to run mode (reconnect: ${reconnect})`);
+
+    try {
+      //Reading device state first as we don't want to change it (even though it's most probably 0)
+      const state = await this.readPlcRuntimeState(targetOpts);
+
+      await this.writeControl("Reset", state.deviceState, undefined, { adsPort: 10000, ...targetOpts });
+
+      this.debug(`setTcSystemToRun(): TwinCAT system at ${this.targetToString(targetOpts)} set to run mode`);
+
+      if (reconnect) {
+        this.debug(`setTcSystemToRun(): Reconnecting after TwinCAT system restart`);
+        !this.settings.hideConsoleWarnings && console.log("WARNING: Reconnicting after TwinCAT system restart");
+        this.onConnectionLost();
+      }
+      
+    } catch (err) {
+      this.debug(`setTcSystemToRun(): Setting TwinCAT system to run mode at ${this.targetToString(targetOpts)} failed: %o`, err);
+      throw new ClientError(`setTcSystemToRun(): Setting TwinCAT system to run mode at ${this.targetToString(targetOpts)} failed`, err);
+    }
+  }
+
+  /**
+   * Sets TwinCAT system to config mode
+   * 
+   * @param targetOpts Optional target settings that override values in `settings`
+   */
+  public async setTcSystemToConfig(targetOpts: Partial<AmsAddress> = {}): Promise<void> {
+    if (!this.connection.connected) {
+      throw new ClientError(`setTcSystemToConfig(): Client is not connected. Use connect() to connect to the target first.`);
+    }
+
+    this.debug(`setTcSystemToConfig(): Setting TwinCAT system to config mode`);
+
+    try {
+      //Reading device state first as we don't want to change it (even though it's most probably 0)
+      const state = await this.readPlcRuntimeState(targetOpts);
+
+      await this.writeControl("Reconfig", state.deviceState, undefined, { adsPort: 10000, ...targetOpts });
+
+      this.debug(`setTcSystemToConfig(): TwinCAT system at ${this.targetToString(targetOpts)} set to config mode`);
+
+    } catch (err) {
+      this.debug(`setTcSystemToConfig(): Setting TwinCAT system to config mode at ${this.targetToString(targetOpts)} failed: %o`, err);
+      throw new ClientError(`setTcSystemToConfig(): Setting TwinCAT system to config mode at ${this.targetToString(targetOpts)} failed`, err);
+    }
+  }
+
+  /**
+   * Restarts TwinCAT system to run mode. Actually just a wrapper for `setTcSystemToRun()`
+   * 
+   * NOTE: As default, restarts also the ads-client connection
+   * 
+   * @param reconnect If true (default), ads-client connection is reconnected after restarting (to restore subscriptions etc.)
+   * @param targetOpts Optional target settings that override values in `settings`
+   */
+  public async restartTcSystem(reconnect: boolean = true, targetOpts: Partial<AmsAddress> = {}): Promise<void> {
+    if (!this.connection.connected) {
+      throw new ClientError(`restartTcSystem(): Client is not connected. Use connect() to connect to the target first.`);
+    }
+
+    this.debug(`restartTcSystem(): Restarting TwinCAT system (reconnect: ${reconnect})`);
+    await this.setTcSystemToRun(reconnect, targetOpts);
+    this.debug(`restartTcSystem(): TwinCAT system was restarted`);
   }
 
   /**
