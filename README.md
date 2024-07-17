@@ -25,7 +25,7 @@ The target of 2.0 is to rewrite evertyhing in Typescript. During the development
 
 ## Development status
 
-`npm test` results - updated 13.07.2024
+`npm test` results - updated 17.07.2024
 
 ```
   √ IMPORTANT NOTE: This test requires running a specific PLC project locally (https://github.com/jisotalo/ads-client-test-plc-project) (2 ms)
