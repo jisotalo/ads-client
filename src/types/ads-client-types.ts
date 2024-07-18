@@ -257,3 +257,8 @@ export interface VariableHandle {
   typeDecoration: number,
   dataType: string
 }
+
+export interface RpcMethodCallResult<T = any, U = Record<string, any>> {
+  resultValue: T,
+  outputs: U
+}

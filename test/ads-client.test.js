@@ -541,7 +541,7 @@ describe('data conversion', () => {
 
   test('converting a raw PLC value to a Javascript variable', async () => {
     //Only testing once, as this is used internally in readSymbol(), which is tested very well
-    const res = await client.readRawByName('GVL_Read.StandardTypes.WORD_');
+    const res = await client.readRawByPath('GVL_Read.StandardTypes.WORD_');
 
     const value = await client.convertFromRaw(res, 'WORD');
     expect(value).toBe(ST_STANDARD_TYPES.WORD_);
@@ -550,7 +550,7 @@ describe('data conversion', () => {
   test('converting a Javascript value to a raw PLC value', async () => {
     //Only doing small tests, as the convertObjectToBuffer() used is also used by writeymbol(), which is tested very well
     {
-      const res = await client.readRawByName('GVL_Read.StandardTypes.WORD_');
+      const res = await client.readRawByPath('GVL_Read.StandardTypes.WORD_');
       const value = await client.convertFromRaw(res, 'WORD');
 
       expect(await client.convertToRaw(value, 'WORD')).toStrictEqual(res);
@@ -1477,7 +1477,7 @@ describe('reading values', () => {
   describe('reading dereferenced POINTER and REFERENCE values', () => {
     test('reading POINTER (value)', async () => {
       const symbol = await client.getSymbolInfo('GVL_Read.ComplexTypes.POINTER_^');
-      const res = await client.readRawByName('GVL_Read.ComplexTypes.POINTER_^');
+      const res = await client.readRawByPath('GVL_Read.ComplexTypes.POINTER_^');
       expect(res.byteLength).toBe(symbol.size);
       expect(symbol.type).toBe("ST_StandardTypes");
 
@@ -1487,7 +1487,7 @@ describe('reading values', () => {
 
     test('reading REFERENCE (value)', async () => {
       const symbol = await client.getSymbolInfo('GVL_Read.ComplexTypes.REFERENCE_');
-      const res = await client.readRawByName('GVL_Read.ComplexTypes.REFERENCE_');
+      const res = await client.readRawByPath('GVL_Read.ComplexTypes.REFERENCE_');
       expect(res.byteLength).toBe(symbol.size);
       expect(symbol.type).toBe("ST_StandardTypes");
 
@@ -1523,6 +1523,15 @@ describe('reading values', () => {
 
         const res = await client.readRawBySymbol(symbol);
         const value = await client.convertFromRaw(res, symbol.type);
+
+        expect(value).toStrictEqual(ST_STANDARD_TYPES.INT_);
+      }
+    });
+
+    test('reading a raw value using path', async () => {
+      {
+        const res = await client.readRawByPath('GVL_Read.StandardTypes.INT_');
+        const value = await client.convertFromRaw(res, 'INT');
 
         expect(value).toStrictEqual(ST_STANDARD_TYPES.INT_);
       }
@@ -2728,6 +2737,17 @@ describe('writing values', () => {
         await client.writeRawBySymbol(symbol, value);
 
         const res = await client.readRawBySymbol(symbol);
+
+        expect(res).toStrictEqual(value);
+      }
+    });
+
+    test('writing a raw value using path', async () => {
+      {
+        const value = await client.convertToRaw(!ST_STANDARD_TYPES.INT_ - 10, 'INT');
+        await client.writeRawByPath('GVL_Write.StandardTypes.INT_', value);
+
+        const res = await client.readRawByPath('GVL_Write.StandardTypes.INT_');
 
         expect(res).toStrictEqual(value);
       }

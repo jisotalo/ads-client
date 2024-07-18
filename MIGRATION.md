@@ -37,6 +37,7 @@ This file contains detailed migration guide from migrating from ads-client major
 * `setSystemManagerToConfig()` -> `setTcSystemToConfig()`
 * `restartSystemManager()` -> `restartTcSystem()`
 * `readSymbolVersion()` -> `readPlcSymbolVersion()`
+* `readRawByName()` -> `readRawByPath()`
 *  `settings.checkStateInterval` -> `settings.connectionCheckInterval`  
 * `metaData.symbolVersion` -> `metaData.plcSymbolVersion`
 * Setting `disableSymbolVersionMonitoring` -> `monitorPlcSymbolVersion`

@@ -1,5 +1,5 @@
 import EventEmitter from "events";
-import type { ActiveAdsRequestContainer, ActiveSubscription, ActiveSubscriptionContainer, AdsClientConnection, AdsClientSettings, AdsCommandToSend, AdsDataTypeContainer, AdsSymbolInfoContainer, AdsUploadInfo, ConnectionMetaData, PlcPrimitiveType, SubscriptionCallback, SubscriptionData, SubscriptionSettings, ReadSymbolResult, TimerObject, ObjectToBufferConversionResult, WriteSymbolResult, VariableHandle } from "./types/ads-client-types";
+import type { ActiveAdsRequestContainer, ActiveSubscription, ActiveSubscriptionContainer, AdsClientConnection, AdsClientSettings, AdsCommandToSend, AdsDataTypeContainer, AdsSymbolInfoContainer, AdsUploadInfo, ConnectionMetaData, PlcPrimitiveType, SubscriptionCallback, SubscriptionData, SubscriptionSettings, ReadSymbolResult, TimerObject, ObjectToBufferConversionResult, WriteSymbolResult, VariableHandle, RpcMethodCallResult } from "./types/ads-client-types";
 import { AdsAddNotificationResponse, AdsAddNotificationResponseData, AdsArrayInfoEntry, AdsAttributeEntry, AdsDataType, AdsDeleteNotificationResponse, AdsDeviceInfo, AdsEnumInfoEntry, AdsNotification, AdsNotificationResponse, AdsNotificationSample, AdsNotificationStamp, AdsRawInfo, AdsReadDeviceInfoResponse, AdsReadResponse, AdsReadStateResponse, AdsReadWriteResponse, AdsRequest, AdsResponse, AdsRpcMethodEntry, AdsRpcMethodParameterEntry, AdsState, AdsSymbolInfo, AdsWriteControlResponse, AdsWriteResponse, AmsAddress, AmsHeader, AmsPortRegisteredData, AmsRouterState, AmsRouterStateData, AmsTcpHeader, AmsTcpPacket, BaseAdsResponse, EmptyAdsResponse, UnknownAdsResponse } from "./types/ads-protocol-types";
 import {
   Socket,
@@ -209,7 +209,6 @@ export class Client extends EventEmitter {
    * Uses values from settings unless targetOpts fields are defined
    * 
    * @param targetOpts Optional target settings that override values in `settings`
-   * @returns 
    */
   private targetToString(targetOpts: Partial<AmsAddress> = {}): string {
     let target: AmsAddress = {
@@ -1307,8 +1306,9 @@ export class Client extends EventEmitter {
   /**
    * Parses an AMS/TCP header from given buffer
    * 
+   * Returns the rest of the payload as data
+   * 
    * @param data Buffer that contains data for a single full AMS/TCP packet
-   * @returns Object `{amsTcp, data}`, where amsTcp is the parsed header and data is rest of the data
    */
   private parseAmsTcpHeader(data: Buffer): { amsTcp: AmsTcpHeader, data: Buffer } {
     this.debugD(`parseAmsTcpHeader(): Starting to parse AMS/TCP header`)
@@ -1344,8 +1344,9 @@ export class Client extends EventEmitter {
   /**
    * Parses an AMS header from given buffer
    * 
+   * Returns the rest of the payload as data
+   * 
    * @param data Buffer that contains data for a single AMS packet (without AMS/TCP header)
-   * @returns Object `{ams, data}`, where ams is the parsed AMS header and data is rest of the data
    */
   private parseAmsHeader(data: Buffer): { ams: AmsHeader, data: Buffer } {
     this.debugD("parseAmsHeader(): Starting to parse AMS header");
@@ -1417,7 +1418,6 @@ export class Client extends EventEmitter {
    * Parses ADS data from given buffer. Uses `packet.ams` to determine the ADS command.
   * 
   * @param data Buffer that contains data for a single ADS packet (without AMS/TCP header and AMS header)
-  * @returns Object that contains the parsed ADS data
   */
   private parseAdsResponse(packet: AmsTcpPacket, data: Buffer): AdsResponse {
     this.debugD("parseAdsResponse(): Starting to parse ADS data");
@@ -1753,7 +1753,6 @@ export class Client extends EventEmitter {
    * Parses received ADS notification data (stamps) from given (byte) Buffer
    * 
    * @param data Raw data to convert
-   * @returns Parsed ADS notification
    */
   private parseAdsNotification(data: Buffer) {
     let pos = 0;
@@ -2781,7 +2780,6 @@ export class Client extends EventEmitter {
    * 
    * @param buffer Buffer containing the raw data
    * @param dataType Target data type
-   * @returns 
    */
   private convertBufferToPrimitiveType(buffer: Buffer, dataType: AdsDataType): PlcPrimitiveType {
     if (dataType.adsDataType === ADS.ADS_DATA_TYPES.ADST_STRING) {
@@ -2930,7 +2928,6 @@ export class Client extends EventEmitter {
        * @param value 
        * @param dimension 
        * @param path 
-       * @returns 
        */
       const parseArrayDimension = (value: any, dimension: number, path = ''): string | undefined => {
         for (let child = 0; child < dataType.arrayInfos[dimension].length; child++) {
@@ -4086,7 +4083,6 @@ export class Client extends EventEmitter {
    * @param indexOffset Index offset (address) of the data to read
    * @param size Data length to read (bytes)
    * @param targetOpts Optional target settings that override values in `settings`
-   * @returns Data read
    */
   public async readRaw(indexGroup: number, indexOffset: number, size: number, targetOpts: Partial<AmsAddress> = {}): Promise<Buffer> {
     if (!this.connection.connected) {
@@ -4183,18 +4179,17 @@ export class Client extends EventEmitter {
    * 
    * Supports also reading POINTER and REFERENCE values by using deference operator in path (`^`)
    * 
-   * This uses the `READ_SYMVAL_BYNAME` command under the hood
+   * This uses the ADS command `READ_SYMVAL_BYNAME` under the hood
    *  
    * @param path Variable path in the PLC to read (such as `GVL_Test.ExampleStruct`)
    * @param targetOpts Optional target settings that override values in `settings`
-   * @returns Data read
    */
-  public async readRawByName(path: string, targetOpts: Partial<AmsAddress> = {}): Promise<Buffer> {
+  public async readRawByPath(path: string, targetOpts: Partial<AmsAddress> = {}): Promise<Buffer> {
     if (!this.connection.connected) {
-      throw new ClientError(`readRawByName(): Client is not connected. Use connect() to connect to the target first.`);
+      throw new ClientError(`readRawByPath(): Client is not connected. Use connect() to connect to the target first.`);
     }
     path = path.trim();
-    this.debug(`readRawByName(): Reading raw data (${path})`);
+    this.debug(`readRawByPath(): Reading raw data from ${path}`);
 
     //Allocating bytes for request
     const data = Buffer.alloc(16 + path.length + 1);
@@ -4228,12 +4223,51 @@ export class Client extends EventEmitter {
         payload: data
       });
 
-      this.debug(`readRawByName(): Reading raw data (${path}) done (${res.ads.length} bytes)`);
+      this.debug(`readRawByPath(): Reading raw data from ${path} done (${res.ads.length} bytes)`);
       return res.ads.payload;
 
     } catch (err) {
-      this.debug(`readRawByName(): Reading raw data (${path}) failed: %o`, err);
-      throw new ClientError(`readRawByName(): Reading raw data (${path}) failed`, err);
+      this.debug(`readRawByPath(): Reading raw data from ${path} failed: %o`, err);
+      throw new ClientError(`readRawByPath(): Reading raw data from ${path} failed`, err);
+    }
+  }
+
+  /**
+   * Writes raw byte data to the target system by symbol path.
+   * 
+   * Supports also reading POINTER and REFERENCE values by using deference operator in path (`^`)
+   * 
+   * Unlike `readRawByPath()`, this uses variable handles under the hood, the as there is no direct ADS command available for this.
+   *  
+   * @param path Variable path in the PLC to read (such as `GVL_Test.ExampleStruct`)
+   * @param value Data to write
+   * @param targetOpts Optional target settings that override values in `settings`
+   */
+  public async writeRawByPath(path: string, value: Buffer, targetOpts: Partial<AmsAddress> = {}): Promise<void> {
+    if (!this.connection.connected) {
+      throw new ClientError(`writeRawByPath(): Client is not connected. Use connect() to connect to the target first.`);
+    }
+
+    this.debug(`writeRawByPath(): Writing raw data to ${path} (${value.byteLength} bytes)`);
+
+    try {
+      let handle = null;
+
+      try {
+        handle = await this.createVariableHandle(path);
+        await this.writeRawByHandle(handle, value);
+        
+      } finally {
+        if (handle) {
+          await this.deleteVariableHandle(handle);
+        }
+      }
+
+      this.debug(`writeRawByPath(): Writing raw data to ${path} done (${value.byteLength} bytes)`);
+
+    } catch (err) {
+      this.debug(`writeRawByPath(): Writing raw data to ${path} failed: %o`, err);
+      throw new ClientError(`writeRawByPath(): Writing raw data to ${path} failed`, err);
     }
   }
 
@@ -4244,7 +4278,6 @@ export class Client extends EventEmitter {
    * 
    * @param path Variable path in the PLC to read (such as `GVL_Test.ExampleStruct`)
    * @param targetOpts Optional target settings that override values in `settings`
-   * @returns 
    * 
    * @template T Typescript data type of the PLC data, for example `readSymbol<number>(...)` or `readSymbol<ST_TypedStruct>(...)`
    */
@@ -4319,7 +4352,6 @@ export class Client extends EventEmitter {
    * @param path Variable path in the PLC to read (such as `GVL_Test.ExampleStruct`)
    * @param targetOpts Optional target settings that override values in `settings`
    * @param autoFill If true and data type is a container (`STRUCT`, `FUNCTION_BLOCK` etc.), missing properties are automatically **set to default values** (usually `0` or `''`) 
-   * @returns 
    * 
    * @template T Typescript data type of the PLC data, for example `writeSymbol<number>(...)` or `writeSymbol<ST_TypedStruct>(...)`
    */
@@ -4419,7 +4451,6 @@ export class Client extends EventEmitter {
    * 
    * @param dataType Data type name in the PLC as string (such as `ST_Struct`) or `AdsDataType` object 
    * @param targetOpts Optional target settings that override values in `settings` 
-   * @returns 
    * 
    * @template T Typescript data type of the PLC data, for example `readSymbol<number>(...)` or `readSymbol<ST_TypedStruct>(...)`
    */
@@ -4455,7 +4486,6 @@ export class Client extends EventEmitter {
    * @param data Raw PLC data as Buffer (read for example with `readRaw()`)
    * @param dataType Data type name in the PLC as string (such as `ST_Struct`) or `AdsDataType` object
    * @param targetOpts Optional target settings that override values in `settings`
-   * @returns 
    * 
    * @template T Typescript data type of the PLC data, for example `convertFromRaw<number>(...)` or `convertFromRaw<ST_TypedStruct>(...)`
    */
@@ -4502,7 +4532,6 @@ export class Client extends EventEmitter {
    * @param dataType Data type name in the PLC as string (such as `ST_Struct`) or `AdsDataType` object
    * @param autoFill If true and data type is a container (`STRUCT`, `FUNCTION_BLOCK` etc.), missing properties are automatically **set to default values** (usually `0` or `''`) 
    * @param targetOpts Optional target settings that override values in `settings`
-   * @returns 
    * 
    * @template T Typescript data type of the PLC data, for example `convertFromRaw<number>(...)` or `convertFromRaw<ST_TypedStruct>(...)`
    */
