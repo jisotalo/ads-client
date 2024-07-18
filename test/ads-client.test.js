@@ -2961,6 +2961,52 @@ describe('subscriptions (ADS notifications)', () => {
   });
 });
 
+describe('remote procedure calls (RPC methods)', () => {
+  test('calling a RPC method', async () => {
+    const res = await client.invokeRpcMethod('GVL_RPC.RpcBlock', 'Calculator', {
+      Value1: ST_STANDARD_TYPES_WRITE.REAL_3,
+      Value2: ST_STANDARD_TYPES_WRITE.INT_
+    });
+
+    expect(res).toStrictEqual({
+      returnValue: true,
+      outputs: {
+        Sum: expect.closeTo(108250.546875),
+        Product: expect.closeTo(2473369344),
+        Division: expect.closeTo(2.303645372390747)
+      }
+    });
+  });
+
+  test('calling a RPC method with struct parameters', async () => {
+    const res = await client.invokeRpcMethod('GVL_RPC.RpcBlock', 'Structs', {
+      Input: {
+        SomeText: ST_STANDARD_TYPES_WRITE.STRING_,
+        SomeReal: ST_STANDARD_TYPES_WRITE.REAL_4,
+        SomeDate: ST_STANDARD_TYPES_WRITE.DATE_
+      }
+    });
+
+    expect(res).toStrictEqual({
+      returnValue: {
+        SomeText: `Response: ${ST_STANDARD_TYPES.STRING_}`,
+        SomeReal: expect.closeTo(-754835.5),
+        SomeDate: new Date('2106-02-07T00:00:00.000Z')
+      },
+      outputs: {}
+    });
+  });
+
+  test('calling a RPC method without return value and without parameters', async () => {
+    const res = await client.invokeRpcMethod('GVL_RPC.RpcBlock', 'NoParameters');
+
+    expect(res).toStrictEqual({
+      returnValue: undefined,
+      outputs: {}
+    });
+  });
+});
+
 describe('issue specific tests', () => {
   describe('issue 103 (https://github.com/jisotalo/ads-client/issues/103)', () => {
     test('calling unsubscribeAll() multiple times (should not crash to unhandled exception)', async () => {

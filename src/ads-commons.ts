@@ -86,7 +86,6 @@ export const AMS_HEADER_FLAG = {
   }
 }
 
-
 /**
  * Reserved/known ADS ports
  * 
@@ -238,9 +237,6 @@ export const ADS_RESERVED_PORTS = {
   USEDEFAULT: 65535, // 0x0000FFFF
 }
 
-
-
-
 /**
  * ADS command
  * 
@@ -277,8 +273,6 @@ export const ADS_COMMAND = {
     return (val !== undefined ? val : 'UNKNOWN')
   }
 }
-
-
 
 /**
  * ADS state flags
@@ -329,7 +323,6 @@ export const ADS_STATE_FLAGS = {
     return flags.join(', ')
   }
 }
-
 
 /**
  * ADS error code
@@ -515,7 +508,6 @@ export const ADS_STATE = {
   }
 }
 
-
 /**
  * Reserved ADS index groups
  * 
@@ -619,10 +611,6 @@ export const ADS_RESERVED_INDEX_GROUPS = {
   }
 }
 
-
-
-
-
 /**
  * ADS symbol flags
  * 
@@ -681,8 +669,6 @@ export const ADS_SYMBOL_FLAGS = {
     return index >= 0 ? Object.keys(this)[index] : "unknown";
   }
 }
-
-
 
 /**
  * ADS data type flags
@@ -769,7 +755,6 @@ export const ADS_DATA_TYPE_FLAGS = {
   }
 }
 
-
 /**
  * ADS data types
  * 
@@ -819,31 +804,27 @@ export const ADS_DATA_TYPES = {
   }
 }
 
-
-
 /**
- * ADS RCP method parameter flags
+ * ADS RCP method flags
  * 
  * Source: TwinCAT.Ads.dll By Beckhoff
  */
-export const RCP_METHOD_PARAM_FLAGS = {
-  /**  Input Parameter (ADSMETHODPARAFLAG_IN) */
-  In: 1,
-  /**  Output Parameter (ADSMETHODPARAFLAG_OUT) */
-  Out: 2,
-  /**   By reference Parameter (ADSMETHODPARAFLAG_BYREFERENCE) */
-  ByReference: 4,
-  /**  Mask for In parameters. */
-  MaskIn: 5,
-  /**  Mask for Out parameters. */
-  MaskOut: 6,
+export const ADS_RCP_METHOD_FLAGS = {
+  /**  (ADSMETHODFLAG_PLC_CALLINGCONVENTION, 0x00000001) */
+  PlcCallingConvention: 1,
+  /**  (ADSMETHODFLAG_CALL_UNLOCKED, 0x00000002) */
+  CallUnlocked: 2,
+  /**  (ADSMETHODFLAG_NOTCALLABLE, 0x00000004) */
+  NotCallable: 4,
+  /**  (ADSMETHODFLAG_ATTRIBUTES, 0x00000008) */
+  Attributes: 8,
 
   /** Return given flag value as string array */
   toStringArray: function (flags: number): string[] {
     const flagsArr: Array<string> = []
 
     for (const key of Object.keys(this)) {
-      const typedKey = key as keyof typeof RCP_METHOD_PARAM_FLAGS
+      const typedKey = key as keyof typeof ADS_RCP_METHOD_FLAGS
 
       if (typeof this[typedKey] !== 'number')
         continue
@@ -858,7 +839,47 @@ export const RCP_METHOD_PARAM_FLAGS = {
   }
 }
 
+/**
+ * ADS RCP method parameter flags
+ * 
+ * Source: TwinCAT.Ads.dll By Beckhoff
+ */
+export const ADS_RCP_METHOD_PARAM_FLAGS = {
+  /**  Input Parameter (ADSMETHODPARAFLAG_IN) */
+  In: 1,
+  /**  Output Parameter (ADSMETHODPARAFLAG_OUT) */
+  Out: 2,
+  /**  
+   * By reference Parameter (ADSMETHODPARAFLAG_BYREFERENCE)
+   * This flag indicates parameters that are transfered as REFERENCE or POINTER Types.
+  */
+  ByReference: 4,
+  /** (ADSMETHODPARAFLAG_RPC_OUTPTR, 0x00000008) */
+  RpcOutPtr: 4,
+  /** (ADSMETHODPARAFLAG_RPC_ARRAYDIM_MASK,0x00000030) */
+  MaskRpcArrayDim: 48,
+  /** Attributes (ADSMETHODPARAFLAG_ATTRIBUTES, 0x00000040)*/
+  Attributes: 64,
 
+  /** Return given flag value as string array */
+  toStringArray: function (flags: number): string[] {
+    const flagsArr: Array<string> = []
+
+    for (const key of Object.keys(this)) {
+      const typedKey = key as keyof typeof ADS_RCP_METHOD_PARAM_FLAGS
+
+      if (typeof this[typedKey] !== 'number')
+        continue
+
+      //Check if flag is available
+      if ((flags & this[typedKey] as number) === this[typedKey]) {
+        if (flags === 0 || this[typedKey] !== 0) flagsArr.push(key)
+      }
+    }
+
+    return flagsArr
+  }
+}
 
 /**
  * AMS router state

@@ -386,9 +386,9 @@ export interface AdsRpcMethodEntry {
   returnAdsDataType: number,
   /** Return value ADS data type as string (see ADS.ADS_DATA_TYPES) */
   returnAdsDataTypeStr: string,
-  /** Data type flags as bit-notation (see ADS.ADS_DATA_TYPE_FLAGS) */
+  /** Data type flags as bit-notation (see ADS.ADS_RCP_METHOD_FLAGS) */
   flags: number,
-  /** Data type flags as string array (see ADS.ADS_DATA_TYPE_FLAGS) */
+  /** Data type flags as string array (see ADS.ADS_RCP_METHOD_FLAGS) */
   flagsStr: string[],
   /** RPC method name*/
   name: string,
@@ -396,12 +396,16 @@ export interface AdsRpcMethodEntry {
   retunDataType: string,
   /** RPC method comment (comment in the PLC code) */
   comment: string,
-  /**  */
+  /** Parameters (inputs and outputs) */
   parameters: Array<AdsRpcMethodParameterEntry>
+  /** Method attributes */
+  attributes: Array<AdsAttributeEntry>
 }
 
 export interface AdsRpcMethodParameterEntry {
+  /** Size in bytes */
   size: number,
+  /** Size in bytes for alignment */
   alignSize: number,
   /** ADS data type as number (see ADS.ADS_DATA_TYPES) */
   adsDataType: number,
@@ -411,6 +415,7 @@ export interface AdsRpcMethodParameterEntry {
   flags: number,
   /** Data type flags as string array (see ADS.RCP_METHOD_PARAM_FLAGS) */
   flagsStr: string[],
+  /** Reserved */
   reserved: number,
   /** GUID of data type */
   typeGuid: string,
@@ -427,6 +432,8 @@ export interface AdsRpcMethodParameterEntry {
   type: string,
   /** Parameter comment (comment in the PLC code) */
   comment: string,
+  /** Attributes */
+  attributes: Array<AdsAttributeEntry>,
   /** Reserved data in the end of entry (if any) */
   reserved2: Buffer
 }

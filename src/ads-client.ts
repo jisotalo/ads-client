@@ -2329,7 +2329,8 @@ export class Client extends EventEmitter {
         const method = {} as AdsRpcMethodEntry;
 
         //0..3 method entry length
-        //let len = data.readUInt32LE(pos)
+        let entryLength = data.readUInt32LE(pos)
+        let endPos = pos + entryLength;
         pos += 4;
 
         //4..7 Version
@@ -2363,7 +2364,7 @@ export class Client extends EventEmitter {
 
         //44..47 Flags
         method.flags = data.readUInt32LE(pos);
-        method.flagsStr = ADS.ADS_DATA_TYPE_FLAGS.toStringArray(method.flags);
+        method.flagsStr = ADS.ADS_RCP_METHOD_FLAGS.toStringArray(method.flags);
         pos += 4;
 
         //48..49 Name length
@@ -2421,7 +2422,7 @@ export class Client extends EventEmitter {
 
           //16..19 Flags
           param.flags = data.readUInt16LE(pos);
-          param.flagsStr = ADS.RCP_METHOD_PARAM_FLAGS.toStringArray(param.flags);
+          param.flagsStr = ADS.ADS_RCP_METHOD_PARAM_FLAGS.toStringArray(param.flags);
           pos += 4;
 
           //20..23 Reserved
@@ -2460,6 +2461,37 @@ export class Client extends EventEmitter {
           param.comment = ADS.decodePlcStringBuffer(data.subarray(pos, pos + commentLength + 1));
           pos += commentLength + 1;
 
+          //Attributes
+          param.attributes = [];
+
+          if ((param.flags & ADS.ADS_RCP_METHOD_PARAM_FLAGS.Attributes) === ADS.ADS_RCP_METHOD_PARAM_FLAGS.Attributes) {
+            const attributeCount = data.readUInt16LE(pos);
+            pos += 2;
+      
+            //Attributes
+            for (let i = 0; i < attributeCount; i++) {
+              const attr = {} as AdsAttributeEntry;
+      
+              //Name length
+              const nameLength = data.readUInt8(pos);
+              pos += 1;
+      
+              //Value length
+              const valueLength = data.readUInt8(pos);
+              pos += 1;
+      
+              //Name
+              attr.name = ADS.decodePlcStringBuffer(data.subarray(pos, pos + nameLength + 1));
+              pos += nameLength + 1;
+      
+              //Value
+              attr.value = ADS.decodePlcStringBuffer(data.subarray(pos, pos + valueLength + 1));
+              pos += valueLength + 1;
+      
+              method.attributes.push(attr);
+            }
+          }
+
           if (pos - beginPosition > entryLength) {
             //There is some additional data left
             param.reserved2 = data.subarray(pos);
@@ -2468,6 +2500,39 @@ export class Client extends EventEmitter {
           method.parameters.push(param);
         }
 
+        //Attributes
+        method.attributes = [];
+
+        if ((method.flags & ADS.ADS_RCP_METHOD_FLAGS.Attributes) === ADS.ADS_RCP_METHOD_FLAGS.Attributes) {
+          const attributeCount = data.readUInt16LE(pos);
+          pos += 2;
+    
+          //Attributes
+          for (let i = 0; i < attributeCount; i++) {
+            const attr = {} as AdsAttributeEntry;
+    
+            //Name length
+            const nameLength = data.readUInt8(pos);
+            pos += 1;
+    
+            //Value length
+            const valueLength = data.readUInt8(pos);
+            pos += 1;
+    
+            //Name
+            attr.name = ADS.decodePlcStringBuffer(data.subarray(pos, pos + nameLength + 1));
+            pos += nameLength + 1;
+    
+            //Value
+            attr.value = ADS.decodePlcStringBuffer(data.subarray(pos, pos + valueLength + 1));
+            pos += valueLength + 1;
+    
+            method.attributes.push(attr);
+          }
+        }
+
+        //Using endPos to fix issues if new data is added by Beckhoff
+        pos = endPos;
         dataType.rpcMethods.push(method)
       }
     }
@@ -2876,7 +2941,7 @@ export class Client extends EventEmitter {
       rawValue = Buffer.alloc(dataType.size);
 
       for (const subItem of dataType.subItems) {
-        //Does that javascript object contain this field/subItem?
+        //Does value object contain this field/subItem?
         let key: undefined | string = undefined;
 
         //First, try the easy way (5-20x times faster)
@@ -4256,7 +4321,7 @@ export class Client extends EventEmitter {
       try {
         handle = await this.createVariableHandle(path);
         await this.writeRawByHandle(handle, value);
-        
+
       } finally {
         if (handle) {
           await this.deleteVariableHandle(handle);
@@ -4820,7 +4885,7 @@ export class Client extends EventEmitter {
    * 
    * @param symbol Symbol information (acquired using `getSymbolInfo()`)
    * @param value Data to write
-   * @param targetOpts Optional target settings that override values in `settings` (NOTE: If used, no caching is available -> worse performance)
+   * @param targetOpts Optional target settings that override values in `settings`
    */
   public async writeRawBySymbol(symbol: AdsSymbolInfo, value: Buffer, targetOpts: Partial<AmsAddress> = {}): Promise<void> {
     if (!this.connection.connected) {
@@ -4837,6 +4902,188 @@ export class Client extends EventEmitter {
     } catch (err) {
       this.debug(`writeRawBySymbol(): Writing raw data by symbol ${symbol.name} failed: %o`, err);
       throw new ClientError(`writeRawBySymbol(): Writing raw data by symbol ${symbol.name} failed`, err);
+    }
+  }
+
+  /**
+   * Invokes/calls a function block RPC method from PLC
+   * 
+   * Returns method return value and/or outputs (if any)
+   * 
+   * For RPC support, the method needs to have `{attribute 'TcRpcEnable'}` attribute above the `METHOD` definition
+   * 
+   * @param path Full function block instance path in the PLC (such as `GVL_Test.ExampleBlock`)
+   * @param method Function block method name to call
+   * @param parameters Function block method parameters (inputs) (if any)
+   * @param targetOpts Optional target settings that override values in `settings`
+   * 
+   * @template T Typescript data type of the method return value, for example `invokeRpcMethod<number>(...)` or `invokeRpcMethod<ST_TypedStruct>(...)`
+   * @template U Typescript data type of the method outputs object, for example `invokeRpcMethod<number, ST_TypedStruct>(...)`
+   */
+  public async invokeRpcMethod<T = any, U = Record<string, any>>(path: string, method: string, parameters: Record<string, any> = {}, targetOpts: Partial<AmsAddress> = {}): Promise<RpcMethodCallResult<T, U>> {
+    if (!this.connection.connected) {
+      throw new ClientError(`invokeRpcMethod(): Client is not connected. Use connect() to connect to the target first.`);
+    }
+
+    const debugPath = `${path}.${method}()`;
+    this.debug(`invokeRpcMethod(): Calling RPC method ${debugPath}`);
+
+    try {
+      //Getting the symbol information
+      let symbolInfo: AdsSymbolInfo;
+      try {
+        this.debugD(`invokeRpcMethod(): Getting symbol information for ${path}`);
+        symbolInfo = await this.getSymbolInfo(path, targetOpts);
+
+      } catch (err) {
+        this.debug(`invokeRpcMethod(): Getting symbol information for ${path} failed: %o`, err);
+        throw new ClientError(`invokeRpcMethod(): Getting symbol information for ${path} failed`, err);
+      }
+
+      //Getting the symbol data type
+      let dataType: AdsDataType;
+      try {
+        this.debugD(`invokeRpcMethod(): Getting data type for ${path}`);
+        dataType = await this.buildDataType(symbolInfo.type, targetOpts);
+
+      } catch (err) {
+        this.debug(`invokeRpcMethod(): Getting symbol information for ${path} failed: %o`, err);
+        throw new ClientError(`invokeRpcMethod(): Getting symbol information for ${path} failed`, err);
+      }
+
+
+      //Finding the RPC method
+      const rpcMethod = dataType.rpcMethods.find(m => m.name.toLowerCase() === method.toLowerCase());
+
+      if (!rpcMethod) {
+        throw new ClientError(`invokeRpcMethod(): Method ${method} was not found from symbol ${path}. Available RPC methods are: ${dataType.rpcMethods.map(m => m.name).join(', ')}`);
+      }
+
+      //Method inputs and outputs
+      const inputs = rpcMethod.parameters.filter(p => p.flags === ADS.ADS_RCP_METHOD_PARAM_FLAGS.In);
+      const outputs = rpcMethod.parameters.filter(p => p.flags === ADS.ADS_RCP_METHOD_PARAM_FLAGS.Out);
+
+      //Creating data buffer for inputs
+      let inputsData = Buffer.alloc(0);
+
+      for (const input of inputs) {
+        //Does parameter object contain this field/subItem?
+        let key: undefined | string = undefined;
+
+        //First, try the easy way (5-20x times faster)
+        if (parameters[input.name] !== undefined) {
+          key = input.name;
+
+        } else {
+          //Not found, try case-insensitive way (this is slower -> only doing if needed)
+          try {
+            key = Object.keys(parameters).find(objKey => objKey.toLowerCase() === input.name.toLowerCase());
+
+          } catch (err) {
+            //value is null/ not an object/something else went wrong
+            key = undefined;
+          }
+        }
+
+        if (key === undefined) {
+          throw new ClientError(`invokeRpcMethod(): Missing RPC method input parameter "${input.name}"`);
+        }
+
+        //Creating raw data from object
+        //NOTE: Using internal convertObjectToBuffer() instead of convertToRaw() to achieve better error message with missing properties
+        const type = await this.buildDataType(input.type, targetOpts);
+        let res = await this.convertObjectToBuffer(parameters[key], type);
+
+        if (res.missingProperty) {
+          throw new ClientError(`invokeRpcMethod(): RPC method parameter "${input.name}" is missing at least key/value "${res.missingProperty}"`);
+        }
+
+        inputsData = Buffer.concat([inputsData, res.rawValue]);
+      }
+
+      //Creating a handle to the RPC method
+      let handle: VariableHandle;
+      try {
+        this.debugD(`invokeRpcMethod(): Creating a variable handle for ${debugPath}`);
+        //NOTE: #
+        handle = await this.createVariableHandle(`${path}#${method}`, targetOpts);
+
+      } catch (err) {
+        this.debug(`invokeRpcMethod(): Creating a variable handle for ${debugPath} failed: %o`, err);
+        throw new ClientError(`invokeRpcMethod(): Creating a variable handle for ${debugPath} failed`, err);
+      }
+
+      //Allocating bytes for request
+      const data = Buffer.alloc(16 + inputsData.byteLength);
+      let pos = 0;
+
+      //0..3 IndexGroup 
+      data.writeUInt32LE(ADS.ADS_RESERVED_INDEX_GROUPS.SymbolValueByHandle, pos);
+      pos += 4;
+
+      //4..7 IndexOffset
+      data.writeUInt32LE(handle.handle, pos);
+      pos += 4;
+
+      //8..11 Read data length
+      data.writeUInt32LE(rpcMethod.returnTypeSize + outputs.reduce((total, output) => total + output.size, 0), pos);
+      pos += 4;
+
+      //12..15 Write data length
+      data.writeUInt32LE(inputsData.byteLength, pos);
+      pos += 4;
+
+      //16..n Data
+      inputsData.copy(data, pos);
+
+      try {
+        const res = await this.sendAdsCommand<AdsReadWriteResponse>({
+          adsCommand: ADS.ADS_COMMAND.ReadWrite,
+          targetAmsNetId: targetOpts.amsNetId,
+          targetAdsPort: targetOpts.adsPort,
+          payload: data
+        });
+
+        this.debug(`invokeRpcMethod(): Calling RPC method ${debugPath} done!`);
+
+        let pos = 0;
+        const result: RpcMethodCallResult<T, U> = {
+          returnValue: undefined as T,
+          outputs: {} as U
+        };
+
+        //Method return value
+        if (rpcMethod.returnTypeSize > 0) {
+          result.returnValue = await this.convertFromRaw<T>(res.ads.payload.subarray(pos, pos + rpcMethod.returnTypeSize), rpcMethod.retunDataType);
+          pos += rpcMethod.returnTypeSize;
+        }
+
+        //Outputs (VAR_OUTPUT)
+        for (const output of outputs) {
+          (result.outputs as Record<string, any>)[output.name] = await this.convertFromRaw(res.ads.payload.subarray(pos, pos + output.size), output.type);
+          pos += output.size;
+        }
+
+        return result;
+
+      } catch (err) {
+        this.debug(`invokeRpcMethod(): Calling RPC method ${debugPath} failed: %o`, err);
+        throw new ClientError(`invokeRpcMethod(): Calling RPC method ${debugPath} failed`, err);
+
+      } finally {
+        //Delete handle in all cases
+        if (handle) {
+          try {
+            await this.deleteVariableHandle(handle);
+          } catch (err) {
+            this.debug(`invokeRpcMethod(): Deleting variable handle to RPC method failed: %o`, err);
+          }
+        }
+      }
+
+    } catch (err) {
+      this.debug(`invokeRpcMethod(): Calling RPC method ${debugPath} failed: %o`, err);
+      throw new ClientError(`invokeRpcMethod(): Calling RPC method ${debugPath} failed`, err);
     }
   }
 }

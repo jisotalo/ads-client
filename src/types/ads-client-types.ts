@@ -259,6 +259,6 @@ export interface VariableHandle {
 }
 
 export interface RpcMethodCallResult<T = any, U = Record<string, any>> {
-  resultValue: T,
+  returnValue?: T,
   outputs: U
 }
