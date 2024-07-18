@@ -231,6 +231,12 @@ describe('system state, PLC runtime states and device information', () => {
 
     expect(res.deviceName).toBe('TwinCAT System');
   });
+
+  test('reading PLC runtime symbol version', async () => {
+    const res = await client.readPlcSymbolVersion();
+
+    expect(typeof res).toBe('number');
+  });
 });
 
 describe('symbols and data types', () => {
@@ -3001,7 +3007,7 @@ describe('controlling TwinCAT system service', () => {
     state = await sysClient.readTcSystemState();
     expect(state.adsState).toBe(ADS.ADS_STATE.Config);
   });
-  
+
   test('setting TwinCAT system to run', async () => {
     let state = await sysClient.readTcSystemState();
     expect(state.adsState).toBe(ADS.ADS_STATE.Config);
@@ -3021,5 +3027,5 @@ describe('controlling TwinCAT system service', () => {
       expect(task).resolves.toBeUndefined()
     }
   })
-  
+
 });

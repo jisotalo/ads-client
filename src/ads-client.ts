@@ -55,7 +55,7 @@ export class Client extends EventEmitter {
     convertDatesToJavascript: true,
     readAndCacheSymbols: false,
     readAndCacheDataTypes: false,
-    disableSymbolVersionMonitoring: false,
+    monitorPlcSymbolVersion: true,
     hideConsoleWarnings: false,
     connectionCheckInterval: 1000,
     connectionDownDelay: 5000,
@@ -90,7 +90,7 @@ export class Client extends EventEmitter {
     tcSystemState: undefined,
     plcRuntimeState: undefined,
     uploadInfo: undefined,
-    symbolVersion: undefined,
+    plcSymbolVersion: undefined,
     allSymbolsCached: false,
     symbols: {},
     allDataTypesCached: false,
@@ -755,14 +755,14 @@ export class Client extends EventEmitter {
     //Reading target runtime upload info
     await this.readUploadInfo();
 
-    //Subscribe to symbol version changes (detect PLC software updates etc.)
+    //Subscribe to PLC symbol version changes (detect PLC software updates etc.)
     await this.addSubscription<Buffer>({
       target: {
         indexGroup: ADS.ADS_RESERVED_INDEX_GROUPS.SymbolVersion,
         indexOffset: 0,
         size: 1
       },
-      callback: this.onSymbolVersionChanged.bind(this),
+      callback: this.onPlcSymbolVersionChanged.bind(this),
       cycleTime: 0
     }, true);
 
@@ -909,22 +909,23 @@ export class Client extends EventEmitter {
    * @param data Data as buffer
    * @param subscription Subscription object
    */
-  private async onSymbolVersionChanged(data: SubscriptionData<Buffer>, subscription: ActiveSubscription<Buffer>) {
+  private async onPlcSymbolVersionChanged(data: SubscriptionData<Buffer> | Buffer, subscription?: ActiveSubscription<Buffer>) {
     let pos = 0;
 
-    //0 symbol version
-    const symbolVersion = data.value.readUInt8(pos)
+    const symbolVersion = Buffer.isBuffer(data)
+      ? data.readUInt8(pos)
+      : data.value.readUInt8(pos);
 
     //Checking if symbol version has really changed
-    if (this.metaData.symbolVersion === undefined) {
+    if (this.metaData.plcSymbolVersion === undefined) {
       //This happens during connect (do nothing special)
-      this.debug(`onSymbolVersionChanged(): PLC runtime symbol version is now ${symbolVersion}`);
+      this.debug(`onPlcSymbolVersionChanged(): PLC runtime symbol version is now ${symbolVersion}`);
 
-    } else if (this.metaData.symbolVersion === symbolVersion) {
-      this.debug(`onSymbolVersionChanged(): PLC runtime symbol version received (not changed). Versionis now ${symbolVersion}`);
+    } else if (this.metaData.plcSymbolVersion === symbolVersion) {
+      this.debug(`onPlcSymbolVersionChanged(): PLC runtime symbol version received (not changed). Version is now ${symbolVersion}`);
 
-    } else if (this.metaData.symbolVersion !== symbolVersion) {
-      this.debug(`onSymbolVersionChanged(): PLC runtime symbol version changed from ${this.metaData.symbolVersion === undefined ? 'UNKNOWN' : this.metaData.symbolVersion} to ${symbolVersion} -> Refreshing all cached data and subscriptions`);
+    } else if (this.metaData.plcSymbolVersion !== symbolVersion) {
+      this.debug(`onPlcSymbolVersionChanged(): PLC runtime symbol version changed from ${this.metaData.plcSymbolVersion === undefined ? 'UNKNOWN' : this.metaData.plcSymbolVersion} to ${symbolVersion} -> Refreshing all cached data and subscriptions`);
 
       //Clear all cached symbol infos and data types etc.
       this.metaData.dataTypes = {};
@@ -936,7 +937,7 @@ export class Client extends EventEmitter {
         await this.readUploadInfo();
 
       } catch (err) {
-        this.debug(`onSymbolVersionChanged(): Failed to refresh upload info`);
+        this.debug(`onPlcSymbolVersionChanged(): Failed to refresh upload info`);
       }
 
       //Refreshing symbol cache (if needed)
@@ -945,7 +946,7 @@ export class Client extends EventEmitter {
           await this.cacheSymbolInfos();
 
         } catch (err) {
-          this.debug(`onSymbolVersionChanged(): Failed to refresh symbol cache`);
+          this.debug(`onPlcSymbolVersionChanged(): Failed to refresh symbol cache`);
         }
       }
 
@@ -955,7 +956,7 @@ export class Client extends EventEmitter {
           await this.cacheDataTypes();
 
         } catch (err) {
-          this.debug(`onSymbolVersionChanged(): Failed to refresh data type cache`);
+          this.debug(`onPlcSymbolVersionChanged(): Failed to refresh data type cache`);
         }
       }
 
@@ -966,12 +967,12 @@ export class Client extends EventEmitter {
 
       } catch (err) {
         !this.settings.hideConsoleWarnings && console.log(`WARNING: Target PLC symbol version changed and all subscriptions were not restored (data might be lost from now on). Error info: ${JSON.stringify(err)}`);
-        this.debug(`onSymbolVersionChanged(): Failed to restore all subscriptions. Error: %o`, err);
+        this.debug(`onPlcSymbolVersionChanged(): Failed to restore all subscriptions. Error: %o`, err);
       }
     }
 
-    this.metaData.symbolVersion = symbolVersion;
-    this.emit('symbolVersionChange', symbolVersion);
+    this.metaData.plcSymbolVersion = symbolVersion;
+    this.emit('plcSymbolVersionChange', symbolVersion);
   }
 
   /**
@@ -3397,7 +3398,7 @@ export class Client extends EventEmitter {
         !this.settings.hideConsoleWarnings && console.log("WARNING: Reconnicting after TwinCAT system restart");
         this.onConnectionLost();
       }
-      
+
     } catch (err) {
       this.debug(`setTcSystemToRun(): Setting TwinCAT system to run mode at ${this.targetToString(targetOpts)} failed: %o`, err);
       throw new ClientError(`setTcSystemToRun(): Setting TwinCAT system to run mode at ${this.targetToString(targetOpts)} failed`, err);
@@ -3617,6 +3618,40 @@ export class Client extends EventEmitter {
     }
   }
 
+  /**
+    * Reads PLC runtime symbol version (only works if target is a PLC runtime).
+    * 
+    * Symbol version usually changes when PLC software is updated
+    * 
+    * If original target, the symbol version is also updated to the `metaData.plcSymbolVersion`
+    * 
+    * @param targetOpts Optional target settings that override values in `settings`
+    */
+  public async readPlcSymbolVersion(targetOpts: Partial<AmsAddress> = {}): Promise<number> {
+    if (!this.connection.connected) {
+      throw new ClientError(`readPlcSymbolVersion(): Client is not connected. Use connect() to connect to the target first.`);
+    }
+
+    try {
+      this.debug(`readPlcSymbolVersion(): Reading PLC runtime symbol version`);
+
+      const res = await this.readRaw(ADS.ADS_RESERVED_INDEX_GROUPS.SymbolVersion, 0, 1);
+      const symbolVersion = res.readUInt8(0);
+
+      this.debug(`readPlcSymbolVersion(): PLC runtime symbol version is now ${symbolVersion}`);
+
+      if (!targetOpts.adsPort && !targetOpts.amsNetId) {
+        //Target is not overridden
+        this.onPlcSymbolVersionChanged(res);
+      }
+
+      return symbolVersion;
+
+    } catch (err) {
+      this.debug(`readPlcSymbolVersion(): Reading PLC runtime symbol failed: %o`, err);
+      throw new ClientError(`readPlcSymbolVersion(): Reading PLC runtime symbol failed`, err);
+    }
+  }
 
   /**
    * Subscribes to variable or raw ADS address value change notifications (ADS notifications).
@@ -4725,7 +4760,7 @@ export class Client extends EventEmitter {
       throw new ClientError(`writeRawByHandle(): Writing raw data by handle ${handleNumber} failed`, err);
     }
   }
-  
+
   /**
    * Reads raw data by symbol
    * 
@@ -4736,7 +4771,7 @@ export class Client extends EventEmitter {
     if (!this.connection.connected) {
       throw new ClientError(`readRawBySymbol(): Client is not connected. Use connect() to connect to the target first.`);
     }
-    
+
     this.debug(`readRawBySymbol(): Reading raw data by symbol ${symbol.name}`);
 
     try {
@@ -4750,7 +4785,7 @@ export class Client extends EventEmitter {
       throw new ClientError(`readRawBySymbol(): Reading raw data by symbol ${symbol.name} failed`, err);
     }
   }
-  
+
   /**
    * Writes raw data by symbol
    * 
@@ -4762,14 +4797,14 @@ export class Client extends EventEmitter {
     if (!this.connection.connected) {
       throw new ClientError(`writeRawBySymbol(): Client is not connected. Use connect() to connect to the target first.`);
     }
-    
+
     this.debug(`writeRawBySymbol(): Writing raw data by symbol ${symbol.name} (${value.byteLength} bytes)`);
 
     try {
       await this.writeRaw(symbol.indexGroup, symbol.indexOffset, value, targetOpts);
 
       this.debug(`writeRawBySymbol(): Writing raw data by symbol ${symbol.name} done (${value.byteLength} bytes)`);
-      
+
     } catch (err) {
       this.debug(`writeRawBySymbol(): Writing raw data by symbol ${symbol.name} failed: %o`, err);
       throw new ClientError(`writeRawBySymbol(): Writing raw data by symbol ${symbol.name} failed`, err);

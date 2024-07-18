@@ -34,8 +34,8 @@ export interface AdsClientSettings extends ConnectionSettings {
   readAndCacheSymbols?: boolean,
   /** Optional: If true, all data types from PLC runtime are read and cached when connected. This is quite an intensive operation but useful in some cases. Otherwise types are read and cached only when used. (default: false).*/
   readAndCacheDataTypes?: boolean,
-  /** Optional: If true, PLC symbol version changes (PLC sofware updates etc.) are not detected and symbols are not updated automatically. Can be set to true in non-TwinCAT systems that do not support this feature. (default: false) */
-  disableSymbolVersionMonitoring?: boolean,
+  /** Optional: If false, PLC symbol version changes (PLC sofware updates etc.) are not detected and symbols/subscriptions are not updated automatically. (default: true) */
+  monitorPlcSymbolVersion?: boolean,
   /** Optional: If true, no warnings are written to console using console.log() (default: false)*/
   hideConsoleWarnings?: boolean,
   /** Optional: Time (milliseconds) how often connection is checked by reading target TwinCAT system state - only when `bareClient` is false (default: 1000ms)*/
@@ -128,8 +128,8 @@ export interface ConnectionMetaData {
   plcRuntimeState?: AdsState,
   /** Target runtime symbol and datatype count/size information */
   uploadInfo?: AdsUploadInfo,
-  /** Actice symbol version in the target runtime - changes when PLC software is updated (symbols change) */
-  symbolVersion?: number,
+  /** Actice PLC symbol version in the target runtime - changes when PLC software is updated (symbols change) */
+  plcSymbolVersion?: number,
   /** True if client has cached all symbols previously - we know to cache all again after a symbol version change */
   allSymbolsCached: boolean,
   /** All cached target runtime symbols */

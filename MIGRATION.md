@@ -36,7 +36,12 @@ This file contains detailed migration guide from migrating from ads-client major
 * `setSystemManagerToRun()` -> `setTcSystemToRun()`
 * `setSystemManagerToConfig()` -> `setTcSystemToConfig()`
 * `restartSystemManager()` -> `restartTcSystem()`
-*  `settings.checkStateInterval` -> `settings.connectionCheckInterval`
-* Event `systemManagerStateChange` -> `tcSystemStateChange` and payload value changed to AdsState object instead of state number
+* `readSymbolVersion()` -> `readPlcSymbolVersion()`
+*  `settings.checkStateInterval` -> `settings.connectionCheckInterval`  
+* `metaData.symbolVersion` -> `metaData.plcSymbolVersion`
+* Setting `disableSymbolVersionMonitoring` -> `monitorPlcSymbolVersion`
+* Events
+  * `systemManagerStateChange` -> `tcSystemStateChange` and payload value changed to AdsState object instead of state number
+  * `symbolVersionChange` -> `plcSymbolVersionChange`
 ### Optional  
 * Remove `disableBigInt` from settings 
