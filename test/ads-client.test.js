@@ -1470,22 +1470,22 @@ describe('reading values', () => {
 
   describe('reading dereferenced POINTER and REFERENCE values', () => {
     test('reading POINTER (value)', async () => {
-      const symbolInfo = await client.getSymbolInfo('GVL_Read.ComplexTypes.POINTER_^');
+      const symbol = await client.getSymbolInfo('GVL_Read.ComplexTypes.POINTER_^');
       const res = await client.readRawByName('GVL_Read.ComplexTypes.POINTER_^');
-      expect(res.byteLength).toBe(symbolInfo.size);
-      expect(symbolInfo.type).toBe("ST_StandardTypes");
+      expect(res.byteLength).toBe(symbol.size);
+      expect(symbol.type).toBe("ST_StandardTypes");
 
-      const value = await client.convertFromRaw(res, symbolInfo.type);
+      const value = await client.convertFromRaw(res, symbol.type);
       expect(value).toStrictEqual(ST_STANDARD_TYPES);
     });
 
     test('reading REFERENCE (value)', async () => {
-      const symbolInfo = await client.getSymbolInfo('GVL_Read.ComplexTypes.REFERENCE_');
+      const symbol = await client.getSymbolInfo('GVL_Read.ComplexTypes.REFERENCE_');
       const res = await client.readRawByName('GVL_Read.ComplexTypes.REFERENCE_');
-      expect(res.byteLength).toBe(symbolInfo.size);
-      expect(symbolInfo.type).toBe("ST_StandardTypes");
+      expect(res.byteLength).toBe(symbol.size);
+      expect(symbol.type).toBe("ST_StandardTypes");
 
-      const value = await client.convertFromRaw(res, symbolInfo.type);
+      const value = await client.convertFromRaw(res, symbol.type);
       expect(value).toStrictEqual(ST_STANDARD_TYPES);
     });
   });
@@ -1494,8 +1494,8 @@ describe('reading values', () => {
     test('reading a raw value', async () => {
       {
         //Only testing once, as this is used internally in readSymbol(), which is tested very well
-        const symbolInfo = await client.getSymbolInfo('GVL_Read.StandardTypes.BOOL_');
-        const res = await client.readRaw(symbolInfo.indexGroup, symbolInfo.indexOffset, symbolInfo.size);
+        const symbol = await client.getSymbolInfo('GVL_Read.StandardTypes.BOOL_');
+        const res = await client.readRaw(symbol.indexGroup, symbol.indexOffset, symbol.size);
 
         expect(Buffer.isBuffer(res)).toBe(true);
         expect(res.byteLength).toBe(1);
@@ -1507,6 +1507,18 @@ describe('reading values', () => {
         const value = await client.convertFromRaw(res, 'BOOL');
 
         expect(value).toBe(ST_STANDARD_TYPES.BOOL_);
+      }
+    });
+
+    test('reading a raw value using symbol', async () => {
+      {
+        //Uses readRaw() internally
+        const symbol = await client.getSymbolInfo('GVL_Read.StandardTypes.INT_');
+
+        const res = await client.readRawBySymbol(symbol);
+        const value = await client.convertFromRaw(res, symbol.type);
+
+        expect(value).toStrictEqual(ST_STANDARD_TYPES.INT_);
       }
     });
   });
@@ -2691,13 +2703,27 @@ describe('writing values', () => {
     test('writing a raw value', async () => {
       {
         //Only testing once, as this is used internally in writeSymbol(), which is tested very well
-        const symbolInfo = await client.getSymbolInfo('GVL_Write.StandardTypes.BOOL_');
+        const symbol = await client.getSymbolInfo('GVL_Write.StandardTypes.BOOL_');
 
         const value = await client.convertToRaw(!ST_STANDARD_TYPES.BOOL_, 'BOOL');
-        await client.writeRaw(symbolInfo.indexGroup, symbolInfo.indexOffset, value);
+        await client.writeRaw(symbol.indexGroup, symbol.indexOffset, value);
 
         const res = await client.readSymbol('GVL_Write.StandardTypes.BOOL_');
         expect(res.value).toStrictEqual(!ST_STANDARD_TYPES.BOOL_);
+      }
+    });
+
+    test('writing a raw value using symbol', async () => {
+      {
+        //Uses writeRaw() internally
+        const symbol = await client.getSymbolInfo('GVL_Write.StandardTypes.INT_');
+
+        const value = await client.convertToRaw(!ST_STANDARD_TYPES.INT_ - 1, symbol.type);
+        await client.writeRawBySymbol(symbol, value);
+
+        const res = await client.readRawBySymbol(symbol);
+
+        expect(res).toStrictEqual(value);
       }
     });
   });
@@ -2888,15 +2914,15 @@ describe('subscriptions (ADS notifications)', () => {
     let subscription = null;
 
     await new Promise(async (resolve, reject) => {
-      const symbolInfo = await client.getSymbolInfo('GVL_Subscription.NumericValue_100ms');
+      const symbol = await client.getSymbolInfo('GVL_Subscription.NumericValue_100ms');
 
       let startTime = Date.now();
 
       subscription = await client.subscribe({
         target: {
-          indexGroup: symbolInfo.indexGroup,
-          indexOffset: symbolInfo.indexOffset,
-          size: symbolInfo.size
+          indexGroup: symbol.indexGroup,
+          indexOffset: symbol.indexOffset,
+          size: symbol.size
         },
         callback: async (data, subscription) => {
           expect(Buffer.isBuffer(data.value)).toBe(true);

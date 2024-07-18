@@ -33,6 +33,9 @@ This file contains detailed migration guide from migrating from ads-client major
 * `getEmptyPlcType()` -> `getDefaultPlcObject()`
 * `readAndCacheSymbols()` -> `cacheSymbolInfos()` and `getSymbolInfos()`
 * `readAndCacheDataTypes()` -> `cacheDataTypes()` and `getDataTypes()`
+* `setSystemManagerToRun()` -> `setTcSystemToRun()`
+* `setSystemManagerToConfig()` -> `setTcSystemToConfig()`
+* `restartSystemManager()` -> `restartTcSystem()`
 *  `settings.checkStateInterval` -> `settings.connectionCheckInterval`
 * Event `systemManagerStateChange` -> `tcSystemStateChange` and payload value changed to AdsState object instead of state number
 ### Optional  

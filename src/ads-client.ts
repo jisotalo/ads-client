@@ -4106,7 +4106,7 @@ export class Client extends EventEmitter {
     if (!this.connection.connected) {
       throw new ClientError(`writeRaw(): Client is not connected. Use connect() to connect to the target first.`);
     }
-    this.debug(`readRaw(): Writing raw data to ${JSON.stringify({ indexGroup, indexOffset })}`);
+    this.debug(`readRaw(): Writing raw data to ${JSON.stringify({ indexGroup, indexOffset })} (${value.byteLength} bytes)`);
 
     //Allocating bytes for request
     const data = Buffer.alloc(12 + value.byteLength);
@@ -4723,6 +4723,56 @@ export class Client extends EventEmitter {
     } catch (err) {
       this.debug(`writeRawByHandle(): Writing raw data by handle ${handleNumber} failed: %o`, err);
       throw new ClientError(`writeRawByHandle(): Writing raw data by handle ${handleNumber} failed`, err);
+    }
+  }
+  
+  /**
+   * Reads raw data by symbol
+   * 
+   * @param symbol Symbol information (acquired using `getSymbolInfo()`)
+   * @param targetOpts Optional target settings that override values in `settings` (NOTE: If used, no caching is available -> worse performance)
+   */
+  public async readRawBySymbol(symbol: AdsSymbolInfo, targetOpts: Partial<AmsAddress> = {}): Promise<Buffer> {
+    if (!this.connection.connected) {
+      throw new ClientError(`readRawBySymbol(): Client is not connected. Use connect() to connect to the target first.`);
+    }
+    
+    this.debug(`readRawBySymbol(): Reading raw data by symbol ${symbol.name}`);
+
+    try {
+      const res = await this.readRaw(symbol.indexGroup, symbol.indexOffset, symbol.size, targetOpts);
+
+      this.debug(`readRawBySymbol(): Reading raw data read by symbol ${symbol.name} done (${res.byteLength} bytes)`);
+      return res;
+
+    } catch (err) {
+      this.debug(`readRawBySymbol(): Reading raw data by symbol ${symbol.name} failed: %o`, err);
+      throw new ClientError(`readRawBySymbol(): Reading raw data by symbol ${symbol.name} failed`, err);
+    }
+  }
+  
+  /**
+   * Writes raw data by symbol
+   * 
+   * @param symbol Symbol information (acquired using `getSymbolInfo()`)
+   * @param value Data to write
+   * @param targetOpts Optional target settings that override values in `settings` (NOTE: If used, no caching is available -> worse performance)
+   */
+  public async writeRawBySymbol(symbol: AdsSymbolInfo, value: Buffer, targetOpts: Partial<AmsAddress> = {}): Promise<void> {
+    if (!this.connection.connected) {
+      throw new ClientError(`writeRawBySymbol(): Client is not connected. Use connect() to connect to the target first.`);
+    }
+    
+    this.debug(`writeRawBySymbol(): Writing raw data by symbol ${symbol.name} (${value.byteLength} bytes)`);
+
+    try {
+      await this.writeRaw(symbol.indexGroup, symbol.indexOffset, value, targetOpts);
+
+      this.debug(`writeRawBySymbol(): Writing raw data by symbol ${symbol.name} done (${value.byteLength} bytes)`);
+      
+    } catch (err) {
+      this.debug(`writeRawBySymbol(): Writing raw data by symbol ${symbol.name} failed: %o`, err);
+      throw new ClientError(`writeRawBySymbol(): Writing raw data by symbol ${symbol.name} failed`, err);
     }
   }
 }
