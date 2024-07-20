@@ -1,6 +1,6 @@
 import EventEmitter from "events";
 import type { ActiveAdsRequestContainer, ActiveSubscription, ActiveSubscriptionContainer, AdsClientConnection, AdsClientSettings, AdsCommandToSend, AdsDataTypeContainer, AdsSymbolInfoContainer, AdsUploadInfo, ConnectionMetaData, PlcPrimitiveType, SubscriptionCallback, SubscriptionData, SubscriptionSettings, ReadSymbolResult, TimerObject, ObjectToBufferConversionResult, WriteSymbolResult, VariableHandle, RpcMethodCallResult } from "./types/ads-client-types";
-import { AdsAddNotificationResponse, AdsAddNotificationResponseData, AdsArrayInfoEntry, AdsAttributeEntry, AdsDataType, AdsDeleteNotificationResponse, AdsDeviceInfo, AdsEnumInfoEntry, AdsNotification, AdsNotificationResponse, AdsNotificationSample, AdsNotificationStamp, AdsRawInfo, AdsReadDeviceInfoResponse, AdsReadResponse, AdsReadStateResponse, AdsReadWriteResponse, AdsRequest, AdsResponse, AdsRpcMethodEntry, AdsRpcMethodParameterEntry, AdsState, AdsSymbolInfo, AdsWriteControlResponse, AdsWriteResponse, AmsAddress, AmsHeader, AmsPortRegisteredData, AmsRouterState, AmsRouterStateData, AmsTcpHeader, AmsTcpPacket, BaseAdsResponse, EmptyAdsResponse, UnknownAdsResponse } from "./types/ads-protocol-types";
+import { AdsAddNotificationResponse, AdsAddNotificationResponseData, AdsArrayInfoEntry, AdsAttributeEntry, AdsDataType, AdsDeleteNotificationResponse, AdsDeviceInfo, AdsEnumInfoEntry, AdsNotification, AdsNotificationResponse, AdsNotificationSample, AdsNotificationStamp, AdsRawInfo, AdsReadDeviceInfoResponse, AdsReadRawMultiResult, AdsReadResponse, AdsReadStateResponse, AdsReadWriteResponse, AdsRequest, AdsResponse, AdsRpcMethodEntry, AdsRpcMethodParameterEntry, AdsState, AdsSymbolInfo, AdsWriteControlResponse, AdsWriteResponse, AmsAddress, AmsHeader, AmsPortRegisteredData, AmsRouterState, AmsRouterStateData, AmsTcpHeader, AmsTcpPacket, BaseAdsResponse, EmptyAdsResponse, UnknownAdsResponse } from "./types/ads-protocol-types";
 import {
   Socket,
   SocketConnectOpts
@@ -2467,27 +2467,27 @@ export class Client extends EventEmitter {
           if ((param.flags & ADS.ADS_RCP_METHOD_PARAM_FLAGS.Attributes) === ADS.ADS_RCP_METHOD_PARAM_FLAGS.Attributes) {
             const attributeCount = data.readUInt16LE(pos);
             pos += 2;
-      
+
             //Attributes
             for (let i = 0; i < attributeCount; i++) {
               const attr = {} as AdsAttributeEntry;
-      
+
               //Name length
               const nameLength = data.readUInt8(pos);
               pos += 1;
-      
+
               //Value length
               const valueLength = data.readUInt8(pos);
               pos += 1;
-      
+
               //Name
               attr.name = ADS.decodePlcStringBuffer(data.subarray(pos, pos + nameLength + 1));
               pos += nameLength + 1;
-      
+
               //Value
               attr.value = ADS.decodePlcStringBuffer(data.subarray(pos, pos + valueLength + 1));
               pos += valueLength + 1;
-      
+
               method.attributes.push(attr);
             }
           }
@@ -2506,27 +2506,27 @@ export class Client extends EventEmitter {
         if ((method.flags & ADS.ADS_RCP_METHOD_FLAGS.Attributes) === ADS.ADS_RCP_METHOD_FLAGS.Attributes) {
           const attributeCount = data.readUInt16LE(pos);
           pos += 2;
-    
+
           //Attributes
           for (let i = 0; i < attributeCount; i++) {
             const attr = {} as AdsAttributeEntry;
-    
+
             //Name length
             const nameLength = data.readUInt8(pos);
             pos += 1;
-    
+
             //Value length
             const valueLength = data.readUInt8(pos);
             pos += 1;
-    
+
             //Name
             attr.name = ADS.decodePlcStringBuffer(data.subarray(pos, pos + nameLength + 1));
             pos += nameLength + 1;
-    
+
             //Value
             attr.value = ADS.decodePlcStringBuffer(data.subarray(pos, pos + valueLength + 1));
             pos += valueLength + 1;
-    
+
             method.attributes.push(attr);
           }
         }
@@ -4236,6 +4236,100 @@ export class Client extends EventEmitter {
     } catch (err) {
       this.debug(`writeRaw(): Writing raw data (${JSON.stringify({ indexGroup, indexOffset })}) failed: %o`, err);
       throw new ClientError(`writeRaw(): Writing raw data (${JSON.stringify({ indexGroup, indexOffset })}) failed`, err);
+    }
+  }
+
+  /**
+   * Reads multiple raw values from given addresses using ADS sum command
+   * 
+   * @param targets Array of targets to read from
+   * @param targetOpts Optional target settings that override values in `settings`
+   */
+  public async readRawMulti(targets: Required<AdsRawInfo>[], targetOpts: Partial<AmsAddress> = {}): Promise<AdsReadRawMultiResult[]> {
+    if (!this.connection.connected) {
+      throw new ClientError(`readRawMulti(): Client is not connected. Use connect() to connect to the target first.`);
+    }
+    this.debug(`readRawMulti(): Reading raw data from ${targets.length} targets`);
+    const totalSize = targets.reduce((total, target) => total + target.size, 0);
+
+    //Allocating bytes for request
+    const data = Buffer.alloc(16 + targets.length * 12);
+    let pos = 0;
+
+    //0..3 IndexGroup 
+    data.writeUInt32LE(ADS.ADS_RESERVED_INDEX_GROUPS.SumCommandRead, pos);
+    pos += 4;
+
+    //4..7 IndexOffset - Number of targets
+    data.writeUInt32LE(targets.length, pos);
+    pos += 4;
+
+    //8..11 Read data length
+    data.writeUInt32LE(targets.length * 4 + totalSize, pos);
+    pos += 4;
+
+    //12..15 Write data length
+    data.writeUInt32LE(targets.length * 12, pos);
+    pos += 4;
+
+    //16..n targets
+    targets.forEach(target => {
+      //0..3 IndexGroup
+      data.writeUInt32LE(target.indexGroup, pos);
+      pos += 4;
+
+      //4..7 IndexOffset
+      data.writeUInt32LE(target.indexOffset, pos);
+      pos += 4;
+
+      //8..11 Data size
+      data.writeUInt32LE(target.size, pos);
+      pos += 4;
+    });
+
+    try {
+      const res = await this.sendAdsCommand<AdsReadWriteResponse>({
+        adsCommand: ADS.ADS_COMMAND.ReadWrite,
+        targetAmsNetId: targetOpts.amsNetId,
+        targetAdsPort: targetOpts.adsPort,
+        payload: data
+      });
+
+      this.debug(`readRawMulti(): Reading raw data from ${targets.length} targets done (${res.ads.length} bytes)`);
+
+      let pos = 0;
+      let results: AdsReadRawMultiResult[] = [];
+
+      //Error codes of each target
+      for (let i = 0; i < targets.length; i++) {
+        const errorCode = res.ads.payload.readUInt32LE(pos);
+        pos += 4;
+
+        const result: AdsReadRawMultiResult = {
+          target: targets[i],
+          error: errorCode > 0,
+          errorCode,
+          errorStr: ADS.ADS_ERROR[errorCode],
+          value: undefined
+        };
+
+        results.push(result);
+      };
+
+      //Value for each target
+      for (let i = 0; i < targets.length; i++) {
+        if (!results[i].error) {
+          results[i].value = res.ads.payload.subarray(pos, pos + targets[i].size);
+        }
+
+        pos += targets[i].size;
+      }
+
+      return results;
+
+    } catch (err) {
+      this.debug(`readRawMulti(): Reading raw data from ${targets.length} targets failed: %o`, err);
+      throw new ClientError(`readRawMulti(): Reading raw data from ${targets.length} targets failed`, err);
     }
   }
 

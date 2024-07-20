@@ -1536,6 +1536,50 @@ describe('reading values', () => {
         expect(value).toStrictEqual(ST_STANDARD_TYPES.INT_);
       }
     });
+
+    test('reading multiple raw values (multi/sum command)', async () => {
+      {
+        const symbol = await client.getSymbolInfo('GVL_Read.StandardTypes.BOOL_');
+        const symbol2 = await client.getSymbolInfo('GVL_Read.StandardTypes');
+
+        //Note: we can pass symbols directly as they have correct properties
+        const res = await client.readRawMulti([
+          symbol,
+          {
+            indexGroup: symbol2.indexGroup,
+            indexOffset: symbol2.indexOffset,
+            size: symbol2.size
+          },
+          {
+            indexGroup: 666666, //NOTE: This should be faulty index group
+            indexOffset: 999999,
+            size: 123
+          }
+        ]);
+
+        expect(res[0].error).toBe(false);
+        expect(res[0].errorCode).toBe(0);
+        expect(res[0].errorStr).toBe('No error');
+        expect(Buffer.isBuffer(res[0].value)).toBe(true);
+        expect(res[0].value.byteLength).toBe(symbol.size);
+        const value = await client.convertFromRaw(res[0].value, symbol.type);
+        expect(value).toBe(ST_STANDARD_TYPES.BOOL_)
+
+        expect(res[1].error).toBe(false);
+        expect(res[1].errorCode).toBe(0);
+        expect(res[1].errorStr).toBe('No error');
+        expect(Buffer.isBuffer(res[1].value)).toBe(true);
+        expect(res[1].value.byteLength).toBe(symbol2.size);
+        const value2 = await client.convertFromRaw(res[1].value, symbol2.type);
+        expect(value2).toStrictEqual(ST_STANDARD_TYPES)
+
+        expect(res[2].error).toBe(true);
+        expect(res[2].errorCode).toBe(1794);
+        expect(res[2].errorStr).toBe('Invalid index group');
+        expect(res[2].value).toBe(undefined);
+
+      }
+    });
   });
 
 });

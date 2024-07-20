@@ -444,3 +444,16 @@ export interface AdsEnumInfoEntry {
   /** Enumeration value */
   value: PlcPrimitiveType
 }
+
+export interface AdsReadRawMultiResult {
+  /** Target address*/
+  target: Required<AdsRawInfo>,
+  /** True if error and reading failed, false if reading was successful */
+  error: boolean,
+  /** ADS error code (0 = no error) */
+  errorCode: number,
+  /** ADS error string */
+  errorStr: string,
+  /** Value if reading was successful */
+  value?: Buffer
+}

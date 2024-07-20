@@ -40,6 +40,7 @@ This file contains detailed migration guide from migrating from ads-client major
 * `readRawByName()` -> `readRawByPath()`
 *  `settings.checkStateInterval` -> `settings.connectionCheckInterval`  
 * `metaData.symbolVersion` -> `metaData.plcSymbolVersion`
+* `readRawMulti()` return value changed
 * Setting `disableSymbolVersionMonitoring` -> `monitorPlcSymbolVersion`
 * Events
   * `systemManagerStateChange` -> `tcSystemStateChange` and payload value changed to AdsState object instead of state number
