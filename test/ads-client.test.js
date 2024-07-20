@@ -1557,6 +1557,7 @@ describe('reading values', () => {
           }
         ]);
 
+        expect(res[0].success).toBe(true);
         expect(res[0].error).toBe(false);
         expect(res[0].errorCode).toBe(0);
         expect(res[0].errorStr).toBe('No error');
@@ -1565,6 +1566,7 @@ describe('reading values', () => {
         const value = await client.convertFromRaw(res[0].value, symbol.type);
         expect(value).toBe(ST_STANDARD_TYPES.BOOL_)
 
+        expect(res[1].success).toBe(true);
         expect(res[1].error).toBe(false);
         expect(res[1].errorCode).toBe(0);
         expect(res[1].errorStr).toBe('No error');
@@ -1573,6 +1575,7 @@ describe('reading values', () => {
         const value2 = await client.convertFromRaw(res[1].value, symbol2.type);
         expect(value2).toStrictEqual(ST_STANDARD_TYPES)
 
+        expect(res[2].success).toBe(false);
         expect(res[2].error).toBe(true);
         expect(res[2].errorCode).toBe(1794);
         expect(res[2].errorStr).toBe('Invalid index group');
@@ -2796,6 +2799,57 @@ describe('writing values', () => {
         expect(res).toStrictEqual(value);
       }
     });
+
+    test('writing multiple raw values (multi/sum command)', async () => {
+      {
+        const value = await client.readRawByPath('GVL_Read.StandardTypes.INT_');
+        const value2 = await client.readRawByPath('GVL_Read.StandardTypes.REAL_');
+
+        const symbol = await client.getSymbolInfo('GVL_Write.StandardTypes.INT_2');
+        const symbol2 = await client.getSymbolInfo('GVL_Write.StandardTypes.REAL_2');
+
+        //Note: we can pass symbols directly as they have correct properties
+        const res = await client.writeRawMulti([
+          {
+            indexGroup: symbol.indexGroup,
+            indexOffset: symbol.indexOffset,
+            value: value
+          },
+          {
+            indexGroup: symbol2.indexGroup,
+            indexOffset: symbol2.indexOffset,
+            value: value2
+          },
+          {
+            indexGroup: 666666, //NOTE: This should be faulty index group
+            indexOffset: 999999,
+            value: value
+          }
+        ]);
+
+        expect(res[0].success).toBe(true);
+        expect(res[0].error).toBe(false);
+        expect(res[0].errorCode).toBe(0);
+        expect(res[0].errorStr).toBe('No error');
+
+        expect(res[1].success).toBe(true);
+        expect(res[1].error).toBe(false);
+        expect(res[1].errorCode).toBe(0);
+        expect(res[1].errorStr).toBe('No error');
+
+        expect(res[2].success).toBe(false);
+        expect(res[2].error).toBe(true);
+        expect(res[2].errorCode).toBe(1793);
+        expect(res[2].errorStr).toBe('Service is not supported by server');
+
+        const valueAfter = await client.readRawByPath('GVL_Write.StandardTypes.INT_2');
+        const valueAfter2 = await client.readRawByPath('GVL_Write.StandardTypes.REAL_2');
+
+        expect(valueAfter).toStrictEqual(value);
+        expect(valueAfter2).toStrictEqual(value2);
+
+      }
+    });
   });
 
   describe('using variable handles for reading and writing', () => {
@@ -3048,6 +3102,20 @@ describe('remote procedure calls (RPC methods)', () => {
       returnValue: undefined,
       outputs: {}
     });
+  });
+});
+
+describe('misc', () => {
+  test('readWrite ADS command', async () => {
+    {
+      //Testing readWrite() with SymbolValueByName
+      const value = await client.readRawByPath('GVL_Read.StandardTypes.INT_');
+  
+      const path = ADS.encodeStringToPlcStringBuffer('GVL_Read.StandardTypes.INT_');
+      const res = await client.readWrite(ADS.ADS_RESERVED_INDEX_GROUPS.SymbolValueByName, 0, 0xFFFFFFFF, path);
+
+      expect(res).toStrictEqual(value);
+    }
   });
 });
 

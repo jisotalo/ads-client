@@ -1,6 +1,6 @@
 import EventEmitter from "events";
-import type { ActiveAdsRequestContainer, ActiveSubscription, ActiveSubscriptionContainer, AdsClientConnection, AdsClientSettings, AdsCommandToSend, AdsDataTypeContainer, AdsSymbolInfoContainer, AdsUploadInfo, ConnectionMetaData, PlcPrimitiveType, SubscriptionCallback, SubscriptionData, SubscriptionSettings, ReadSymbolResult, TimerObject, ObjectToBufferConversionResult, WriteSymbolResult, VariableHandle, RpcMethodCallResult } from "./types/ads-client-types";
-import { AdsAddNotificationResponse, AdsAddNotificationResponseData, AdsArrayInfoEntry, AdsAttributeEntry, AdsDataType, AdsDeleteNotificationResponse, AdsDeviceInfo, AdsEnumInfoEntry, AdsNotification, AdsNotificationResponse, AdsNotificationSample, AdsNotificationStamp, AdsRawInfo, AdsReadDeviceInfoResponse, AdsReadRawMultiResult, AdsReadResponse, AdsReadStateResponse, AdsReadWriteResponse, AdsRequest, AdsResponse, AdsRpcMethodEntry, AdsRpcMethodParameterEntry, AdsState, AdsSymbolInfo, AdsWriteControlResponse, AdsWriteResponse, AmsAddress, AmsHeader, AmsPortRegisteredData, AmsRouterState, AmsRouterStateData, AmsTcpHeader, AmsTcpPacket, BaseAdsResponse, EmptyAdsResponse, UnknownAdsResponse } from "./types/ads-protocol-types";
+import type { ActiveAdsRequestContainer, ActiveSubscription, ActiveSubscriptionContainer, AdsClientConnection, AdsClientSettings, AdsCommandToSend, AdsDataTypeContainer, AdsSymbolInfoContainer, AdsUploadInfo, ConnectionMetaData, PlcPrimitiveType, SubscriptionData, SubscriptionSettings, ReadSymbolResult, TimerObject, ObjectToBufferConversionResult, WriteSymbolResult, VariableHandle, RpcMethodCallResult } from "./types/ads-client-types";
+import { AdsAddNotificationResponse, AdsAddNotificationResponseData, AdsArrayInfoEntry, AdsAttributeEntry, AdsDataType, AdsDeleteNotificationResponse, AdsDeviceInfo, AdsEnumInfoEntry, AdsNotification, AdsNotificationResponse, AdsNotificationSample, AdsNotificationStamp, AdsRawInfo, AdsReadDeviceInfoResponse, AdsReadRawMultiResult, AdsReadRawMultiTarget, AdsReadResponse, AdsReadStateResponse, AdsReadWriteResponse, AdsRequest, AdsResponse, AdsRpcMethodEntry, AdsRpcMethodParameterEntry, AdsState, AdsSymbolInfo, AdsWriteControlResponse, AdsWriteRawMultiResult, AdsWriteRawMultiTarget, AdsWriteResponse, AmsAddress, AmsHeader, AmsPortRegisteredData, AmsRouterState, AmsRouterStateData, AmsTcpHeader, AmsTcpPacket, BaseAdsResponse, EmptyAdsResponse, UnknownAdsResponse } from "./types/ads-protocol-types";
 import {
   Socket,
   SocketConnectOpts
@@ -10,7 +10,6 @@ import Long from "long";
 
 import * as ADS from './ads-commons';
 import ClientError from "./client-error";
-import { count } from "console";
 export * as ADS from './ads-commons';
 
 export class Client extends EventEmitter {
@@ -4242,10 +4241,10 @@ export class Client extends EventEmitter {
   /**
    * Reads multiple raw values from given addresses using ADS sum command
    * 
-   * @param targets Array of targets to read from
+   * @param targets Array of targets to read
    * @param targetOpts Optional target settings that override values in `settings`
    */
-  public async readRawMulti(targets: Required<AdsRawInfo>[], targetOpts: Partial<AmsAddress> = {}): Promise<AdsReadRawMultiResult[]> {
+  public async readRawMulti(targets: AdsReadRawMultiTarget[], targetOpts: Partial<AmsAddress> = {}): Promise<AdsReadRawMultiResult[]> {
     if (!this.connection.connected) {
       throw new ClientError(`readRawMulti(): Client is not connected. Use connect() to connect to the target first.`);
     }
@@ -4307,6 +4306,7 @@ export class Client extends EventEmitter {
 
         const result: AdsReadRawMultiResult = {
           target: targets[i],
+          success: errorCode === 0,
           error: errorCode > 0,
           errorCode,
           errorStr: ADS.ADS_ERROR[errorCode],
@@ -4330,6 +4330,97 @@ export class Client extends EventEmitter {
     } catch (err) {
       this.debug(`readRawMulti(): Reading raw data from ${targets.length} targets failed: %o`, err);
       throw new ClientError(`readRawMulti(): Reading raw data from ${targets.length} targets failed`, err);
+    }
+  }
+
+  /**
+   * Writes multiple raw values to given addresses using ADS sum command
+   * 
+   * @param targets Array of targets to write
+   * @param targetOpts Optional target settings that override values in `settings`
+   */
+  public async writeRawMulti(targets: AdsWriteRawMultiTarget[], targetOpts: Partial<AmsAddress> = {}): Promise<AdsWriteRawMultiResult[]> {
+    if (!this.connection.connected) {
+      throw new ClientError(`writeRawMulti(): Client is not connected. Use connect() to connect to the target first.`);
+    }
+    this.debug(`writeRawMulti(): Writing raw data to ${targets.length} targets`);
+    const totalSize = targets.reduce((total, target) => total + (target.size ?? target.value.byteLength), 0);
+
+    //Allocating bytes for request
+    const data = Buffer.alloc(16 + targets.length * 12 + totalSize);
+    let pos = 0;
+
+    //0..3 IndexGroup 
+    data.writeUInt32LE(ADS.ADS_RESERVED_INDEX_GROUPS.SumCommandWrite, pos);
+    pos += 4;
+
+    //4..7 IndexOffset - Number of targets
+    data.writeUInt32LE(targets.length, pos);
+    pos += 4;
+
+    //8..11 Read data length
+    data.writeUInt32LE(targets.length * 4, pos);
+    pos += 4;
+
+    //12..15 Write data length
+    data.writeUInt32LE(targets.length * 12 + totalSize, pos);
+    pos += 4;
+
+    //16..n targets
+    targets.forEach(target => {
+      //0..3 IndexGroup
+      data.writeUInt32LE(target.indexGroup, pos);
+      pos += 4;
+
+      //4..7 IndexOffset
+      data.writeUInt32LE(target.indexOffset, pos);
+      pos += 4;
+
+      //8..11 Data size
+      data.writeUInt32LE(target.size ?? target.value.byteLength, pos);
+      pos += 4;
+    });
+
+    //values
+    targets.forEach(target => {
+      target.value.copy(data, pos, 0, target.size ?? target.value.byteLength); //allowing to use size
+      pos += target.size ?? target.value.byteLength;
+    });
+
+    try {
+      const res = await this.sendAdsCommand<AdsReadWriteResponse>({
+        adsCommand: ADS.ADS_COMMAND.ReadWrite,
+        targetAmsNetId: targetOpts.amsNetId,
+        targetAdsPort: targetOpts.adsPort,
+        payload: data
+      });
+
+      this.debug(`writeRawMulti(): Writing raw data to ${targets.length} targets done`);
+
+      let pos = 0;
+      let results: AdsWriteRawMultiResult[] = [];
+
+      //Error codes of each target
+      for (let i = 0; i < targets.length; i++) {
+        const errorCode = res.ads.payload.readUInt32LE(pos);
+        pos += 4;
+
+        const result: AdsWriteRawMultiResult = {
+          target: targets[i],
+          success: errorCode === 0,
+          error: errorCode > 0,
+          errorCode,
+          errorStr: ADS.ADS_ERROR[errorCode]
+        };
+
+        results.push(result);
+      };
+
+      return results;
+
+    } catch (err) {
+      this.debug(`writeRawMulti(): Writing raw data to ${targets.length} targets failed: %o`, err);
+      throw new ClientError(`writeRawMulti(): Writing raw data to ${targets.length} targets failed`, err);
     }
   }
 
@@ -4427,6 +4518,65 @@ export class Client extends EventEmitter {
     } catch (err) {
       this.debug(`writeRawByPath(): Writing raw data to ${path} failed: %o`, err);
       throw new ClientError(`writeRawByPath(): Writing raw data to ${path} failed`, err);
+    }
+  }
+
+  /**
+   * Writes data to the target and reads the result
+   * 
+   * Uses `ADS ReadWrite` command
+   * 
+   * @param indexGroup Address index group
+   * @param indexOffset Address index offset
+   * @param readLength How many bytes to read
+   * @param writeData Data to write
+   * @param targetOpts Optional target settings that override values in `settings`
+   */
+  public async readWrite(indexGroup: number, indexOffset: number, readLength: number, writeData: Buffer, targetOpts: Partial<AmsAddress> = {}): Promise<Buffer> {
+    if (!this.connection.connected) {
+      throw new ClientError(`readWrite(): Client is not connected. Use connect() to connect to the target first.`);
+    }
+    this.debug(`readWrite(): Sending ReadWrite command (${JSON.stringify({ indexGroup, indexOffset, readLength })} with ${writeData.byteLength} bytes of data`);
+
+    //Allocating bytes for request
+    const data = Buffer.alloc(16 + writeData.byteLength);
+    let pos = 0;
+
+    //0..3 IndexGroup 
+    data.writeUInt32LE(indexGroup, pos);
+    pos += 4;
+
+    //4..7 IndexOffset
+    data.writeUInt32LE(indexOffset, pos);
+    pos += 4;
+
+    //8..11 Read data length
+    data.writeUInt32LE(readLength, pos);
+    pos += 4;
+
+    //12..15 Write data length
+    data.writeUInt32LE(writeData.byteLength, pos);
+    pos += 4;
+
+    //16..n Write data
+    writeData.copy(data, pos);
+    pos += writeData.byteLength;
+
+    try {
+      const res = await this.sendAdsCommand<AdsReadWriteResponse>({
+        adsCommand: ADS.ADS_COMMAND.ReadWrite,
+        targetAmsNetId: targetOpts.amsNetId,
+        targetAdsPort: targetOpts.adsPort,
+        payload: data
+      });
+
+      this.debug(`readWrite(): ReadWrite command (${JSON.stringify({ indexGroup, indexOffset, readLength })}) done - returned ${res.ads.payload.byteLength} bytes`);
+
+      return res.ads.payload;
+
+    } catch (err) {
+      this.debug(`readWrite(): ReadWrite command (${JSON.stringify({ indexGroup, indexOffset, readLength })}) failed: %o`, err);
+      throw new ClientError(`readWrite(): ReadWrite command (${JSON.stringify({ indexGroup, indexOffset, readLength })}) failed`, err);
     }
   }
 

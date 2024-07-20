@@ -445,15 +445,29 @@ export interface AdsEnumInfoEntry {
   value: PlcPrimitiveType
 }
 
-export interface AdsReadRawMultiResult {
+export interface AdsReadRawMultiTarget extends Required<AdsRawInfo> {
+
+}
+
+export interface AdsReadRawMultiResult extends BaseAdsResponse {
   /** Target address*/
-  target: Required<AdsRawInfo>,
-  /** True if error and reading failed, false if reading was successful */
-  error: boolean,
-  /** ADS error code (0 = no error) */
-  errorCode: number,
-  /** ADS error string */
-  errorStr: string,
+  target: AdsReadRawMultiTarget,
+  /** True if reading was successful */
+  success: boolean,
   /** Value if reading was successful */
   value?: Buffer
+}
+
+export interface AdsWriteRawMultiTarget extends AdsRawInfo {
+  /** Value to write */
+  value: Buffer,
+  /** Size (bytes) - optional - as default, size of value is used*/
+  size?: number
+}
+
+export interface AdsWriteRawMultiResult extends BaseAdsResponse {
+  /** Target address*/
+  target: AdsWriteRawMultiTarget,
+  /** True if writing was successful */
+  success: boolean
 }
