@@ -2918,6 +2918,75 @@ describe('writing values', () => {
         expect(res.value).toBe(value);
       }
     });
+
+    test('creating and deleting multiple varible handles (multi/sum command)', async () => {
+      {
+        const res = await client.createVariableHandleMulti([
+          'GVL_Read.StandardTypes.BOOL_',
+          'GVL_Read.StandardTypes',
+          'THIS-IS-ERROR'
+        ]);
+
+        expect(res[0].success).toBe(true);
+        expect(res[0].error).toBe(false);
+        expect(res[0].errorCode).toBe(0);
+        expect(res[0].errorStr).toBe('No error');
+
+        //Note: checking only keys
+        //TODO: Check values (is UM runtime having issue?)
+        expect(Object.keys(res[0].handle)).toStrictEqual(Object.keys({
+          handle: 0,
+          size: 0,
+          typeDecoration: 0,
+          dataType: ''
+        }));
+
+        expect(res[1].success).toBe(true);
+        expect(res[1].error).toBe(false);
+        expect(res[1].errorCode).toBe(0);
+        expect(res[1].errorStr).toBe('No error');
+
+        //Note: checking only keys
+        //TODO: Check values (is UM runtime having issue?)
+        expect(Object.keys(res[1].handle)).toStrictEqual(Object.keys({
+          handle: 0,
+          size: 0,
+          typeDecoration: 0,
+          dataType: ''
+        }));
+
+        expect(res[2].success).toBe(false);
+        expect(res[2].error).toBe(true);
+        expect(res[2].errorCode).toBe(1808);
+        expect(res[2].errorStr).toBe('Symbol not found');
+        expect(res[2].handle).toBe(undefined);
+
+        const res2 = await client.deleteVariableHandleMulti([
+          res[0].handle,
+          res[1].handle.handle,
+          12345234
+        ]);
+
+        expect(res2[0].success).toBe(true);
+        expect(res2[0].error).toBe(false);
+        expect(res2[0].errorCode).toBe(0);
+        expect(res2[0].errorStr).toBe('No error');
+        expect(res2[0].handle).toStrictEqual(res[0].handle);
+
+        expect(res2[1].success).toBe(true);
+        expect(res2[1].error).toBe(false);
+        expect(res2[1].errorCode).toBe(0);
+        expect(res2[1].errorStr).toBe('No error');
+        expect(res2[1].handle).toStrictEqual(res[1].handle.handle);
+
+        expect(res2[2].success).toBe(false);
+        expect(res2[2].error).toBe(true);
+        expect(res2[2].errorCode).toBe(1809);
+        expect(res2[2].errorStr).toBe('Symbol version invalid');
+        expect(res2[2].handle).toBe(12345234);
+
+      }
+    });
   });
 
 });
@@ -3105,14 +3174,14 @@ describe('remote procedure calls (RPC methods)', () => {
   });
 });
 
-describe('misc', () => {
-  test('readWrite ADS command', async () => {
+describe('miscellaneous', () => {
+  test('ReadWrite ADS command', async () => {
     {
-      //Testing readWrite() with SymbolValueByName
+      //Testing readWriteRaw() with SymbolValueByName
       const value = await client.readRawByPath('GVL_Read.StandardTypes.INT_');
   
       const path = ADS.encodeStringToPlcStringBuffer('GVL_Read.StandardTypes.INT_');
-      const res = await client.readWrite(ADS.ADS_RESERVED_INDEX_GROUPS.SymbolValueByName, 0, 0xFFFFFFFF, path);
+      const res = await client.readWriteRaw(ADS.ADS_RESERVED_INDEX_GROUPS.SymbolValueByName, 0, 0xFFFFFFFF, path);
 
       expect(res).toStrictEqual(value);
     }

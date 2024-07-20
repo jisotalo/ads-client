@@ -1,4 +1,4 @@
-import { AdsDataType, AdsDeviceInfo, AdsRawInfo, AdsResponse, AdsState, AdsSymbolInfo, AmsAddress, AmsTcpPacket } from "./ads-protocol-types"
+import { AdsDataType, AdsDeviceInfo, AdsRawInfo, AdsResponse, AdsState, AdsSymbolInfo, AmsAddress, AmsTcpPacket, BaseAdsResponse } from "./ads-protocol-types"
 
 interface ConnectionSettings {
   /** **REQUIRED**: Default target TwinCAT system AmsNetId address. For local (same machine), use `localhost` or `127.0.0.1.1` */
@@ -261,4 +261,48 @@ export interface VariableHandle {
 export interface RpcMethodCallResult<T = any, U = Record<string, any>> {
   returnValue?: T,
   outputs: U
+}
+
+
+export interface AdsReadRawMultiTarget extends Required<AdsRawInfo> {
+
+}
+
+export interface AdsReadRawMultiResult extends BaseAdsResponse {
+  /** Target address*/
+  target: AdsReadRawMultiTarget,
+  /** True if reading was successful */
+  success: boolean,
+  /** Value if reading was successful */
+  value?: Buffer
+}
+
+export interface AdsWriteRawMultiTarget extends AdsRawInfo {
+  /** Value to write */
+  value: Buffer,
+  /** Size (bytes) - optional - as default, size of value is used*/
+  size?: number
+}
+
+export interface AdsWriteRawMultiResult extends BaseAdsResponse {
+  /** Target address*/
+  target: AdsWriteRawMultiTarget,
+  /** True if writing was successful */
+  success: boolean
+}
+
+export interface AdsCreateVariableHandleMultiResult extends BaseAdsResponse {
+  /** Full variable path in the PLC (such as `GVL_Test.ExampleStruct`) */
+  path: string,
+  /** True if handle was created successfully */
+  success: boolean,
+  /** Created handle if successful */
+  handle?: VariableHandle
+}
+
+export interface AdsDeleteVariableHandleMultiResult extends BaseAdsResponse {
+  /** Variable handle */
+  handle: VariableHandle | number,
+  /** True if handle was deleted successfully */
+  success: boolean
 }

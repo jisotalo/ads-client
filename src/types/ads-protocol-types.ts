@@ -444,30 +444,3 @@ export interface AdsEnumInfoEntry {
   /** Enumeration value */
   value: PlcPrimitiveType
 }
-
-export interface AdsReadRawMultiTarget extends Required<AdsRawInfo> {
-
-}
-
-export interface AdsReadRawMultiResult extends BaseAdsResponse {
-  /** Target address*/
-  target: AdsReadRawMultiTarget,
-  /** True if reading was successful */
-  success: boolean,
-  /** Value if reading was successful */
-  value?: Buffer
-}
-
-export interface AdsWriteRawMultiTarget extends AdsRawInfo {
-  /** Value to write */
-  value: Buffer,
-  /** Size (bytes) - optional - as default, size of value is used*/
-  size?: number
-}
-
-export interface AdsWriteRawMultiResult extends BaseAdsResponse {
-  /** Target address*/
-  target: AdsWriteRawMultiTarget,
-  /** True if writing was successful */
-  success: boolean
-}

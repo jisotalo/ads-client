@@ -1,6 +1,6 @@
 import EventEmitter from "events";
-import type { ActiveAdsRequestContainer, ActiveSubscription, ActiveSubscriptionContainer, AdsClientConnection, AdsClientSettings, AdsCommandToSend, AdsDataTypeContainer, AdsSymbolInfoContainer, AdsUploadInfo, ConnectionMetaData, PlcPrimitiveType, SubscriptionData, SubscriptionSettings, ReadSymbolResult, TimerObject, ObjectToBufferConversionResult, WriteSymbolResult, VariableHandle, RpcMethodCallResult } from "./types/ads-client-types";
-import { AdsAddNotificationResponse, AdsAddNotificationResponseData, AdsArrayInfoEntry, AdsAttributeEntry, AdsDataType, AdsDeleteNotificationResponse, AdsDeviceInfo, AdsEnumInfoEntry, AdsNotification, AdsNotificationResponse, AdsNotificationSample, AdsNotificationStamp, AdsRawInfo, AdsReadDeviceInfoResponse, AdsReadRawMultiResult, AdsReadRawMultiTarget, AdsReadResponse, AdsReadStateResponse, AdsReadWriteResponse, AdsRequest, AdsResponse, AdsRpcMethodEntry, AdsRpcMethodParameterEntry, AdsState, AdsSymbolInfo, AdsWriteControlResponse, AdsWriteRawMultiResult, AdsWriteRawMultiTarget, AdsWriteResponse, AmsAddress, AmsHeader, AmsPortRegisteredData, AmsRouterState, AmsRouterStateData, AmsTcpHeader, AmsTcpPacket, BaseAdsResponse, EmptyAdsResponse, UnknownAdsResponse } from "./types/ads-protocol-types";
+import type { ActiveAdsRequestContainer, ActiveSubscription, ActiveSubscriptionContainer, AdsClientConnection, AdsClientSettings, AdsCommandToSend, AdsDataTypeContainer, AdsSymbolInfoContainer, AdsUploadInfo, ConnectionMetaData, PlcPrimitiveType, SubscriptionData, SubscriptionSettings, ReadSymbolResult, TimerObject, ObjectToBufferConversionResult, WriteSymbolResult, VariableHandle, RpcMethodCallResult, AdsCreateVariableHandleMultiResult, AdsReadRawMultiResult, AdsReadRawMultiTarget, AdsWriteRawMultiResult, AdsWriteRawMultiTarget, AdsDeleteVariableHandleMultiResult } from "./types/ads-client-types";
+import { AdsAddNotificationResponse, AdsAddNotificationResponseData, AdsArrayInfoEntry, AdsAttributeEntry, AdsDataType, AdsDeleteNotificationResponse, AdsDeviceInfo, AdsEnumInfoEntry, AdsNotification, AdsNotificationResponse, AdsNotificationSample, AdsNotificationStamp, AdsRawInfo, AdsReadDeviceInfoResponse, AdsReadResponse, AdsReadStateResponse, AdsReadWriteResponse, AdsRequest, AdsResponse, AdsRpcMethodEntry, AdsRpcMethodParameterEntry, AdsState, AdsSymbolInfo, AdsWriteControlResponse, AdsWriteResponse, AmsAddress, AmsHeader, AmsPortRegisteredData, AmsRouterState, AmsRouterStateData, AmsTcpHeader, AmsTcpPacket, BaseAdsResponse, EmptyAdsResponse, UnknownAdsResponse } from "./types/ads-protocol-types";
 import {
   Socket,
   SocketConnectOpts
@@ -4239,7 +4239,9 @@ export class Client extends EventEmitter {
   }
 
   /**
-   * Reads multiple raw values from given addresses using ADS sum command
+   * Reads multiple raw values from given addresses
+   * 
+   * Uses ADS sum command under the hood
    * 
    * @param targets Array of targets to read
    * @param targetOpts Optional target settings that override values in `settings`
@@ -4334,7 +4336,9 @@ export class Client extends EventEmitter {
   }
 
   /**
-   * Writes multiple raw values to given addresses using ADS sum command
+   * Writes multiple raw values to given addresses
+   * 
+   * Uses ADS sum command under the hood
    * 
    * @param targets Array of targets to write
    * @param targetOpts Optional target settings that override values in `settings`
@@ -4522,7 +4526,7 @@ export class Client extends EventEmitter {
   }
 
   /**
-   * Writes data to the target and reads the result
+   * Writes raw data to the target and reads the result as raw data
    * 
    * Uses `ADS ReadWrite` command
    * 
@@ -4532,11 +4536,11 @@ export class Client extends EventEmitter {
    * @param writeData Data to write
    * @param targetOpts Optional target settings that override values in `settings`
    */
-  public async readWrite(indexGroup: number, indexOffset: number, readLength: number, writeData: Buffer, targetOpts: Partial<AmsAddress> = {}): Promise<Buffer> {
+  public async readWriteRaw(indexGroup: number, indexOffset: number, readLength: number, writeData: Buffer, targetOpts: Partial<AmsAddress> = {}): Promise<Buffer> {
     if (!this.connection.connected) {
-      throw new ClientError(`readWrite(): Client is not connected. Use connect() to connect to the target first.`);
+      throw new ClientError(`readWriteRaw(): Client is not connected. Use connect() to connect to the target first.`);
     }
-    this.debug(`readWrite(): Sending ReadWrite command (${JSON.stringify({ indexGroup, indexOffset, readLength })} with ${writeData.byteLength} bytes of data`);
+    this.debug(`readWriteRaw(): Sending ReadWrite command (${JSON.stringify({ indexGroup, indexOffset, readLength })} with ${writeData.byteLength} bytes of data`);
 
     //Allocating bytes for request
     const data = Buffer.alloc(16 + writeData.byteLength);
@@ -4570,13 +4574,13 @@ export class Client extends EventEmitter {
         payload: data
       });
 
-      this.debug(`readWrite(): ReadWrite command (${JSON.stringify({ indexGroup, indexOffset, readLength })}) done - returned ${res.ads.payload.byteLength} bytes`);
+      this.debug(`readWriteRaw(): ReadWrite command (${JSON.stringify({ indexGroup, indexOffset, readLength })}) done - returned ${res.ads.payload.byteLength} bytes`);
 
       return res.ads.payload;
 
     } catch (err) {
-      this.debug(`readWrite(): ReadWrite command (${JSON.stringify({ indexGroup, indexOffset, readLength })}) failed: %o`, err);
-      throw new ClientError(`readWrite(): ReadWrite command (${JSON.stringify({ indexGroup, indexOffset, readLength })}) failed`, err);
+      this.debug(`readWriteRaw(): ReadWrite command (${JSON.stringify({ indexGroup, indexOffset, readLength })}) failed: %o`, err);
+      throw new ClientError(`readWriteRaw(): ReadWrite command (${JSON.stringify({ indexGroup, indexOffset, readLength })}) failed`, err);
     }
   }
 
@@ -4912,7 +4916,7 @@ export class Client extends EventEmitter {
   /**
    * Creates a variable handle for a PLC symbol by given variable path
    * 
-   * Variable value can be accessed by using the handle `readRawByHandle()`/`writeRawByHandle()`
+   * Variable value can be accessed by using the handle with `readRawByHandle()` and `writeRawByHandle()`
    * 
    * @param path Full variable path in the PLC (such as `GVL_Test.ExampleStruct`)
    * @param targetOpts Optional target settings that override values in `settings` (NOTE: If used, no caching is available -> worse performance)
@@ -4988,11 +4992,151 @@ export class Client extends EventEmitter {
       throw new ClientError(`createVariableHandle(): Creating variable handle to ${path} failed`, err);
     }
   }
+  
+  /**
+   * Creates multiple variable handles for PLC symbols by given variable paths
+   * 
+   * Uses ADS sum command under the hood
+   * 
+   * Variable value can be accessed by using the handle with `readRawByHandle()` and `writeRawByHandle()`
+   * 
+   * @param targets Array of full variable paths in the PLC (such as `GVL_Test.ExampleStruct`)
+   * @param targetOpts Optional target settings that override values in `settings`
+   */
+  public async createVariableHandleMulti(paths: string[], targetOpts: Partial<AmsAddress> = {}): Promise<AdsCreateVariableHandleMultiResult[]> {
+    if (!this.connection.connected) {
+      throw new ClientError(`createVariableHandleMulti(): Client is not connected. Use connect() to connect to the target first.`);
+    }
+    this.debug(`createVariableHandleMulti(): Creating variable handle to ${paths.length} paths`);
+    const totalPathsLength = paths.reduce((total, path) => total + path.length + 1, 0);
+
+    //Allocating bytes for request
+    const data = Buffer.alloc(16 + paths.length * 16 + totalPathsLength);
+    let pos = 0;
+
+    //0..3 IndexGroup 
+    data.writeUInt32LE(ADS.ADS_RESERVED_INDEX_GROUPS.SumCommandReadWrite, pos);
+    pos += 4;
+
+    //4..7 IndexOffset - Number of handles to create
+    data.writeUInt32LE(paths.length, pos);
+    pos += 4;
+
+    //8..11 Read data length
+    data.writeUInt32LE(0xFFFFFFFF, pos); //Seems to work OK (we don't know the size)
+    pos += 4;
+
+    //12..15 Write data length
+    data.writeUInt32LE(paths.length * 16 + totalPathsLength, pos);
+    pos += 4;
+
+    //16..n targets
+    paths.forEach(path => {
+      //0..3 IndexGroup
+      data.writeUInt32LE(ADS.ADS_RESERVED_INDEX_GROUPS.SymbolHandleByName, pos);
+      pos += 4;
+
+      //4..7 IndexOffset
+      data.writeUInt32LE(0, pos);
+      pos += 4;
+
+      //8..11 Read data length
+      data.writeUInt32LE(0xFFFF, pos); //Seems to work OK (we don't know the size)
+      pos += 4;
+
+      //12..15 Write data length
+      data.writeUInt32LE(path.length + 1, pos) //Note: String end delimeter
+      pos += 4
+    });
+
+    //paths
+    paths.forEach(path => {
+      ADS.encodeStringToPlcStringBuffer(path).copy(data, pos);
+      pos += path.length + 1; //Note: String end delimeter
+    });
+
+    try {
+      const res = await this.sendAdsCommand<AdsReadWriteResponse>({
+        adsCommand: ADS.ADS_COMMAND.ReadWrite,
+        targetAmsNetId: targetOpts.amsNetId,
+        targetAdsPort: targetOpts.adsPort,
+        payload: data
+      });
+
+      this.debug(`createVariableHandleMulti(): Creating variable handle to ${paths.length} paths done`);
+
+      let pos = 0;
+      const response = res.ads.payload;
+      let results: AdsCreateVariableHandleMultiResult[] = [];
+      let sizes: number[] = [];
+
+      //Error codes of each target
+      for (let i = 0; i < paths.length; i++) {
+        const errorCode = response.readUInt32LE(pos);
+        pos += 4;
+
+        //Data length
+        sizes.push(response.readUInt32LE(pos));
+        pos += 4;
+
+        const result: AdsCreateVariableHandleMultiResult = {
+          path: paths[i],
+          success: errorCode === 0,
+          error: errorCode > 0,
+          errorCode,
+          errorStr: ADS.ADS_ERROR[errorCode],
+          handle: undefined
+        };
+
+        results.push(result);
+      };
+
+      //Handle for each target
+      for (let i = 0; i < paths.length; i++) {
+        let startPos = pos;
+
+        if (results[i].success) {
+          const result = {} as VariableHandle;
+
+          //0..3 Variable handle
+          result.handle = response.readUInt32LE(pos);
+          pos += 4;
+    
+          //4..7 Size
+          result.size = response.readUInt32LE(pos);
+          pos += 4;
+    
+          //8..11 "type decoration"
+          result.typeDecoration = response.readUInt32LE(pos);
+          pos += 4;
+    
+          //8..9 Data type length
+          let dataTypeLength = response.readUInt16LE(pos);
+          pos += 2;
+    
+          //10..n Data type
+          result.dataType = ADS.decodePlcStringBuffer(response.subarray(pos, pos + dataTypeLength + 1));
+          pos += dataTypeLength + 1;
+    
+          results[i].handle = result;
+
+        }
+        
+        pos = startPos + sizes[i];
+      }
+
+      return results;
+
+    } catch (err) {
+      this.debug(`createVariableHandleMulti(): Creating variable handle to ${paths.length} paths failed: %o`, err);
+      throw new ClientError(`createVariableHandleMulti(): Creating variable handle to ${paths.length} paths failed`, err);
+    }
+  }
 
   /**
    * Deletes a variable handle that was previously created using `createVariableHandle()`
    * 
-   * @param handle Variable handle
+   * @param handle Variable handle to delete
    * @param targetOpts Optional target settings that override values in `settings` (NOTE: If used, no caching is available -> worse performance)
    */
   public async deleteVariableHandle(handle: VariableHandle | number, targetOpts: Partial<AmsAddress> = {}): Promise<void> {
@@ -5037,6 +5181,101 @@ export class Client extends EventEmitter {
     } catch (err) {
       this.debug(`deleteVariableHandle(): Deleting variable handle ${handleNumber} failed: %o`, err);
       throw new ClientError(`deleteVariableHandle(): Deleting variable handle ${handleNumber} failed`, err);
+    }
+  }
+
+
+  /**
+   * Deletes multiple variable handles that were previously created using `createVariableHandle()`
+   * 
+   * Uses ADS sum command under the hood
+   * 
+   * @param handles Array of variable handles to delete
+   * @param targetOpts Optional target settings that override values in `settings`
+   */
+  public async deleteVariableHandleMulti(handles: (VariableHandle | number)[], targetOpts: Partial<AmsAddress> = {}): Promise<AdsDeleteVariableHandleMultiResult[]> {
+    if (!this.connection.connected) {
+      throw new ClientError(`deleteVariableHandleMulti(): Client is not connected. Use connect() to connect to the target first.`);
+    }
+    this.debug(`deleteVariableHandleMulti(): Deleting ${handles.length} variable handles`);
+
+    //Allocating bytes for request
+    const data = Buffer.alloc(16 + handles.length * 16);
+    let pos = 0;
+
+    //0..3 IndexGroup 
+    data.writeUInt32LE(ADS.ADS_RESERVED_INDEX_GROUPS.SumCommandWrite, pos);
+    pos += 4;
+
+    //4..7 IndexOffset - Number of handles to delete
+    data.writeUInt32LE(handles.length, pos);
+    pos += 4;
+
+    //8..11 Read data length
+    data.writeUInt32LE(handles.length * 4, pos);
+    pos += 4;
+
+    //12..15 Write data length
+    data.writeUInt32LE(handles.length * 16, pos);
+    pos += 4;
+
+    //16..n targets
+    handles.forEach(handle => {
+      //0..3 IndexGroup
+      data.writeUInt32LE(ADS.ADS_RESERVED_INDEX_GROUPS.SymbolReleaseHandle, pos);
+      pos += 4;
+
+      //4..7 IndexOffset
+      data.writeUInt32LE(0, pos);
+      pos += 4;
+
+      //8..11 Data size
+      data.writeUInt32LE(ADS.ADS_INDEX_OFFSET_LENGTH, pos);
+      pos += 4;
+    });
+
+    //handles
+    handles.forEach(handle => {
+      const handleNumber = typeof handle === 'number' ? handle : handle.handle;
+      
+      data.writeUInt32LE(handleNumber, pos);
+      pos += 4;
+    });
+
+    try {
+      const res = await this.sendAdsCommand<AdsReadWriteResponse>({
+        adsCommand: ADS.ADS_COMMAND.ReadWrite,
+        targetAmsNetId: targetOpts.amsNetId,
+        targetAdsPort: targetOpts.adsPort,
+        payload: data
+      });
+
+      this.debug(`deleteVariableHandleMulti(): Deleting ${handles.length} variable handles done`);
+
+      let pos = 0;
+      let results: AdsDeleteVariableHandleMultiResult[] = [];
+
+      //Error codes of each target
+      for (let i = 0; i < handles.length; i++) {
+        const errorCode = res.ads.payload.readUInt32LE(pos);
+        pos += 4;
+
+        const result: AdsDeleteVariableHandleMultiResult = {
+          handle: handles[i],
+          success: errorCode === 0,
+          error: errorCode > 0,
+          errorCode,
+          errorStr: ADS.ADS_ERROR[errorCode]
+        };
+
+        results.push(result);
+      };
+
+      return results;
+
+    } catch (err) {
+      this.debug(`deleteVariableHandleMulti(): Deleting ${handles.length} variable handles failed: %o`, err);
+      throw new ClientError(`deleteVariableHandleMulti(): Deleting ${handles.length} variable handles failed`, err);
     }
   }
 
