@@ -264,34 +264,34 @@ export interface RpcMethodCallResult<T = any, U = Record<string, any>> {
 }
 
 
-export interface AdsReadRawMultiTarget extends Required<AdsRawInfo> {
+export interface ReadRawMultiCommand extends Required<AdsRawInfo> {
 
 }
 
-export interface AdsReadRawMultiResult extends BaseAdsResponse {
-  /** Target address*/
-  target: AdsReadRawMultiTarget,
+export interface ReadRawMultiResult extends BaseAdsResponse {
+  /** Command */
+  command: ReadRawMultiCommand,
   /** True if reading was successful */
   success: boolean,
   /** Value if reading was successful */
   value?: Buffer
 }
 
-export interface AdsWriteRawMultiTarget extends AdsRawInfo {
+export interface WriteRawMultiCommand extends AdsRawInfo {
   /** Value to write */
   value: Buffer,
   /** Size (bytes) - optional - as default, size of value is used*/
   size?: number
 }
 
-export interface AdsWriteRawMultiResult extends BaseAdsResponse {
-  /** Target address*/
-  target: AdsWriteRawMultiTarget,
+export interface WriteRawMultiResult extends BaseAdsResponse {
+  /** Command */
+  command: WriteRawMultiCommand,
   /** True if writing was successful */
   success: boolean
 }
 
-export interface AdsCreateVariableHandleMultiResult extends BaseAdsResponse {
+export interface CreateVariableHandleMultiResult extends BaseAdsResponse {
   /** Full variable path in the PLC (such as `GVL_Test.ExampleStruct`) */
   path: string,
   /** True if handle was created successfully */
@@ -300,9 +300,25 @@ export interface AdsCreateVariableHandleMultiResult extends BaseAdsResponse {
   handle?: VariableHandle
 }
 
-export interface AdsDeleteVariableHandleMultiResult extends BaseAdsResponse {
+export interface DeleteVariableHandleMultiResult extends BaseAdsResponse {
   /** Variable handle */
   handle: VariableHandle | number,
   /** True if handle was deleted successfully */
   success: boolean
+}
+
+export interface ReadWriteRawMultiCommand extends Required<AdsRawInfo> {
+  /** Data to write */
+  writeData: Buffer,
+  /** How many bytes to read */
+  size: number
+}
+
+export interface ReadWriteRawMultiResult extends BaseAdsResponse {
+  /** Command */
+  command: ReadWriteRawMultiCommand,
+  /** True if ReadWrite command was successful */
+  success: boolean,
+  /** Response data */
+  data?: Buffer,
 }

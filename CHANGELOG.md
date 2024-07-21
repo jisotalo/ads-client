@@ -41,6 +41,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - Added support for reading/writing `INTERFACE` data types
 - Added support for reading/writing empty `FUNCTION_BLOCK`s
+- Added `readWriteRawMulti()`
 
 
 ## [1.14.1] - 13.09.2022

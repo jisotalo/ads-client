@@ -3175,15 +3175,65 @@ describe('remote procedure calls (RPC methods)', () => {
 });
 
 describe('miscellaneous', () => {
-  test('ReadWrite ADS command', async () => {
+  test('sending read write ADS command', async () => {
     {
       //Testing readWriteRaw() with SymbolValueByName
       const value = await client.readRawByPath('GVL_Read.StandardTypes.INT_');
-  
+
       const path = ADS.encodeStringToPlcStringBuffer('GVL_Read.StandardTypes.INT_');
       const res = await client.readWriteRaw(ADS.ADS_RESERVED_INDEX_GROUPS.SymbolValueByName, 0, 0xFFFFFFFF, path);
 
       expect(res).toStrictEqual(value);
+    }
+  });
+  test('sending multiple read write ADS commands (multi/sum command)', async () => {
+    {
+      //Testing readWriteRaw() with SymbolValueByName
+      const value = await client.readRawByPath('GVL_Read.StandardTypes.INT_');
+      const value2 = await client.readRawByPath('GVL_Read.StandardTypes.REAL_');
+
+      const path = ADS.encodeStringToPlcStringBuffer('GVL_Read.StandardTypes.INT_');
+      const path2 = ADS.encodeStringToPlcStringBuffer('GVL_Read.StandardTypes.REAL_');
+      const path3 = ADS.encodeStringToPlcStringBuffer('GVL_Read.StandardTypes.SAASDASDASD'); //error
+
+      const res = await client.readWriteRawMulti([
+        {
+          indexGroup: ADS.ADS_RESERVED_INDEX_GROUPS.SymbolValueByName,
+          indexOffset: 0,
+          size: 0xFFFF,
+          writeData: path
+        },
+        {
+          indexGroup: ADS.ADS_RESERVED_INDEX_GROUPS.SymbolValueByName,
+          indexOffset: 0,
+          size: 0xFFFF,
+          writeData: path2
+        },
+        {
+          indexGroup: ADS.ADS_RESERVED_INDEX_GROUPS.SymbolValueByName,
+          indexOffset: 0,
+          size: 0xFFFF,
+          writeData: path3
+        }
+      ])
+
+      expect(res[0].success).toBe(true);
+      expect(res[0].error).toBe(false);
+      expect(res[0].errorCode).toBe(0);
+      expect(res[0].errorStr).toBe('No error');
+      expect(res[0].data).toStrictEqual(value);
+      
+      expect(res[1].success).toBe(true);
+      expect(res[1].error).toBe(false);
+      expect(res[1].errorCode).toBe(0);
+      expect(res[1].errorStr).toBe('No error');
+      expect(res[1].data).toStrictEqual(value2);
+
+      expect(res[2].success).toBe(false);
+      expect(res[2].error).toBe(true);
+      expect(res[2].errorCode).toBe(1808);
+      expect(res[2].errorStr).toBe('Symbol not found');
+
     }
   });
 });

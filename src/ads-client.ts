@@ -1,5 +1,5 @@
 import EventEmitter from "events";
-import type { ActiveAdsRequestContainer, ActiveSubscription, ActiveSubscriptionContainer, AdsClientConnection, AdsClientSettings, AdsCommandToSend, AdsDataTypeContainer, AdsSymbolInfoContainer, AdsUploadInfo, ConnectionMetaData, PlcPrimitiveType, SubscriptionData, SubscriptionSettings, ReadSymbolResult, TimerObject, ObjectToBufferConversionResult, WriteSymbolResult, VariableHandle, RpcMethodCallResult, AdsCreateVariableHandleMultiResult, AdsReadRawMultiResult, AdsReadRawMultiTarget, AdsWriteRawMultiResult, AdsWriteRawMultiTarget, AdsDeleteVariableHandleMultiResult } from "./types/ads-client-types";
+import type { ActiveAdsRequestContainer, ActiveSubscription, ActiveSubscriptionContainer, AdsClientConnection, AdsClientSettings, AdsCommandToSend, AdsDataTypeContainer, AdsSymbolInfoContainer, AdsUploadInfo, ConnectionMetaData, PlcPrimitiveType, SubscriptionData, SubscriptionSettings, ReadSymbolResult, TimerObject, ObjectToBufferConversionResult, WriteSymbolResult, VariableHandle, RpcMethodCallResult, CreateVariableHandleMultiResult, ReadRawMultiResult, ReadRawMultiCommand, WriteRawMultiResult, DeleteVariableHandleMultiResult, ReadWriteRawMultiResult, ReadWriteRawMultiCommand, WriteRawMultiCommand } from "./types/ads-client-types";
 import { AdsAddNotificationResponse, AdsAddNotificationResponseData, AdsArrayInfoEntry, AdsAttributeEntry, AdsDataType, AdsDeleteNotificationResponse, AdsDeviceInfo, AdsEnumInfoEntry, AdsNotification, AdsNotificationResponse, AdsNotificationSample, AdsNotificationStamp, AdsRawInfo, AdsReadDeviceInfoResponse, AdsReadResponse, AdsReadStateResponse, AdsReadWriteResponse, AdsRequest, AdsResponse, AdsRpcMethodEntry, AdsRpcMethodParameterEntry, AdsState, AdsSymbolInfo, AdsWriteControlResponse, AdsWriteResponse, AmsAddress, AmsHeader, AmsPortRegisteredData, AmsRouterState, AmsRouterStateData, AmsTcpHeader, AmsTcpPacket, BaseAdsResponse, EmptyAdsResponse, UnknownAdsResponse } from "./types/ads-protocol-types";
 import {
   Socket,
@@ -4239,52 +4239,54 @@ export class Client extends EventEmitter {
   }
 
   /**
-   * Reads multiple raw values from given addresses
+   * Sends multiple readRaw() commands in one ADS packet
    * 
-   * Uses ADS sum command under the hood
+   * Reads raw byte data from the target system by provided index group, index offset and data length (bytes)
    * 
-   * @param targets Array of targets to read
+   * Uses ADS sum command under the hood (better performance)
+   * 
+   * @param commands Array of read commands
    * @param targetOpts Optional target settings that override values in `settings`
    */
-  public async readRawMulti(targets: AdsReadRawMultiTarget[], targetOpts: Partial<AmsAddress> = {}): Promise<AdsReadRawMultiResult[]> {
+  public async readRawMulti(commands: ReadRawMultiCommand[], targetOpts: Partial<AmsAddress> = {}): Promise<ReadRawMultiResult[]> {
     if (!this.connection.connected) {
       throw new ClientError(`readRawMulti(): Client is not connected. Use connect() to connect to the target first.`);
     }
-    this.debug(`readRawMulti(): Reading raw data from ${targets.length} targets`);
-    const totalSize = targets.reduce((total, target) => total + target.size, 0);
+    this.debug(`readRawMulti(): Sending ${commands.length} read commands`);
+    const totalSize = commands.reduce((total, command) => total + command.size, 0);
 
     //Allocating bytes for request
-    const data = Buffer.alloc(16 + targets.length * 12);
+    const data = Buffer.alloc(16 + commands.length * 12);
     let pos = 0;
 
     //0..3 IndexGroup 
     data.writeUInt32LE(ADS.ADS_RESERVED_INDEX_GROUPS.SumCommandRead, pos);
     pos += 4;
 
-    //4..7 IndexOffset - Number of targets
-    data.writeUInt32LE(targets.length, pos);
+    //4..7 IndexOffset - Number of commands
+    data.writeUInt32LE(commands.length, pos);
     pos += 4;
 
     //8..11 Read data length
-    data.writeUInt32LE(targets.length * 4 + totalSize, pos);
+    data.writeUInt32LE(commands.length * 4 + totalSize, pos);
     pos += 4;
 
     //12..15 Write data length
-    data.writeUInt32LE(targets.length * 12, pos);
+    data.writeUInt32LE(commands.length * 12, pos);
     pos += 4;
 
-    //16..n targets
-    targets.forEach(target => {
+    //16..n commands
+    commands.forEach(command => {
       //0..3 IndexGroup
-      data.writeUInt32LE(target.indexGroup, pos);
+      data.writeUInt32LE(command.indexGroup, pos);
       pos += 4;
 
       //4..7 IndexOffset
-      data.writeUInt32LE(target.indexOffset, pos);
+      data.writeUInt32LE(command.indexOffset, pos);
       pos += 4;
 
       //8..11 Data size
-      data.writeUInt32LE(target.size, pos);
+      data.writeUInt32LE(command.size, pos);
       pos += 4;
     });
 
@@ -4296,18 +4298,19 @@ export class Client extends EventEmitter {
         payload: data
       });
 
-      this.debug(`readRawMulti(): Reading raw data from ${targets.length} targets done (${res.ads.length} bytes)`);
+      this.debug(`readRawMulti(): Sending ${commands.length} read commands done (${res.ads.length} bytes)`);
 
       let pos = 0;
-      let results: AdsReadRawMultiResult[] = [];
+      const response = res.ads.payload;
+      let results: ReadRawMultiResult[] = [];
 
       //Error codes of each target
-      for (let i = 0; i < targets.length; i++) {
-        const errorCode = res.ads.payload.readUInt32LE(pos);
+      for (let i = 0; i < commands.length; i++) {
+        const errorCode = response.readUInt32LE(pos);
         pos += 4;
 
-        const result: AdsReadRawMultiResult = {
-          target: targets[i],
+        const result: ReadRawMultiResult = {
+          command: commands[i],
           success: errorCode === 0,
           error: errorCode > 0,
           errorCode,
@@ -4319,76 +4322,78 @@ export class Client extends EventEmitter {
       };
 
       //Value for each target
-      for (let i = 0; i < targets.length; i++) {
+      for (let i = 0; i < commands.length; i++) {
         if (!results[i].error) {
-          results[i].value = res.ads.payload.subarray(pos, pos + targets[i].size);
+          results[i].value = response.subarray(pos, pos + commands[i].size);
         }
 
-        pos += targets[i].size;
+        pos += commands[i].size;
       }
 
       return results;
 
     } catch (err) {
-      this.debug(`readRawMulti(): Reading raw data from ${targets.length} targets failed: %o`, err);
-      throw new ClientError(`readRawMulti(): Reading raw data from ${targets.length} targets failed`, err);
+      this.debug(`readRawMulti(): Sending ${commands.length} read commands failed: %o`, err);
+      throw new ClientError(`readRawMulti(): Sending ${commands.length} read commands failed`, err);
     }
   }
 
   /**
-   * Writes multiple raw values to given addresses
+   * Sends multiple writeRaw() commands in one ADS packet
    * 
-   * Uses ADS sum command under the hood
+   * Writes raw byte data to the target system by provided index group and index offset.
    * 
-   * @param targets Array of targets to write
+   * Uses ADS sum command under the hood (better performance)
+   * 
+   * @param commands Array of write commands
    * @param targetOpts Optional target settings that override values in `settings`
    */
-  public async writeRawMulti(targets: AdsWriteRawMultiTarget[], targetOpts: Partial<AmsAddress> = {}): Promise<AdsWriteRawMultiResult[]> {
+  public async writeRawMulti(commands: WriteRawMultiCommand[], targetOpts: Partial<AmsAddress> = {}): Promise<WriteRawMultiResult[]> {
     if (!this.connection.connected) {
       throw new ClientError(`writeRawMulti(): Client is not connected. Use connect() to connect to the target first.`);
     }
-    this.debug(`writeRawMulti(): Writing raw data to ${targets.length} targets`);
-    const totalSize = targets.reduce((total, target) => total + (target.size ?? target.value.byteLength), 0);
+    this.debug(`writeRawMulti(): Sending ${commands.length} write commands`);
+    const totalSize = commands.reduce((total, command) => total + (command.size ?? command.value.byteLength), 0);
 
     //Allocating bytes for request
-    const data = Buffer.alloc(16 + targets.length * 12 + totalSize);
+    const data = Buffer.alloc(16 + commands.length * 12 + totalSize);
     let pos = 0;
 
     //0..3 IndexGroup 
     data.writeUInt32LE(ADS.ADS_RESERVED_INDEX_GROUPS.SumCommandWrite, pos);
     pos += 4;
 
-    //4..7 IndexOffset - Number of targets
-    data.writeUInt32LE(targets.length, pos);
+    //4..7 IndexOffset - Number of commands
+    data.writeUInt32LE(commands.length, pos);
     pos += 4;
 
     //8..11 Read data length
-    data.writeUInt32LE(targets.length * 4, pos);
+    data.writeUInt32LE(commands.length * 4, pos);
     pos += 4;
 
     //12..15 Write data length
-    data.writeUInt32LE(targets.length * 12 + totalSize, pos);
+    data.writeUInt32LE(commands.length * 12 + totalSize, pos);
     pos += 4;
 
-    //16..n targets
-    targets.forEach(target => {
+    //16..n commands
+    commands.forEach(command => {
       //0..3 IndexGroup
-      data.writeUInt32LE(target.indexGroup, pos);
+      data.writeUInt32LE(command.indexGroup, pos);
       pos += 4;
 
       //4..7 IndexOffset
-      data.writeUInt32LE(target.indexOffset, pos);
+      data.writeUInt32LE(command.indexOffset, pos);
       pos += 4;
 
       //8..11 Data size
-      data.writeUInt32LE(target.size ?? target.value.byteLength, pos);
+      data.writeUInt32LE(command.size ?? command.value.byteLength, pos);
       pos += 4;
     });
 
     //values
-    targets.forEach(target => {
-      target.value.copy(data, pos, 0, target.size ?? target.value.byteLength); //allowing to use size
-      pos += target.size ?? target.value.byteLength;
+    commands.forEach(command => {
+      command.value.copy(data, pos, 0, command.size ?? command.value.byteLength);
+      pos += command.size ?? command.value.byteLength;
     });
 
     try {
@@ -4399,18 +4404,18 @@ export class Client extends EventEmitter {
         payload: data
       });
 
-      this.debug(`writeRawMulti(): Writing raw data to ${targets.length} targets done`);
+      this.debug(`writeRawMulti(): Sending ${commands.length} write commands done`);
 
       let pos = 0;
-      let results: AdsWriteRawMultiResult[] = [];
+      let results: WriteRawMultiResult[] = [];
 
       //Error codes of each target
-      for (let i = 0; i < targets.length; i++) {
+      for (let i = 0; i < commands.length; i++) {
         const errorCode = res.ads.payload.readUInt32LE(pos);
         pos += 4;
 
-        const result: AdsWriteRawMultiResult = {
-          target: targets[i],
+        const result: WriteRawMultiResult = {
+          command: commands[i],
           success: errorCode === 0,
           error: errorCode > 0,
           errorCode,
@@ -4423,8 +4428,8 @@ export class Client extends EventEmitter {
       return results;
 
     } catch (err) {
-      this.debug(`writeRawMulti(): Writing raw data to ${targets.length} targets failed: %o`, err);
-      throw new ClientError(`writeRawMulti(): Writing raw data to ${targets.length} targets failed`, err);
+      this.debug(`writeRawMulti(): Sending ${commands.length} write commands failed: %o`, err);
+      throw new ClientError(`writeRawMulti(): Sending ${commands.length} write commands failed`, err);
     }
   }
 
@@ -4532,15 +4537,15 @@ export class Client extends EventEmitter {
    * 
    * @param indexGroup Address index group
    * @param indexOffset Address index offset
-   * @param readLength How many bytes to read
+   * @param size How many bytes to read
    * @param writeData Data to write
    * @param targetOpts Optional target settings that override values in `settings`
    */
-  public async readWriteRaw(indexGroup: number, indexOffset: number, readLength: number, writeData: Buffer, targetOpts: Partial<AmsAddress> = {}): Promise<Buffer> {
+  public async readWriteRaw(indexGroup: number, indexOffset: number, size: number, writeData: Buffer, targetOpts: Partial<AmsAddress> = {}): Promise<Buffer> {
     if (!this.connection.connected) {
       throw new ClientError(`readWriteRaw(): Client is not connected. Use connect() to connect to the target first.`);
     }
-    this.debug(`readWriteRaw(): Sending ReadWrite command (${JSON.stringify({ indexGroup, indexOffset, readLength })} with ${writeData.byteLength} bytes of data`);
+    this.debug(`readWriteRaw(): Sending ReadWrite command (${JSON.stringify({ indexGroup, indexOffset, size })} with ${writeData.byteLength} bytes of data`);
 
     //Allocating bytes for request
     const data = Buffer.alloc(16 + writeData.byteLength);
@@ -4555,7 +4560,7 @@ export class Client extends EventEmitter {
     pos += 4;
 
     //8..11 Read data length
-    data.writeUInt32LE(readLength, pos);
+    data.writeUInt32LE(size, pos);
     pos += 4;
 
     //12..15 Write data length
@@ -4574,13 +4579,131 @@ export class Client extends EventEmitter {
         payload: data
       });
 
-      this.debug(`readWriteRaw(): ReadWrite command (${JSON.stringify({ indexGroup, indexOffset, readLength })}) done - returned ${res.ads.payload.byteLength} bytes`);
+      this.debug(`readWriteRaw(): ReadWrite command (${JSON.stringify({ indexGroup, indexOffset, size })}) done - returned ${res.ads.payload.byteLength} bytes`);
 
       return res.ads.payload;
 
     } catch (err) {
-      this.debug(`readWriteRaw(): ReadWrite command (${JSON.stringify({ indexGroup, indexOffset, readLength })}) failed: %o`, err);
-      throw new ClientError(`readWriteRaw(): ReadWrite command (${JSON.stringify({ indexGroup, indexOffset, readLength })}) failed`, err);
+      this.debug(`readWriteRaw(): ReadWrite command (${JSON.stringify({ indexGroup, indexOffset, size })}) failed: %o`, err);
+      throw new ClientError(`readWriteRaw(): ReadWrite command (${JSON.stringify({ indexGroup, indexOffset, size })}) failed`, err);
+    }
+  }
+  
+  /**
+   * Sends multiple readWriteRaw() commands in one ADS packet
+   * 
+   * Uses ADS sum command under the hood (better performance)
+   * 
+   * @param commands Array of read write commands
+   * @param targetOpts Optional target settings that override values in `settings`
+   */
+  public async readWriteRawMulti(commands: ReadWriteRawMultiCommand[], targetOpts: Partial<AmsAddress> = {}): Promise<ReadWriteRawMultiResult[]> {
+    if (!this.connection.connected) {
+      throw new ClientError(`readWriteRawMulti(): Client is not connected. Use connect() to connect to the target first.`);
+    }
+    this.debug(`readWriteRawMulti(): Sending ${commands.length} ReadWrite commands`);
+    const totalSize = commands.reduce((total, command) => total + command.size, 0);
+    const totalWriteSize = commands.reduce((total, command) => total + command.writeData.byteLength, 0);
+
+    //Allocating bytes for request
+    const data = Buffer.alloc(16 + commands.length * 16 + totalWriteSize);
+    let pos = 0;
+
+    //0..3 IndexGroup 
+    data.writeUInt32LE(ADS.ADS_RESERVED_INDEX_GROUPS.SumCommandReadWrite, pos);
+    pos += 4;
+
+    //4..7 IndexOffset - Number of commands
+    data.writeUInt32LE(commands.length, pos);
+    pos += 4;
+
+    //8..11 Read data length
+    data.writeUInt32LE(commands.length * 8 + totalSize, pos); 
+    pos += 4;
+
+    //12..15 Write data length
+    data.writeUInt32LE(commands.length * 16 + totalWriteSize, pos);
+    pos += 4;
+
+    //16..n commands
+    commands.forEach(command => {
+      //0..3 IndexGroup
+      data.writeUInt32LE(command.indexGroup, pos);
+      pos += 4;
+
+      //4..7 IndexOffset
+      data.writeUInt32LE(command.indexOffset, pos);
+      pos += 4;
+
+      //8..11 Read data length
+      data.writeUInt32LE(command.size, pos);
+      pos += 4;
+
+      //12..15 Write data length
+      data.writeUInt32LE(command.writeData.byteLength, pos);
+      pos += 4
+    });
+
+    //data
+    commands.forEach(command => {
+      command.writeData.copy(data, pos);
+      pos += command.writeData.byteLength;
+    });
+
+    try {
+      const res = await this.sendAdsCommand<AdsReadWriteResponse>({
+        adsCommand: ADS.ADS_COMMAND.ReadWrite,
+        targetAmsNetId: targetOpts.amsNetId,
+        targetAdsPort: targetOpts.adsPort,
+        payload: data
+      });
+
+      this.debug(`readWriteRawMulti(): Sending ${commands.length} ReadWrite commands done`);
+
+      let pos = 0;
+      const response = res.ads.payload;
+      let results: ReadWriteRawMultiResult[] = [];
+      let sizes: number[] = [];
+
+      //Error codes of each target
+      for (let i = 0; i < commands.length; i++) {
+        const errorCode = response.readUInt32LE(pos);
+        pos += 4;
+
+        //Data length
+        sizes.push(response.readUInt32LE(pos));
+        pos += 4;
+
+        const result: ReadWriteRawMultiResult = {
+          command: commands[i],
+          success: errorCode === 0,
+          error: errorCode > 0,
+          errorCode,
+          errorStr: ADS.ADS_ERROR[errorCode],
+          data: undefined
+        };
+
+        results.push(result);
+      };
+      
+      //Response data for each command
+      for (let i = 0; i < commands.length; i++) {
+        let startPos = pos;
+
+
+        if (results[i].success) {
+          results[i].data = Buffer.alloc(sizes[i]);
+          response.copy(results[i].data!, 0, pos, pos + sizes[i]);
+        }
+        
+        pos = startPos + sizes[i];
+      }
+
+      return results;
+
+    } catch (err) {
+      this.debug(`readWriteRawMulti(): Sending ${commands.length} ReadWrite commands failed: %o`, err);
+      throw new ClientError(`readWriteRawMulti(): Sending ${commands.length} ReadWrite commands failed`, err);
     }
   }
 
@@ -4994,16 +5117,19 @@ export class Client extends EventEmitter {
   }
   
   /**
-   * Creates multiple variable handles for PLC symbols by given variable paths
    * 
-   * Uses ADS sum command under the hood
+   * Sends multiple createVariableHandle() commands in one ADS packet
+   * 
+   * Creates a variable handle for a PLC symbol by given variable path
    * 
    * Variable value can be accessed by using the handle with `readRawByHandle()` and `writeRawByHandle()`
+   * 
+   * Uses ADS sum command under the hood (better perfomance)
    * 
    * @param targets Array of full variable paths in the PLC (such as `GVL_Test.ExampleStruct`)
    * @param targetOpts Optional target settings that override values in `settings`
    */
-  public async createVariableHandleMulti(paths: string[], targetOpts: Partial<AmsAddress> = {}): Promise<AdsCreateVariableHandleMultiResult[]> {
+  public async createVariableHandleMulti(paths: string[], targetOpts: Partial<AmsAddress> = {}): Promise<CreateVariableHandleMultiResult[]> {
     if (!this.connection.connected) {
       throw new ClientError(`createVariableHandleMulti(): Client is not connected. Use connect() to connect to the target first.`);
     }
@@ -5067,7 +5193,7 @@ export class Client extends EventEmitter {
 
       let pos = 0;
       const response = res.ads.payload;
-      let results: AdsCreateVariableHandleMultiResult[] = [];
+      let results: CreateVariableHandleMultiResult[] = [];
       let sizes: number[] = [];
 
       //Error codes of each target
@@ -5079,7 +5205,7 @@ export class Client extends EventEmitter {
         sizes.push(response.readUInt32LE(pos));
         pos += 4;
 
-        const result: AdsCreateVariableHandleMultiResult = {
+        const result: CreateVariableHandleMultiResult = {
           path: paths[i],
           success: errorCode === 0,
           error: errorCode > 0,
@@ -5186,14 +5312,16 @@ export class Client extends EventEmitter {
 
 
   /**
-   * Deletes multiple variable handles that were previously created using `createVariableHandle()`
+   * Sends multiple deleteVariableHandle() commands in one ADS packet
    * 
-   * Uses ADS sum command under the hood
+   * Deletes a variable handle that was previously created using `createVariableHandle()`
+   * 
+   * Uses ADS sum command under the hood (better performance)
    * 
    * @param handles Array of variable handles to delete
    * @param targetOpts Optional target settings that override values in `settings`
    */
-  public async deleteVariableHandleMulti(handles: (VariableHandle | number)[], targetOpts: Partial<AmsAddress> = {}): Promise<AdsDeleteVariableHandleMultiResult[]> {
+  public async deleteVariableHandleMulti(handles: (VariableHandle | number)[], targetOpts: Partial<AmsAddress> = {}): Promise<DeleteVariableHandleMultiResult[]> {
     if (!this.connection.connected) {
       throw new ClientError(`deleteVariableHandleMulti(): Client is not connected. Use connect() to connect to the target first.`);
     }
@@ -5253,14 +5381,14 @@ export class Client extends EventEmitter {
       this.debug(`deleteVariableHandleMulti(): Deleting ${handles.length} variable handles done`);
 
       let pos = 0;
-      let results: AdsDeleteVariableHandleMultiResult[] = [];
+      let results: DeleteVariableHandleMultiResult[] = [];
 
       //Error codes of each target
       for (let i = 0; i < handles.length; i++) {
         const errorCode = res.ads.payload.readUInt32LE(pos);
         pos += 4;
 
-        const result: AdsDeleteVariableHandleMultiResult = {
+        const result: DeleteVariableHandleMultiResult = {
           handle: handles[i],
           success: errorCode === 0,
           error: errorCode > 0,
