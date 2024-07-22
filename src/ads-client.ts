@@ -11,6 +11,8 @@ import Long from "long";
 import * as ADS from './ads-commons';
 import ClientError from "./client-error";
 export * as ADS from './ads-commons';
+export type { AdsClientSettings } from "./types/ads-client-types";
+export type { AdsState, AmsRouterState, AdsResponse, EmptyAdsResponse, UnknownAdsResponse, AdsReadResponse, AdsReadWriteResponse, AdsWriteResponse, AdsReadDeviceInfoResponse, AdsNotificationResponse, AdsAddNotificationResponse, AdsDeleteNotificationResponse, AdsWriteControlResponse } from "./types/ads-protocol-types";
 
 export class Client extends EventEmitter {
   private debug = Debug("ads-client");
@@ -1050,7 +1052,7 @@ export class Client extends EventEmitter {
    * 
    * @template T ADS response type. If omitted, generic AdsResponse is used
    */
-  private async sendAdsCommand<T = AdsResponse>(command: AdsCommandToSend) {
+  async sendAdsCommand<T = AdsResponse>(command: AdsCommandToSend) {
     return new Promise<AmsTcpPacket<T>>(async (resolve, reject) => {
 
       if (this.nextInvokeId >= ADS.ADS_INVOKE_ID_MAX_VALUE) {
