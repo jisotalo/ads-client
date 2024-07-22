@@ -1437,7 +1437,7 @@ export class Client extends EventEmitter {
         ads.errorCode = data.readUInt32LE(pos);
         pos += 4;
 
-        if (data.byteLength >= 8) {
+        if (data.byteLength > 4) {
           //4..7 Data length (bytes)
           ads.length = data.readUInt32LE(pos);
           pos += 4;
@@ -1460,7 +1460,7 @@ export class Client extends EventEmitter {
         ads.errorCode = data.readUInt32LE(pos);
         pos += 4;
 
-        if (data.byteLength >= 8) {
+        if (data.byteLength > 4) {
           //4..7 Data length (bytes)
           ads.length = data.readUInt32LE(pos);
           pos += 4;
