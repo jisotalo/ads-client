@@ -1437,14 +1437,21 @@ export class Client extends EventEmitter {
         ads.errorCode = data.readUInt32LE(pos);
         pos += 4;
 
-        //4..7 Data length (bytes)
-        ads.length = data.readUInt32LE(pos);
-        pos += 4;
+        if (data.byteLength >= 8) {
+          //4..7 Data length (bytes)
+          ads.length = data.readUInt32LE(pos);
+          pos += 4;
 
-        //8..n Data
-        ads.payload = Buffer.alloc(ads.length);
-        data.copy(ads.payload, 0, pos);
-        break;
+          //8..n Data
+          ads.payload = Buffer.alloc(ads.length);
+          data.copy(ads.payload, 0, pos);
+          break;
+
+        } else {
+          //Only error code received (some TwinCAT 2 devices)
+          ads.length = 0;
+          ads.payload = Buffer.alloc(0);
+        }
 
       case ADS.ADS_COMMAND.Read:
         ads = {} as AdsReadResponse;
@@ -1453,13 +1460,20 @@ export class Client extends EventEmitter {
         ads.errorCode = data.readUInt32LE(pos);
         pos += 4;
 
-        //4..7 Data length (bytes)
-        ads.length = data.readUInt32LE(pos);
-        pos += 4;
+        if (data.byteLength >= 8) {
+          //4..7 Data length (bytes)
+          ads.length = data.readUInt32LE(pos);
+          pos += 4;
 
-        //8..n Data
-        ads.payload = Buffer.alloc(ads.length);
-        data.copy(ads.payload, 0, pos);
+          //8..n Data
+          ads.payload = Buffer.alloc(ads.length);
+          data.copy(ads.payload, 0, pos);
+
+        } else {
+          //Only error code received (some TwinCAT 2 devices)
+          ads.length = 0;
+          ads.payload = Buffer.alloc(0);
+        }
         break;
 
       case ADS.ADS_COMMAND.Write:
@@ -1479,20 +1493,22 @@ export class Client extends EventEmitter {
 
         ads.payload = {} as AdsDeviceInfo;
 
-        //4 Major version
-        ads.payload.majorVersion = data.readUInt8(pos);
-        pos += 1;
+        if (data.byteLength > 4) {
+          //4 Major version
+          ads.payload.majorVersion = data.readUInt8(pos);
+          pos += 1;
 
-        //5 Minor version
-        ads.payload.minorVersion = data.readUInt8(pos);
-        pos += 1;
+          //5 Minor version
+          ads.payload.minorVersion = data.readUInt8(pos);
+          pos += 1;
 
-        //6..7 Version build
-        ads.payload.versionBuild = data.readUInt16LE(pos);
-        pos += 2;
+          //6..7 Version build
+          ads.payload.versionBuild = data.readUInt16LE(pos);
+          pos += 2;
 
-        //8..24 Device name
-        ads.payload.deviceName = ADS.decodePlcStringBuffer(data.subarray(pos, pos + 16));;
+          //8..24 Device name
+          ads.payload.deviceName = ADS.decodePlcStringBuffer(data.subarray(pos, pos + 16));;
+        }
         break;
 
       case ADS.ADS_COMMAND.ReadState:
@@ -1504,14 +1520,16 @@ export class Client extends EventEmitter {
 
         ads.payload = {} as AdsState;
 
-        //4..5 ADS state
-        ads.payload.adsState = data.readUInt16LE(pos);
-        ads.payload.adsStateStr = ADS.ADS_STATE.toString(ads.payload.adsState);
-        pos += 2;
+        if (data.byteLength > 4) {
+          //4..5 ADS state
+          ads.payload.adsState = data.readUInt16LE(pos);
+          ads.payload.adsStateStr = ADS.ADS_STATE.toString(ads.payload.adsState);
+          pos += 2;
 
-        //6..7 Device state
-        ads.payload.deviceState = data.readUInt16LE(pos);
-        pos += 2;
+          //6..7 Device state
+          ads.payload.deviceState = data.readUInt16LE(pos);
+          pos += 2;
+        }
         break;
 
       case ADS.ADS_COMMAND.AddNotification:
@@ -1523,9 +1541,11 @@ export class Client extends EventEmitter {
 
         ads.payload = {} as AdsAddNotificationResponseData;
 
-        //4..7 Notification handle
-        ads.payload.notificationHandle = data.readUInt32LE(pos);
-        pos += 4;
+        if (data.byteLength > 4) {
+          //4..7 Notification handle
+          ads.payload.notificationHandle = data.readUInt32LE(pos);
+          pos += 4;
+        }
         break;
 
       case ADS.ADS_COMMAND.DeleteNotification:
@@ -4588,7 +4608,7 @@ export class Client extends EventEmitter {
       throw new ClientError(`readWriteRaw(): ReadWrite command (${JSON.stringify({ indexGroup, indexOffset, size })}) failed`, err);
     }
   }
-  
+
   /**
    * Sends multiple readWriteRaw() commands in one ADS packet
    * 
@@ -4618,7 +4638,7 @@ export class Client extends EventEmitter {
     pos += 4;
 
     //8..11 Read data length
-    data.writeUInt32LE(commands.length * 8 + totalSize, pos); 
+    data.writeUInt32LE(commands.length * 8 + totalSize, pos);
     pos += 4;
 
     //12..15 Write data length
@@ -4685,17 +4705,16 @@ export class Client extends EventEmitter {
 
         results.push(result);
       };
-      
+
       //Response data for each command
       for (let i = 0; i < commands.length; i++) {
         let startPos = pos;
-
 
         if (results[i].success) {
           results[i].data = Buffer.alloc(sizes[i]);
           response.copy(results[i].data!, 0, pos, pos + sizes[i]);
         }
-        
+
         pos = startPos + sizes[i];
       }
 
@@ -5115,7 +5134,7 @@ export class Client extends EventEmitter {
       throw new ClientError(`createVariableHandle(): Creating variable handle to ${path} failed`, err);
     }
   }
-  
+
   /**
    * 
    * Sends multiple createVariableHandle() commands in one ADS packet
@@ -5227,27 +5246,27 @@ export class Client extends EventEmitter {
           //0..3 Variable handle
           result.handle = response.readUInt32LE(pos);
           pos += 4;
-    
+
           //4..7 Size
           result.size = response.readUInt32LE(pos);
           pos += 4;
-    
+
           //8..11 "type decoration"
           result.typeDecoration = response.readUInt32LE(pos);
           pos += 4;
-    
+
           //8..9 Data type length
           let dataTypeLength = response.readUInt16LE(pos);
           pos += 2;
-    
+
           //10..n Data type
           result.dataType = ADS.decodePlcStringBuffer(response.subarray(pos, pos + dataTypeLength + 1));
           pos += dataTypeLength + 1;
-    
+
           results[i].handle = result;
 
         }
-        
+
         pos = startPos + sizes[i];
       }
 
@@ -5365,7 +5384,7 @@ export class Client extends EventEmitter {
     //handles
     handles.forEach(handle => {
       const handleNumber = typeof handle === 'number' ? handle : handle.handle;
-      
+
       data.writeUInt32LE(handleNumber, pos);
       pos += 4;
     });
