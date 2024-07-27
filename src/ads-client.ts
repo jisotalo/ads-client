@@ -1,5 +1,5 @@
 import EventEmitter from "events";
-import type { ActiveAdsRequestContainer, ActiveSubscription, ActiveSubscriptionContainer, AdsClientConnection, AdsClientSettings, AdsCommandToSend, AdsDataTypeContainer, AdsSymbolInfoContainer, AdsUploadInfo, ConnectionMetaData, PlcPrimitiveType, SubscriptionData, SubscriptionSettings, ReadSymbolResult, TimerObject, ObjectToBufferConversionResult, WriteSymbolResult, VariableHandle, RpcMethodCallResult, CreateVariableHandleMultiResult, ReadRawMultiResult, ReadRawMultiCommand, WriteRawMultiResult, DeleteVariableHandleMultiResult, ReadWriteRawMultiResult, ReadWriteRawMultiCommand, WriteRawMultiCommand } from "./types/ads-client-types";
+import type { ActiveAdsRequestContainer, ActiveSubscription, ActiveSubscriptionContainer, AdsClientConnection, AdsClientSettings, AdsCommandToSend, AdsDataTypeContainer, AdsSymbolInfoContainer, AdsUploadInfo, ConnectionMetaData, PlcPrimitiveType, SubscriptionData, SubscriptionSettings, ReadSymbolResult, TimerObject, ObjectToBufferConversionResult, WriteSymbolResult, VariableHandle, RpcMethodCallResult, CreateVariableHandleMultiResult, ReadRawMultiResult, ReadRawMultiCommand, WriteRawMultiResult, DeleteVariableHandleMultiResult, ReadWriteRawMultiResult, ReadWriteRawMultiCommand, WriteRawMultiCommand, ClientEvents } from "./types/ads-client-types";
 import { AdsAddNotificationResponse, AdsAddNotificationResponseData, AdsArrayInfoEntry, AdsAttributeEntry, AdsDataType, AdsDeleteNotificationResponse, AdsDeviceInfo, AdsEnumInfoEntry, AdsNotification, AdsNotificationResponse, AdsNotificationSample, AdsNotificationStamp, AdsRawInfo, AdsReadDeviceInfoResponse, AdsReadResponse, AdsReadStateResponse, AdsReadWriteResponse, AdsRequest, AdsResponse, AdsRpcMethodEntry, AdsRpcMethodParameterEntry, AdsState, AdsSymbolInfo, AdsWriteControlResponse, AdsWriteResponse, AmsAddress, AmsHeader, AmsPortRegisteredData, AmsRouterState, AmsRouterStateData, AmsTcpHeader, AmsTcpPacket, BaseAdsResponse, EmptyAdsResponse, UnknownAdsResponse } from "./types/ads-protocol-types";
 import {
   Socket,
@@ -14,7 +14,7 @@ export * as ADS from './ads-commons';
 export type { AdsClientSettings } from "./types/ads-client-types";
 export type { AdsState, AmsRouterState, AdsResponse, EmptyAdsResponse, UnknownAdsResponse, AdsReadResponse, AdsReadWriteResponse, AdsWriteResponse, AdsReadDeviceInfoResponse, AdsNotificationResponse, AdsAddNotificationResponse, AdsDeleteNotificationResponse, AdsWriteControlResponse } from "./types/ads-protocol-types";
 
-export class Client extends EventEmitter {
+export class Client extends EventEmitter<ClientEvents> {
   private debug = Debug("ads-client");
   private debugD = Debug(`ads-client:details`);
   private debugIO = Debug(`ads-client:raw-data`);
@@ -478,7 +478,7 @@ export class Client extends EventEmitter {
         this.socket?.destroy();
         this.socket = undefined;
 
-        this.emit("disconnect");
+        this.emit("disconnect", isReconnecting);
         return resolve();
       }
 
@@ -505,7 +505,7 @@ export class Client extends EventEmitter {
         this.socket = undefined;
 
         this.debug(`disconnectFromTarget(): Connection closed successfully`);
-        this.emit("disconnect");
+        this.emit("disconnect", isReconnecting);
         return resolve();
 
       } catch (err) {
@@ -523,7 +523,7 @@ export class Client extends EventEmitter {
         this.metaData = { ...this.defaultMetaData };
 
         this.debug(`disconnectFromTarget(): Connection closing failed, connection was forced to close`);
-        this.emit("disconnect");
+        this.emit("disconnect", isReconnecting);
         return reject(new ClientError(`disconnect(): Disconnected with errors: ${(disconnectError as Error).message}`, err));
       }
     })
@@ -562,7 +562,7 @@ export class Client extends EventEmitter {
             this.debug(`reconnectToTarget(): Reconnected but failed to restore following subscriptions: ${failures.join(', ')}`);
           }
 
-          this.emit('reconnect');
+          this.emit('reconnect', !failures.length, failures);
           resolve(res);
         })
         .catch(err => {
@@ -815,7 +815,7 @@ export class Client extends EventEmitter {
 
       if (!oldState || state.adsState !== oldState.adsState) {
         this.debug(`checkTcSystemState(): TwinCAT system state has changed from ${oldState?.adsStateStr} to ${state.adsStateStr}`)
-        this.emit('tcSystemStateChange', state);
+        this.emit('tcSystemStateChange', state, oldState);
 
         //If system is not in run mode, we have lost the connection (such as config mode)
         if (state.adsState !== ADS.ADS_STATE.Run) {
@@ -896,10 +896,14 @@ export class Client extends EventEmitter {
       stateChanged = true;
     }
 
+    let oldState = this.metaData.plcRuntimeState !== undefined
+    ? { ...this.metaData.plcRuntimeState }
+      : undefined;
+    
     this.metaData.plcRuntimeState = res;
 
     if (stateChanged) {
-      this.emit('plcRuntimeStateChange', res);
+      this.emit('plcRuntimeStateChange', this.metaData.plcRuntimeState, oldState);
     }
   }
 
@@ -971,8 +975,10 @@ export class Client extends EventEmitter {
       }
     }
 
+    const oldVersion = this.metaData.plcSymbolVersion;
     this.metaData.plcSymbolVersion = symbolVersion;
-    this.emit('plcSymbolVersionChange', symbolVersion);
+
+    this.emit('plcSymbolVersionChange', symbolVersion, oldVersion);
   }
 
   /**
@@ -992,7 +998,7 @@ export class Client extends EventEmitter {
     this.debug(`onConnectionLost(): Connection was lost. Socket failure: ${socketFailure}`);
 
     this.connection.connected = false;
-    this.emit('connectionLost');
+    this.emit('connectionLost', socketFailure);
 
     if (this.settings.autoReconnect !== true) {
       !this.settings.hideConsoleWarnings && console.log("WARNING: Connection to target was lost and setting autoReconnect was false -> disconnecting");
@@ -1710,11 +1716,11 @@ export class Client extends EventEmitter {
                 })
                 .catch(err => {
                   this.debug(`onAdsCommandReceived(): Ads notification received but parsing Javascript object failed: %o`, err);
-                  this.emit('ads-client-error', new ClientError(`onAdsCommandReceived(): Ads notification received but parsing data to Javascript object failed. Subscription: ${JSON.stringify(subscription)}`, err));
+                  this.emit('client-error', new ClientError(`onAdsCommandReceived(): Ads notification received but parsing data to Javascript object failed. Subscription: ${JSON.stringify(subscription)}`, err));
                 });
             } else {
               this.debugD(`onAdsCommandReceived(): Ads notification received with unknown notificationHandle "${sample.notificationHandle}". Use unsubscribe() to save resources`);
-              this.emit('ads-client-error', new ClientError(`onAdsCommandReceived(): Ads notification received with unknown notificationHandle (${sample.notificationHandle}). Use unsubscribe() to save resources.`));
+              this.emit('client-error', new ClientError(`onAdsCommandReceived(): Ads notification received with unknown notificationHandle (${sample.notificationHandle}). Use unsubscribe() to save resources.`));
             }
           }
         }
@@ -1731,7 +1737,7 @@ export class Client extends EventEmitter {
 
         } else {
           this.debugD(`onAdsCommandReceived(): Ads command received with unknown invokeId "${packet.ams.invokeId}"`);
-          this.emit('ads-client-error', new ClientError(`onAdsCommandReceived(): Ads command received with unknown invokeId "${packet.ams.invokeId}"`));
+          this.emit('client-error', new ClientError(`onAdsCommandReceived(): Ads command received with unknown invokeId "${packet.ams.invokeId}"`));
         }
         break;
     }
@@ -1744,13 +1750,17 @@ export class Client extends EventEmitter {
    * @param state New router state
    */
   private onRouterStateChanged(state: AmsRouterStateData) {
+    let oldState = this.metaData.routerState !== undefined
+      ? { ...this.metaData.routerState }
+      : undefined;
+    
     this.metaData.routerState = {
       state: state.routerState,
       stateStr: ADS.AMS_ROUTER_STATE.toString(state.routerState)
     };
 
     this.debug(`onRouterStateChanged(): Local AMS router state has changed to ${this.metaData.routerState.stateStr}`);
-    this.emit('routerStateChange', this.metaData.routerState);
+    this.emit("routerStateChange", this.metaData.routerState, oldState);
 
     //If we have a local connection, connection needs to be reinitialized
     if (this.connection.isLocal) {
@@ -3243,7 +3253,9 @@ export class Client extends EventEmitter {
   }
 
   /**
-   * Connects to the target
+   * Connects to the 
+   * 
+   * Returns active connection information
    */
   public connect(): Promise<Required<AdsClientConnection>> {
     return this.connectToTarget();

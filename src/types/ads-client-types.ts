@@ -1,4 +1,81 @@
+import ClientError from "../client-error";
 import { AdsDataType, AdsDeviceInfo, AdsRawInfo, AdsResponse, AdsState, AdsSymbolInfo, AmsAddress, AmsTcpPacket, BaseAdsResponse } from "./ads-protocol-types"
+
+/**
+ * Events for the client, for example `client.on('connect', ...)`
+ */
+export interface ClientEvents {
+  /**
+   * Emitted when client has connected to the target
+   * 
+   * - `connection`: Active connection information
+   */
+  'connect': [connection: AdsClientConnection],
+
+  /**
+   * Emitted when client has disconnected from the target
+   * 
+   * - `isReconnecting`: True if disconnect happened during reconnecting
+   */
+  'disconnect': [isReconnecting: boolean],
+
+  /**
+   * Emitted when client has reconnected to the target after a disconnection
+   * 
+   * - `allSubscriptionsRestored`: True if all subscriptions were restored successfully
+   * - `unrestoredSubscriptions`: Array of subscription paths that failed to be restored
+   */
+  'reconnect': [allSubscriptionsRestored: boolean, unrestoredSubscriptions: string[]],
+
+  /**
+   * Emitted when client has lost the connection to the target
+   * 
+   * - `socketFailure`: True if connection was lost due to a socket/tcp problem
+   */
+  'connectionLost': [socketFailure: boolean],
+
+  /**
+   * Emitted when PLC runtime symbol version has changed
+   * 
+   * - `version`: New PLC runtime symbol version
+   * - `previousVersion`: Previous PLC runtime symbol version (if known)
+   */
+  'plcSymbolVersionChange': [version: number, previousVersion?: number],
+
+  /**
+   * Emitted when PLC runtime state has changed
+   * 
+   * - `state`: New PLC runtime state
+   * - `previousState`: Previous PLC runtime state (if known)
+   */
+  'plcRuntimeStateChange': [state: AdsState, previousState?: AdsState],
+
+  /**
+   * Emitted when TwinCAT system state has changed
+   * 
+   * - `state`: New TwinCAT system state
+   * - `previousState`: Previous TwinCAT system state (if known)
+   */
+  'tcSystemStateChange': [state: AdsState, previousState?: AdsState],
+
+  /**
+   * Emitted when AMS router state has changed
+   * 
+   * - `state`: New AMS router state
+   * - `previousState`: Previous AMS router state (if known)
+   */
+  'routerStateChange': [state: AmsRouterState, previousState?: AmsRouterState],
+
+  /**
+   * Emitted when the client has had an error, such as
+   *  - unknown ADS notification received
+   *  - handling ADS notification failed
+   *  - unknown ADS command received
+   * 
+   * - `error`: Error that was thrown
+   */
+  'client-error': [error: ClientError]
+}
 
 interface ConnectionSettings {
   /** **REQUIRED**: Default target TwinCAT system AmsNetId address. For local (same machine), use `localhost` or `127.0.0.1.1` */

@@ -69,10 +69,13 @@ describe('connection', () => {
 
   test('connecting to the target', async () => {
     try {
+      const ev = jest.fn();
+      client.on('connect', ev);
       const res = await client.connect();
 
       expect(res).toHaveProperty('connected');
       expect(res.connected).toBe(true);
+      expect(ev).toHaveBeenCalled();
 
     } catch (err) {
       throw new Error(`connecting failed (${err.message}`, err);
@@ -97,10 +100,14 @@ describe('connection', () => {
 
   test('reconnecting', async () => {
     try {
+      
+      const ev = jest.fn();
+      client.on('reconnect', ev);
       const res = await client.reconnect();
 
       expect(res).toHaveProperty('connected');
       expect(res.connected).toBe(true);
+      expect(ev).toHaveBeenCalled();
 
     } catch (err) {
       throw new Error(`reconnecting failed (${err.message}`, err);
@@ -110,7 +117,13 @@ describe('connection', () => {
 
 describe('resetting PLC to original state', () => {
   test('resetting PLC', async () => {
+    const ev = jest.fn();
+    client.on('plcRuntimeStateChange', ev);
     await client.resetPlc();
+
+    await delay(500);
+    
+    expect(ev).toHaveBeenCalled();
   });
 
   test('checking that reset was successful', async () => {
@@ -3274,8 +3287,11 @@ describe('issue specific tests', () => {
 describe('disconnecting', () => {
   test('disconnecting client', async () => {
     if (client?.connection.connected) {
-      const task = client.disconnect()
-      expect(task).resolves.toBeUndefined()
+      const ev = jest.fn();
+      client.on('disconnect', ev);
+
+      await client.disconnect()
+      expect(ev).toHaveBeenCalled();
     }
   })
 });
