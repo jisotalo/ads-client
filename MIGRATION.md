@@ -45,8 +45,10 @@ This file contains detailed migration guide from migrating from ads-client major
 * `createVariableHandleMulti()` return value changed
 * `deleteVariableHandleMulti()` return value changed
 * Setting `disableSymbolVersionMonitoring` -> `monitorPlcSymbolVersion`
-* Events
-  * `systemManagerStateChange` -> `tcSystemStateChange` and payload value changed to AdsState object instead of state number
+* Events payloads changed (and some event names)
+  * `systemManagerStateChange` -> `tcSystemStateChange`
   * `symbolVersionChange` -> `plcSymbolVersionChange`
+  * `symbolVersionChange` -> `plcSymbolVersionChange`
+  * `ads-client-error` -> `client-error`
 ### Optional  
 * Remove `disableBigInt` from settings 
