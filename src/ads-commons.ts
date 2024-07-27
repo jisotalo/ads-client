@@ -492,7 +492,7 @@ export const ADS_STATE = {
   PowerGood: 10,
   Error: 11,
   Shutdown: 12,
-  Susped: 13,
+  Suspend: 13,
   Resume: 14,
   Config: 15,
   Reconfig: 16,
