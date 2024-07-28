@@ -45,6 +45,7 @@ This file contains detailed migration guide from migrating from ads-client major
 * `createVariableHandleMulti()` return value changed
 * `deleteVariableHandleMulti()` return value changed
 * Setting `disableSymbolVersionMonitoring` -> `monitorPlcSymbolVersion`
+* Setting `bareClient` -> `rawClient`
 * Events payloads changed (and some event names)
   * `systemManagerStateChange` -> `tcSystemStateChange`
   * `symbolVersionChange` -> `plcSymbolVersionChange`

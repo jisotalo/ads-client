@@ -3301,7 +3301,7 @@ describe('controlling TwinCAT system service', () => {
   const sysClient = new Client({
     targetAmsNetId: AMS_NET_ID,
     targetAdsPort: 10000,
-    bareClient: true
+    rawClient: true
   });
 
   test('connecting', async () => {

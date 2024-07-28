@@ -77,53 +77,233 @@ export interface ClientEvents {
   'client-error': [error: ClientError]
 }
 
-interface ConnectionSettings {
-  /** **REQUIRED**: Default target TwinCAT system AmsNetId address. For local (same machine), use `localhost` or `127.0.0.1.1` */
+/**
+ * Client settings
+ */
+export interface AdsClientSettings {
+  /** 
+   * **REQUIRED**: Default target AmsNetId address
+   * 
+   * Examples:
+   * - `localhost` or `127.0.0.1.1.1` - Local (same machine as Node.js)
+   * - `192.168.1.5.1.1` - PLC (example)
+   * - `192.168.1.5.2.1` - EtherCAT I/O device (example, see also `rawClient` setting) 
+   */
   targetAmsNetId: string,
-  /** **REQUIRED**: Default target ADS port. E.g. `851` for TwinCAT 3 PLC runtime 1 */
-  targetAdsPort: number,
-  /** Optional: Target ADS router TCP port (default: 48898) */
-  routerTcpPort?: number,
-  /** Optional: Target ADS router IP address/hostname (default: '127.0.0.1') */
-  routerAddress?: string,
-  /** Optional: Local IP address to use, use this to change used network interface if required (default: '' = automatic) */
-  localAddress?: string,
-  /** Optional: Local TCP port to use for outgoing connections (default: 0 = automatic) */
-  localTcpPort?: number,
-  /** Optional: Local AmsNetId to use (default: automatic) */
-  localAmsNetId?: string,
-  /** Optional: Local ADS port to use (default: automatic/router provides) */
-  localAdsPort?: number,
-  /** Optional: Time (milliseconds) after connecting to the router or waiting for command response is canceled to timeout (default: 2000) */
-  timeoutDelay?: number,
-  /** Optional: If true and connection to the router is lost, the server tries to reconnect automatically (default: true) */
-  autoReconnect?: boolean,
-  /** Optional: Time (milliseconds) how often the lost connection is tried to re-establish (default: 2000) */
-  reconnectInterval?: number,
-}
 
-export interface AdsClientSettings extends ConnectionSettings {
-  /** Optional: If true, enumeration (ENUM) data types are converted to objects ({name: 'enumValue', value: 5} instead of 5) (default: true) */
+  /** 
+   * **REQUIRED**: Default target ADS port
+   *  
+   * Examples:
+   * - `851` - TwinCAT 3 PLC runtime 1
+   * - `852` - TwinCAT 3 PLC runtime 2
+   * - `801` - TwinCAT 2 PLC runtime 1
+   * - `10000` - TwinCAT system service
+   * 
+   * NOTE: This is not a TCP port (no firewall config needed).
+   */
+  targetAdsPort: number,
+
+  /** 
+   * **Optional**: Target ADS router TCP port (default: `48898`) 
+   * 
+   * This is usually `48898`, unless using port forwarding (e.g. in docker) or separate TwinCAT router.
+   * 
+   * NOTE: Router needs to have firewall open for this port, TwinCAT PLC has as default.
+   */
+  routerTcpPort?: number,
+
+  /** 
+   * **Optional**: Target ADS router IP address/hostname (default: `127.0.0.1`) 
+   * 
+   * This is usually ´127.0.0.1` (local machine), as the TwinCAT system is usually running on the same machine.
+   * 
+   * However, if connecting from a system without router (such as Linux), this needs to be changed to be the router/PLC address.
+   */
+  routerAddress?: string,
+  
+  /** 
+   * **Optional**: Local IP address to use (default: `(empty string)` -> automatic)
+   * 
+   * Can be used to force using another network interface
+   * 
+   * See https://nodejs.org/api/net.html#socketconnectoptions-connectlistener
+   */
+  localAddress?: string,
+
+  /** 
+   * **Optional**: Local TCP port to use for outgoing connection (default: `0` -> automatic)
+   * 
+   * Can be used to force using specific local TCP port for outogoing connection
+   * 
+   * See https://nodejs.org/api/net.html#socketconnectoptions-connectlistener
+   */
+  localTcpPort?: number,
+
+  /** 
+   * **Optional**: Local AmsNetId to use (default: `(empty string)` -> automatic) 
+   * 
+   * Can be used to set used AmsNetId manually. If not set, AmsNetId is received from the target router.
+   * 
+   * This is needed for example when connecting directly to the PLC without local router.
+   */
+  localAmsNetId?: string,
+
+  /** 
+   * **Optional**: Local ADS port to use (default: `0` -> automatic) 
+   * 
+   * Can be used to set used ADS port manually. If not set, a free ADS port is received from the target router.
+  */
+  localAdsPort?: number,
+
+  /** 
+   * **Optional**: Time (milliseconds) after a command is timeouted if no response received (default: `2000` ms) 
+   * 
+   * This is used for AMS and ADS commands.
+   * 
+   * If using a slow connection, it might be useful to increase this limit.
+  */
+  timeoutDelay?: number,
+
+  /** 
+   * **Optional**: If set, the client tries to reconnect automatically after a connection loss (default: `true`) 
+   * 
+   * The connection loss is detected by
+   *  - TCP socket error
+   *  - local router state change
+   *  - target TwinCAT system state changes (not when `rawClient` setting is set)
+   * 
+   * NOTE: when using `rawClient` setting, the client might not detect the connection loss
+   */
+  autoReconnect?: boolean,
+
+  /** 
+   * **Optional**: Interval (milliseconds) how often the lost connection is tried to re-establish (default: `2000` ms) 
+   * 
+   * Value can be lowered if a very fast response if required, however usually getting the connection back on takes a while
+   * (TwinCAT system restart takes a while etc.)
+   */
+  reconnectInterval?: number,
+
+  /** 
+   * **Optional**: If set, enumeration (ENUM) data types are converted to objects (default: `true`)
+   * 
+   * If `true`, ENUM is converted to an object:
+   * 
+   * ```js
+   * {
+   *  name: 'enumValue', 
+   *  value: 5
+   * }
+   * ```
+   * 
+   * If `false`, ENUM is converted to a plain number (`5`)
+   */
   objectifyEnumerations?: boolean,
-  /** Optional: If true, PLC date types are converted to Javascript Date objects instead of plain number value (default: true)*/
+
+  /** 
+   * **Optional**: If set, PLC date types are converted to Javascript `Date` objects (default: `true`)
+   * 
+   * If `true`, DATE_AND_TIME (DT) and DATE are converted to `Date` objects
+   * 
+   * If `false`, DATE_AND_TIME (DT) and DATE are converted to numbers (epoch time, seconds)
+   */
   convertDatesToJavascript?: boolean,
-  /** Optional: If true, all symbols from PLC runtime are read and cached when connected. This is quite an intensive operation but useful in some cases. Otherwise symbols are read and cached only when used. (default: false).*/
+
+  /** 
+   * **Optional**: If set, all symbols from target are read and cached after connecting. (default: `false`)
+   * 
+   * This is an intensive operation (symbol data is a large object).
+   * 
+   * Can be useful when needing a fast response (client already knows all PLC symbol data) - for example 
+   * when using subscriptions with high cycle times or when dealing with larger amount of ADS data.
+   * 
+   * If not set, the client reads and caches symbol information only on demand.
+   * 
+   * NOTE: This is not available when using the `rawClient` setting.
+   */
   readAndCacheSymbols?: boolean,
-  /** Optional: If true, all data types from PLC runtime are read and cached when connected. This is quite an intensive operation but useful in some cases. Otherwise types are read and cached only when used. (default: false).*/
+  
+  /** 
+   * **Optional**: If set, all data types from target are read and cached after connecting. (default: `false`)
+   * 
+   * This is an intensive operation (symbol data is a large object).
+   * 
+   * Can be useful when needing a fast response (client already knows all PLC datat types) - for example 
+   * when using subscriptions with high cycle times or when dealing with larger amount of ADS data.
+   * 
+   * If not set, the client reads and caches data types only on demand.
+   * 
+   * NOTE: This is not available when using the `rawClient` setting.
+   */
   readAndCacheDataTypes?: boolean,
-  /** Optional: If false, PLC symbol version changes (PLC sofware updates etc.) are not detected and symbols/subscriptions are not updated automatically. (default: true) */
+
+  /** 
+   * **Optional**: If set, client detects target PLC symbol version changes and reloads symbols and data types (default: `true`) 
+   * 
+   * Symbol version changes when PLC software is updated with download (no online change). By detecting it,
+   * the client should work when dealing with a target that has software updated.
+   * 
+   * NOTE: This is not available when using the `rawClient` setting.
+   */
   monitorPlcSymbolVersion?: boolean,
-  /** Optional: If true, no warnings are written to console using console.log() (default: false)*/
+
+  /** 
+   * **Optional**: If set, no warnings are written to console using `console.log()` (default: `false`)
+   * 
+   * As default, the client writes some warnings to console, such as connection loss and reconnection information.
+   * 
+   * If set, the client **never** writes anything to console.
+   */
   hideConsoleWarnings?: boolean,
-  /** Optional: Time (milliseconds) how often connection is checked by reading target TwinCAT system state - only when `bareClient` is false (default: 1000ms)*/
+
+  /** 
+   * **Optional**: Interval (milliseconds) how often the client checks if the connection if working (default: `1000` ms)
+   * 
+   * The client checks connection by reading the target TwinCAT system state.
+   * 
+   * See setting `connectionDownDelay`.
+   * 
+   * NOTE: This is not available when using the `rawClient` setting.
+   */
   connectionCheckInterval?: number,
-  /** Optional: Time (milliseconds) how long after the target TwinCAT system is not available the connection is determined to be lost (default: 5000ms) */
+
+  /** 
+   * **Optional**: Time (milliseconds) how long after the target TwinCAT system state is not available, the connection is determined to be lost (default: `5000` ms) 
+   *    * 
+   * See setting `connectionCheckInterval`.
+   * 
+   * NOTE: This is not available when using the `rawClient` setting.
+   */
   connectionDownDelay?: number,
-  /** Optional: If true, the connect() will success even when target PLC runtime is not available or TwinCAT system is not in run mode. For example if PLC software is not yet downloaded but we want to connect in advance.(default: false) */
+
+  /** 
+   * **Optional**: If set, connecting to the target will success, even if there is no PLC runtime available or if the target TwinCAT system is in CONFIG mode (default: `false`)
+   * 
+   * This can be useful if the target might not yet have a PLC software downloaded when connecting and client needs to be connected in advance.
+   */
   allowHalfOpen?: boolean,
-  /** Optional: If true, only direct raw ADS connection is established to target. Can be used to connect to system without TwinCAT system / PLC etc. (non-TwinCAT or direct I/O) (default: false) */
-  bareClient?: boolean,
-  /** Optional: If true, symbols and data types are not cached. Descriptions are read every time from target and built (slows communication but data is guaranteed to be up-to-date) (default: false) */
+
+  /** 
+   * **Optional**: If set, only a direct raw ADS connection is established to the target (default: `false`) 
+   * 
+   * As default, the client always assumes the target has a TwinCAT system and a PLC runtime.
+   * 
+   * However, in some cases only a direct ADS communication is required or a better choice:
+   *  - connecting directly to I/O terminals by ADS
+   *  - conneting to non-TwinCAT systems (such as custom ADS server - see https://github.com/jisotalo/ads-server)
+   *  - connecting to TwinCAT system only (without PLC)
+   */
+  rawClient?: boolean,
+
+  /** 
+   * **Optional**: If set, the client never caches symbols and data types (default: `false`) 
+   * 
+   * If set, the client always reads data type and symbol information from target.
+   * This slows the communication but guarantees up-to-date data in all cases.
+   * 
+   * As default, the client caches the results after reading them from the target.
+   */
   disableCaching?: boolean
 }
 

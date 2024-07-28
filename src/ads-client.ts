@@ -61,7 +61,7 @@ export class Client extends EventEmitter<ClientEvents> {
     connectionCheckInterval: 1000,
     connectionDownDelay: 5000,
     allowHalfOpen: false,
-    bareClient: false,
+    rawClient: false,
     disableCaching: false
   } as Required<AdsClientSettings>;
 
@@ -370,19 +370,19 @@ export class Client extends EventEmitter<ClientEvents> {
         this.socketErrorHandler = this.onSocketError.bind(this);
         socket.on("error", this.socketErrorHandler);
 
-        //If bareClient setting is true, we are done here (just a connection is enough)
-        if (this.settings.bareClient !== true) {
+        //If rawClient setting is true, we are done here (just a connection is enough)
+        if (this.settings.rawClient !== true) {
           try {
             //Initialize PLC connection (some subscriptions, pollers etc.)
             await this.setupPlcConnection();
           } catch (err) {
             if (!this.settings.allowHalfOpen) {
-              return reject(new ClientError(`connectToTarget(): Connection failed - failed to set PLC connection. If target is not PLC runtime, use setting "bareClient". If system is in config mode or there is no PLC software yet, you might want to use setting "allowHalfOpen". Error: ${(err as ClientError).message}`, err));
+              return reject(new ClientError(`connectToTarget(): Connection failed - failed to set PLC connection. If target is not PLC runtime, use setting "rawClient". If system is in config mode or there is no PLC software yet, you might want to use setting "allowHalfOpen". Error: ${(err as ClientError).message}`, err));
             }
 
             //allowHalfOpen allows this, but show some warnings..
             if (!this.metaData.tcSystemState) {
-              !this.settings.hideConsoleWarnings && console.log(`WARNING: "allowHalfOpen" setting is active. Target is connected but no connection to TwinCAT system. If target is not PLC runtime, use setting "bareClient" instead of "allowHalfOpen".`);
+              !this.settings.hideConsoleWarnings && console.log(`WARNING: "allowHalfOpen" setting is active. Target is connected but no connection to TwinCAT system. If target is not PLC runtime, use setting "rawClient" instead of "allowHalfOpen".`);
 
             } else if (this.metaData.tcSystemState.adsState !== ADS.ADS_STATE.Run) {
               !this.settings.hideConsoleWarnings && console.log(`WARNING: "allowHalfOpen" setting is active. Target is connected but TwinCAT system is in ${this.metaData.tcSystemState.adsStateStr} instead of run mode. No connection to PLC runtime.`);
@@ -3490,7 +3490,7 @@ export class Client extends EventEmitter<ClientEvents> {
 
       if (reconnect) {
         this.debug(`setTcSystemToRun(): Reconnecting after TwinCAT system restart`);
-        !this.settings.hideConsoleWarnings && console.log("WARNING: Reconnicting after TwinCAT system restart");
+        !this.settings.hideConsoleWarnings && console.log("WARNING: Reconnecting after TwinCAT system restart");
         this.onConnectionLost();
       }
 
