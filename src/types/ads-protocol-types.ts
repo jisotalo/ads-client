@@ -362,6 +362,9 @@ export interface AdsSymbolInfo {
   reserved: Buffer
 }
 
+/**
+ * Array information entry for symbol or data type
+ */
 export interface AdsArrayInfoEntry {
   /** Array start/first index */
   startIndex: number,
@@ -369,6 +372,9 @@ export interface AdsArrayInfoEntry {
   length: number,
 }
 
+/**
+ * Attribute entry for symbol, data type, RPC method etc.
+ */
 export interface AdsAttributeEntry {
   /** Attribute name */
   name: string,
@@ -376,62 +382,93 @@ export interface AdsAttributeEntry {
   value: string
 }
 
+/**
+ * ADS data type object
+ */
 export interface AdsDataType {
+  /** Structure version */
   version: number,
+  /** Hash value of data type (for comparison) */
   hashValue: number,
+  /** Type hash value */
   typeHashValue: number,
-  /** Data type size (bytes) */
+  /** Data type size (bytes or bits if `BitValues` flag) */
   size: number,
+  /** Offset of the entry in parent data type (bytes or bits if `BitValues` flag) */
   offset: number
-  /** ADS data type as number (see ADS.ADS_DATA_TYPES) */
+  /** ADS data type as number (see `ADS.ADS_DATA_TYPES`) */
   adsDataType: number,
-  /** ADS data type as string (see ADS.ADS_DATA_TYPES) */
-  adsDataTypeStr: string,
-  /** Data type flags as bit-notation (see ADS.ADS_DATA_TYPE_FLAGS) */
+  /** ADS data type as string (see `ADS.ADS_DATA_TYPES`) */
+  adsDataTypeStr: keyof typeof ADS.ADS_DATA_TYPES | string,
+  /** Data type flags as bit-notation (see `ADS.ADS_DATA_TYPE_FLAGS`) */
   flags: number,
-  /** Data type flags as string array (see ADS.ADS_DATA_TYPE_FLAGS) */
-  flagsStr: string[],
-  /** If data type is an array, its array dimension */
+  /** Data type flags as string array (see `ADS.ADS_DATA_TYPE_FLAGS`) */
+  flagsStr: (keyof typeof ADS.ADS_DATA_TYPE_FLAGS | string)[],
+  /** Array dimension (if array) */
   arrayDimension: number,
-  /** TODO Data type (variable) name (if struct member -> its variable name)*/
+  /** 
+   * Name of this entry
+   * 
+   * **IMPORTANT NOTE**:
+   *  - If entry is a subitem (e.g. struct member, `item: WORD`), this is the variable name (`item`)
+   *  - If entry is not a subitem / it's the topmost type, this is the data type name (`WORD`)
+   * 
+   * See also `type`
+   */
   name: string,
-  /** TODO Data type name */
+  /** 
+   * Type of this entry
+   * 
+   * **IMPORTANT NOTE**:
+   *  - If entry is a subitem (e.g. struct member, `item: WORD`), this is the variable type (`WORD`)
+   *  - If entry is not a subitem / it's the topmost type, this is empty string (``)
+   * 
+   * See also `name`
+   */
   type: string,
   /** Data type comment (comment in the PLC code) */
   comment: string,
   /** If data type is an array, information of each array dimension */
-  arrayInfos: Array<AdsArrayInfoEntry>,
+  arrayInfos: AdsArrayInfoEntry[],
   /** Subitems (children data types) of this data type (e.g. struct members)*/
-  subItems: Array<AdsDataType>,
-  /** GUID of data type */
+  subItems: AdsDataType[],
+  /** Data type unique identifier (GUID) */
   typeGuid: string,
   /** RPC methods */
-  rpcMethods: Array<AdsRpcMethodEntry>,
-  /** */
-  attributes: Array<AdsAttributeEntry>,
-  /** */
-  enumInfos: Array<AdsEnumInfoEntry>,
-  /** */
+  rpcMethods: AdsRpcMethodEntry[],
+  /** Attributes */
+  attributes: AdsAttributeEntry[],
+  /** Enumeration info */
+  enumInfos: AdsEnumInfoEntry[],
+  //TODO: Add missing data, such as extended flags
+  /** Reserved data */
   reserved: Buffer
 }
 
+/**
+ * RPC method entry for a data type
+ */
 export interface AdsRpcMethodEntry {
+  /** Structure version */
   version: number,
+  /** vTable index for this method */
   vTableIndex: number,
-  /** Byte size of the return type */
+  /** Size of the return type (bytes) */
   returnTypeSize: number,
-  /** Size of the biggest element in bytes for alignment */
+  /** Size of the biggest element for alignment (bytes) */
   returnAlignSize: number,
+  /** Reserved */
   reserved: number,
+  /** Unique identifier (GUID) of the return type */
   returnTypeGuid: string,
-  /** Return value ADS data type as number (see ADS.ADS_DATA_TYPES) */
+  /** Return value ADS data type as number (see `ADS.ADS_DATA_TYPES`) */
   returnAdsDataType: number,
-  /** Return value ADS data type as string (see ADS.ADS_DATA_TYPES) */
-  returnAdsDataTypeStr: string,
-  /** Data type flags as bit-notation (see ADS.ADS_RCP_METHOD_FLAGS) */
+  /** Return value ADS data type as string (see `ADS.ADS_DATA_TYPES`) */
+  returnAdsDataTypeStr: keyof typeof ADS.ADS_DATA_TYPES | string,
+  /** Data type flags as bit-notation (see `ADS.ADS_RCP_METHOD_FLAGS`) */
   flags: number,
-  /** Data type flags as string array (see ADS.ADS_RCP_METHOD_FLAGS) */
-  flagsStr: string[],
+  /** Data type flags as string array (see `ADS.ADS_RCP_METHOD_FLAGS`) */
+  flagsStr: (keyof typeof ADS.ADS_RCP_METHOD_FLAGS | string)[],
   /** RPC method name*/
   name: string,
   /** RPC method return data type */
@@ -439,34 +476,32 @@ export interface AdsRpcMethodEntry {
   /** RPC method comment (comment in the PLC code) */
   comment: string,
   /** Parameters (inputs and outputs) */
-  parameters: Array<AdsRpcMethodParameterEntry>
+  parameters: AdsRpcMethodParameterEntry[]
   /** Method attributes */
-  attributes: Array<AdsAttributeEntry>
+  attributes: AdsAttributeEntry[]
 }
 
+/**
+ * RPC method parameter entry for a RPC method
+ */
 export interface AdsRpcMethodParameterEntry {
-  /** Size in bytes */
+  /** Size (bytes) */
   size: number,
-  /** Size in bytes for alignment */
+  /** Size for alignment (bytes) */
   alignSize: number,
-  /** ADS data type as number (see ADS.ADS_DATA_TYPES) */
+  /** ADS data type as number (see `ADS.ADS_DATA_TYPES`) */
   adsDataType: number,
-  /** ADS data type as string (see ADS.ADS_DATA_TYPES) */
+  /** ADS data type as string (see `ADS.ADS_DATA_TYPES`) */
   adsDataTypeStr: string,
-  /** Data type flags as bit-notation (see ADS.RCP_METHOD_PARAM_FLAGS) */
+  /** Data type flags as bit-notation (see `ADS.RCP_METHOD_PARAM_FLAGS`) */
   flags: number,
-  /** Data type flags as string array (see ADS.RCP_METHOD_PARAM_FLAGS) */
-  flagsStr: string[],
+  /** Data type flags as string array (see `ADS.RCP_METHOD_PARAM_FLAGS`) */
+  flagsStr: (keyof typeof ADS.ADS_RCP_METHOD_PARAM_FLAGS | string)[],
   /** Reserved */
   reserved: number,
   /** GUID of data type */
   typeGuid: string,
-  /** 
-    This field references to the Parameter that defines the length for this
-    generic one. Equally to the marshalling attributes of COM (sizeof, length)
-    this enables to transport parameter of type (PVOID)
-    --> RPC method parameter with index `LengthIsParameterIndex` tells the length??
-  */
+  /** Index-1 of corresponding parameter with length info (not relevant) */
   lengthIsParameterIndex: number,
   /** Parameter name*/
   name: string,
@@ -475,11 +510,14 @@ export interface AdsRpcMethodParameterEntry {
   /** Parameter comment (comment in the PLC code) */
   comment: string,
   /** Attributes */
-  attributes: Array<AdsAttributeEntry>,
+  attributes: AdsAttributeEntry[],
   /** Reserved data in the end of entry (if any) */
   reserved2: Buffer
 }
 
+/**
+ * ADS enumeration entry
+ */
 export interface AdsEnumInfoEntry {
   /** Enumeration name*/
   name: string,
