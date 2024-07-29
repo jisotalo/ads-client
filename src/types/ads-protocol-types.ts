@@ -18,19 +18,25 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
-*/
-import * as ADS from '../ads-commons';
+*/;
+import { ADS } from "../ads-client";
 import { PlcPrimitiveType } from "./ads-client-types";
 
-/** AMS address, such as 192.168.1.2.1.1:851 */
+/** 
+ * AMS address
+ * 
+ * Combination of AmsNetId and ADS port
+ */
 export interface AmsAddress {
-  /** AmsNetId, such as 192.168.1.2.1.1*/
+  /** AmsNetId, such as `192.168.1.2.1.1`*/
   amsNetId: string,
-  /** ADS port, such as 851 */
-  adsPort: number,
+  /** ADS port, such as `851` */
+  adsPort: number
 }
 
-/** AMS packet */
+/** 
+ * AMS packet for communication
+ */
 export interface AmsTcpPacket<T = AdsData> {
   /** AMS TCP header */
   amsTcp: AmsTcpHeader,
@@ -40,19 +46,23 @@ export interface AmsTcpPacket<T = AdsData> {
   ads: T
 }
 
-/** AMS TCP header */
+/** 
+ * AMS TCP header 
+ */
 export interface AmsTcpHeader {
   /** AMS command as number */
   command: number
-  /** AMS command as enumerated string */
-  commandStr: string,
+  /** AMS command as string */
+  commandStr: keyof typeof ADS.AMS_HEADER_FLAG | string,
   /** AMS data length (bytes) */
   length?: number,
-  /** AMS data (if available - only in certain commands) */
+  /** AMS data (if any)) */
   data?: Buffer | AmsRouterStateData | AmsPortRegisteredData
 }
 
-/** AMS header */
+/** 
+ * AMS header
+ */
 export interface AmsHeader {
   /** Target AmsNetId and port (receiver) */
   targetAmsAddress: AmsAddress,
@@ -61,7 +71,7 @@ export interface AmsHeader {
   /** ADS command as number */
   adsCommand: number,
   /** ADS command as enumerated string */
-  adsCommandStr: string,
+  adsCommandStr: keyof typeof ADS.ADS_COMMAND | string,
   /** ADS state flags as number (bits) */
   stateFlags: number,
   /** ADS state flags as comma separated string */
@@ -78,19 +88,27 @@ export interface AmsHeader {
   errorStr?: string
 }
 
-/** ADS data */
+/** 
+ * ADS data 
+ */
 export type AdsData = AdsResponse | AdsRequest;
 
-/** Data that is received when AMS router state changes */
+/** 
+ * AmsTcpHeader data that is received when AMS router state changes 
+ */
 export interface AmsRouterStateData {
   /** New router state as number */
   routerState: number
 }
 
-/** Data that is received when AMS port is registered to router */
+/** 
+ * AmsTcpHeader data that is received when AMS port is registered from the router 
+ */
 export type AmsPortRegisteredData = AmsAddress;
 
-/** Local AMS router state (if available) */
+/** 
+ * AMS router state 
+ */
 export interface AmsRouterState {
   /** Router state */
   state: number,
@@ -98,7 +116,9 @@ export interface AmsRouterState {
   stateStr: string
 }
 
-/** ADS response type (any of these) */
+/** 
+ * ADS response
+ */
 export type AdsResponse =
   EmptyAdsResponse
   | UnknownAdsResponse
@@ -111,10 +131,17 @@ export type AdsResponse =
   | AdsDeleteNotificationResponse
   | AdsWriteControlResponse;
 
+/**
+ * ADS request
+ */
 export interface AdsRequest {
+  /** Payload of the ADS request (if any) */
   payload?: Buffer
 };
 
+/**
+ * ADS error
+ */
 export interface AdsError {
   /** ADS error code (0 = no error, -1 = other than ADS error) */
   errorCode: number,
@@ -122,6 +149,9 @@ export interface AdsError {
   errorStr?: string
 }
 
+/**
+ * Base ADS reponse (that is received in all responses)
+ */
 export interface BaseAdsResponse {
   /** True if response has error (ADS or our own customer error) */
   error: boolean,
@@ -140,7 +170,7 @@ export type EmptyAdsResponse = {
 };
 
 /**
- * ADS read response
+ * ADS response for `Read` command
  */
 export interface AdsReadResponse extends BaseAdsResponse {
   /** Data length */
@@ -150,7 +180,7 @@ export interface AdsReadResponse extends BaseAdsResponse {
 };
 
 /**
- * ADS ReadWrite response
+ * ADS response for `ReadWrite` command
  */
 export interface AdsReadWriteResponse extends BaseAdsResponse {
   /** Data length */
@@ -160,13 +190,13 @@ export interface AdsReadWriteResponse extends BaseAdsResponse {
 };
 
 /**
- * ADS Write response
+ * ADS response for `Write` command
  */
 export interface AdsWriteResponse extends BaseAdsResponse {
 };
 
 /**
- * ADS ReadDeviceInfo response
+ * ADS response for `ReadDeviceInfo` command
  */
 export interface AdsReadDeviceInfoResponse extends BaseAdsResponse {
   /** Device info */
@@ -174,7 +204,7 @@ export interface AdsReadDeviceInfoResponse extends BaseAdsResponse {
 };
 
 /**
- * ADS ReadState response
+ * ADS response for `ReadState` command
  */
 export interface AdsReadStateResponse extends BaseAdsResponse {
   /** ADS state */
@@ -182,7 +212,7 @@ export interface AdsReadStateResponse extends BaseAdsResponse {
 };
 
 /**
- * ADS AddNotification response
+ * ADS response for `AddNotification` command
  */
 export interface AdsAddNotificationResponse extends BaseAdsResponse {
   /** Device notification handle */
@@ -190,19 +220,17 @@ export interface AdsAddNotificationResponse extends BaseAdsResponse {
 };
 
 /**
- * ADS DeleteNotification response
+ * ADS response for `DeleteNotification` command
  */
-export interface AdsDeleteNotificationResponse extends BaseAdsResponse {
-};
+export interface AdsDeleteNotificationResponse extends BaseAdsResponse { };
 
 /**
- * ADS WriteControl response
+ * ADS response for `WriteControl` command
  */
-export interface AdsWriteControlResponse extends BaseAdsResponse {
-};
+export interface AdsWriteControlResponse extends BaseAdsResponse { };
 
 /**
- * ADS notification response
+ * ADS response for `Notification` command
  */
 export interface AdsNotificationResponse extends BaseAdsResponse {
   /** Notification data */
@@ -210,10 +238,9 @@ export interface AdsNotificationResponse extends BaseAdsResponse {
 };
 
 /**
- * ADS response that is unknown
+ * ADS response for unknown command
  */
-export interface UnknownAdsResponse extends BaseAdsResponse {
-};
+export interface UnknownAdsResponse extends BaseAdsResponse { };
 
 /**
  * ADS device info
@@ -235,38 +262,47 @@ export interface AdsDeviceInfo {
 export interface AdsState {
   /** ADS state */
   adsState: number,
-  /** ADS state as string (if available) */
+  /** ADS state as string (if any) */
   adsStateStr?: string,
   /** Device state */
   deviceState: number
 }
 
 /**
- * ADS add notification response data
+ * ADS `AddNotification` reponse payload
  */
 export interface AdsAddNotificationResponseData {
   /** Notification handle */
   notificationHandle: number
 }
 
+/**
+ * ADS notification with number of stamps
+ */
 export interface AdsNotification {
   /** Total data length (bytes) */
   length: number,
   /** How many stamps does this packet have */
   stampCount: number,
   /** Stamps */
-  stamps: Array<AdsNotificationStamp>
+  stamps: AdsNotificationStamp[]
 }
 
+/**
+ * Single ADS notification stamp with multiple samples
+ */
 export interface AdsNotificationStamp {
   /** Timestamp of the included data*/
   timestamp: Date,
   /** How many samples */
   count: number,
   /** Samples (payload) */
-  samples: Array<AdsNotificationSample>
+  samples: AdsNotificationSample[]
 }
 
+/**
+ * Single ADS notification sample
+ */
 export interface AdsNotificationSample {
   /** Notification handle this data belongs to */
   notificationHandle: number,
@@ -276,15 +312,21 @@ export interface AdsNotificationSample {
   payload: Buffer
 }
 
-export interface AdsRawInfo {
+/**
+ * ADS raw address
+ */
+export interface AdsRawAddress{
   /** Address indexGroup */
   indexGroup: number,
   /** Address indexOffset */
   indexOffset: number,
-  /** Size (bytes) */
+  /** Size as bytes (if any) */
   size?: number
 }
 
+/**
+ * ADS symbol information object
+ */
 export interface AdsSymbolInfo {
   /** Symbol address indexGroup */
   indexGroup: number,

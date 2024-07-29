@@ -1,6 +1,6 @@
 import EventEmitter from "events";
 import type { ActiveAdsRequestContainer, ActiveSubscription, ActiveSubscriptionContainer, AdsClientConnection, AdsClientSettings, AdsCommandToSend, AdsDataTypeContainer, AdsSymbolInfoContainer, AdsUploadInfo, ConnectionMetaData, PlcPrimitiveType, SubscriptionData, SubscriptionSettings, ReadSymbolResult, TimerObject, ObjectToBufferConversionResult, WriteSymbolResult, VariableHandle, RpcMethodCallResult, CreateVariableHandleMultiResult, ReadRawMultiResult, ReadRawMultiCommand, WriteRawMultiResult, DeleteVariableHandleMultiResult, ReadWriteRawMultiResult, ReadWriteRawMultiCommand, WriteRawMultiCommand, ClientEvents } from "./types/ads-client-types";
-import { AdsAddNotificationResponse, AdsAddNotificationResponseData, AdsArrayInfoEntry, AdsAttributeEntry, AdsDataType, AdsDeleteNotificationResponse, AdsDeviceInfo, AdsEnumInfoEntry, AdsNotification, AdsNotificationResponse, AdsNotificationSample, AdsNotificationStamp, AdsRawInfo, AdsReadDeviceInfoResponse, AdsReadResponse, AdsReadStateResponse, AdsReadWriteResponse, AdsRequest, AdsResponse, AdsRpcMethodEntry, AdsRpcMethodParameterEntry, AdsState, AdsSymbolInfo, AdsWriteControlResponse, AdsWriteResponse, AmsAddress, AmsHeader, AmsPortRegisteredData, AmsRouterState, AmsRouterStateData, AmsTcpHeader, AmsTcpPacket, BaseAdsResponse, EmptyAdsResponse, UnknownAdsResponse } from "./types/ads-protocol-types";
+import { AdsAddNotificationResponse, AdsAddNotificationResponseData, AdsArrayInfoEntry, AdsAttributeEntry, AdsDataType, AdsDeleteNotificationResponse, AdsDeviceInfo, AdsEnumInfoEntry, AdsNotification, AdsNotificationResponse, AdsNotificationSample, AdsNotificationStamp, AdsRawAddress, AdsReadDeviceInfoResponse, AdsReadResponse, AdsReadStateResponse, AdsReadWriteResponse, AdsRequest, AdsResponse, AdsRpcMethodEntry, AdsRpcMethodParameterEntry, AdsState, AdsSymbolInfo, AdsWriteControlResponse, AdsWriteResponse, AmsAddress, AmsHeader, AmsPortRegisteredData, AmsRouterState, AmsRouterStateData, AmsTcpHeader, AmsTcpPacket, BaseAdsResponse, EmptyAdsResponse, UnknownAdsResponse } from "./types/ads-protocol-types";
 import {
   Socket,
   SocketConnectOpts
@@ -1054,103 +1054,6 @@ export class Client extends EventEmitter<ClientEvents> {
   }
 
   /**
-   * Sends an ADS command
-   * 
-   * @template T ADS response type. If omitted, generic AdsResponse is used
-   */
-  async sendAdsCommand<T = AdsResponse>(command: AdsCommandToSend) {
-    return new Promise<AmsTcpPacket<T>>(async (resolve, reject) => {
-
-      if (this.nextInvokeId >= ADS.ADS_INVOKE_ID_MAX_VALUE) {
-        this.nextInvokeId = 0;
-      }
-
-      const packet: AmsTcpPacket<AdsRequest> = {
-        amsTcp: {
-          command: ADS.AMS_HEADER_FLAG.AMS_TCP_PORT_AMS_CMD,
-          commandStr: ADS.AMS_HEADER_FLAG.toString(ADS.AMS_HEADER_FLAG.AMS_TCP_PORT_AMS_CMD)
-        },
-        ams: {
-          targetAmsAddress: {
-            amsNetId: command.targetAmsNetId ?? this.settings.targetAmsNetId,
-            adsPort: command.targetAdsPort ?? this.settings.targetAdsPort
-          },
-          sourceAmsAddress: {
-            amsNetId: this.connection.localAmsNetId!,
-            adsPort: this.connection.localAdsPort!
-          },
-          adsCommand: command.adsCommand,
-          adsCommandStr: ADS.ADS_COMMAND.toString(command.adsCommand),
-          stateFlags: ADS.ADS_STATE_FLAGS.AdsCommand,
-          stateFlagsStr: ADS.ADS_STATE_FLAGS.toString(ADS.ADS_STATE_FLAGS.AdsCommand),
-          dataLength: command.payload?.byteLength ?? 0,
-          errorCode: 0,
-          invokeId: this.nextInvokeId++
-        },
-        ads: {
-          payload: command.payload
-        }
-      };
-
-      if (packet.ams.targetAmsAddress.amsNetId === 'localhost') {
-        packet.ams.targetAmsAddress.amsNetId = '127.0.0.1.1.1';
-      }
-
-      this.debugD(`sendAdsCommand(): Sending an ads command ${packet.ams.adsCommandStr} (${packet.ams.dataLength} bytes): %o`, packet);
-
-      //Creating a full AMS/TCP request
-      try {
-        var request = this.createAmsTcpRequest(packet);
-      } catch (err) {
-        return reject(new ClientError(`sendAdsCommand(): Creating AmsTcpRequest failed`, err));
-      }
-
-      //Registering callback for response handling
-      this.activeAdsRequests[packet.ams.invokeId] = {
-        responseCallback: (res: AmsTcpPacket<AdsResponse>) => {
-
-          this.debugD(`sendAdsCommand(): Response received for command "${packet.ams.adsCommandStr}" with invokeId ${packet.ams.invokeId}`);
-
-          //Callback is no longer needed, delete it
-          delete this.activeAdsRequests[packet.ams.invokeId];
-
-          if (res.ams.error) {
-            return reject(new ClientError(`sendAdsCommand(): Response with AMS error received (error ${res.ams.errorCode} - ${res.ams.errorStr})`, res.ams));
-          } else if (res.ads.error) {
-            return reject(new ClientError(`sendAdsCommand(): Response with ADS error received (error ${res.ads.errorCode} - ${res.ads.errorStr})`, res.ads));
-          }
-
-          return resolve(res as AmsTcpPacket<T>);
-        },
-        timeoutTimerHandle: setTimeout(() => {
-          this.debug(`sendAdsCommand(): Timeout for command ${packet.ams.adsCommandStr} with invokeId ${packet.ams.invokeId} - No response in ${this.settings.timeoutDelay} ms`);
-
-          //Callback is no longer needed, delete it
-          delete this.activeAdsRequests[packet.ams.invokeId];
-
-          //Creating an error object (that mimics ADS error) so it is passed forward
-          const adsError = {
-            ads: {
-              error: true,
-              errorCode: -1,
-              errorStr: `Timeout - no response in ${this.settings.timeoutDelay} ms`
-            } as BaseAdsResponse
-          }
-          return reject(new ClientError(`sendAdsCommand(): Timeout for command ${packet.ams.adsCommandStr} with invokeId ${packet.ams.invokeId} - No response in ${this.settings.timeoutDelay} ms`, adsError));
-
-        }, this.settings.timeoutDelay)
-      };
-
-      //Write the data 
-      try {
-        this.socketWrite(request);
-      } catch (err) {
-        return reject(new ClientError(`sendAdsCommand(): Error - Socket is not available (failed to send data)`, err));
-      }
-    })
-  }
-
-  /**
    * Creates an AMS/TCP request from given packet object
    * 
    * @param packet Object containing the full AMS/TCP packet
@@ -1671,7 +1574,7 @@ export class Client extends EventEmitter<ClientEvents> {
 
       //Get local AmsNetId response
       case ADS.AMS_HEADER_FLAG.GET_LOCAL_NETID:
-        packet.amsTcp.commandStr = 'Get local AmsNetId';
+        packet.amsTcp.commandStr = 'GET_LOCAL_NETID';
         //No action at the moment
         break;
 
@@ -1847,7 +1750,7 @@ export class Client extends EventEmitter<ClientEvents> {
   private async addSubscription<T = any>(settings: SubscriptionSettings<T>, internal: boolean, targetOpts: Partial<AmsAddress> = {}): Promise<ActiveSubscription<T>> {
     this.debugD(`addSubscription(): Subscribing %o (internal: ${internal})`, settings);
 
-    let targetAddress = {} as AdsRawInfo;
+    let targetAddress = {} as AdsRawAddress;
     let symbolInfo: AdsSymbolInfo | undefined = undefined;
 
     if (typeof settings.target === "string") {
@@ -3302,6 +3205,103 @@ export class Client extends EventEmitter<ClientEvents> {
     this.debugIO.enabled = level >= 3;
 
     this.debug(`setDebugLevel(): Debug level set to ${level}`);
+  }
+
+  /**
+   * Sends a raw ADS command to the target
+   * 
+   * @template T ADS response type. If omitted, generic AdsResponse is used
+   */
+  public async sendAdsCommand<T = AdsResponse>(command: AdsCommandToSend) {
+    return new Promise<AmsTcpPacket<T>>(async (resolve, reject) => {
+
+      if (this.nextInvokeId >= ADS.ADS_INVOKE_ID_MAX_VALUE) {
+        this.nextInvokeId = 0;
+      }
+
+      const packet: AmsTcpPacket<AdsRequest> = {
+        amsTcp: {
+          command: ADS.AMS_HEADER_FLAG.AMS_TCP_PORT_AMS_CMD,
+          commandStr: ADS.AMS_HEADER_FLAG.toString(ADS.AMS_HEADER_FLAG.AMS_TCP_PORT_AMS_CMD) as keyof typeof ADS.AMS_HEADER_FLAG
+        },
+        ams: {
+          targetAmsAddress: {
+            amsNetId: command.targetAmsNetId ?? this.settings.targetAmsNetId,
+            adsPort: command.targetAdsPort ?? this.settings.targetAdsPort
+          },
+          sourceAmsAddress: {
+            amsNetId: this.connection.localAmsNetId!,
+            adsPort: this.connection.localAdsPort!
+          },
+          adsCommand: command.adsCommand,
+          adsCommandStr: ADS.ADS_COMMAND.toString(command.adsCommand),
+          stateFlags: ADS.ADS_STATE_FLAGS.AdsCommand,
+          stateFlagsStr: ADS.ADS_STATE_FLAGS.toString(ADS.ADS_STATE_FLAGS.AdsCommand),
+          dataLength: command.payload?.byteLength ?? 0,
+          errorCode: 0,
+          invokeId: this.nextInvokeId++
+        },
+        ads: {
+          payload: command.payload
+        }
+      };
+
+      if (packet.ams.targetAmsAddress.amsNetId === 'localhost') {
+        packet.ams.targetAmsAddress.amsNetId = '127.0.0.1.1.1';
+      }
+
+      this.debugD(`sendAdsCommand(): Sending an ads command ${packet.ams.adsCommandStr} (${packet.ams.dataLength} bytes): %o`, packet);
+
+      //Creating a full AMS/TCP request
+      try {
+        var request = this.createAmsTcpRequest(packet);
+      } catch (err) {
+        return reject(new ClientError(`sendAdsCommand(): Creating AmsTcpRequest failed`, err));
+      }
+
+      //Registering callback for response handling
+      this.activeAdsRequests[packet.ams.invokeId] = {
+        responseCallback: (res: AmsTcpPacket<AdsResponse>) => {
+
+          this.debugD(`sendAdsCommand(): Response received for command "${packet.ams.adsCommandStr}" with invokeId ${packet.ams.invokeId}`);
+
+          //Callback is no longer needed, delete it
+          delete this.activeAdsRequests[packet.ams.invokeId];
+
+          if (res.ams.error) {
+            return reject(new ClientError(`sendAdsCommand(): Response with AMS error received (error ${res.ams.errorCode} - ${res.ams.errorStr})`, res.ams));
+          } else if (res.ads.error) {
+            return reject(new ClientError(`sendAdsCommand(): Response with ADS error received (error ${res.ads.errorCode} - ${res.ads.errorStr})`, res.ads));
+          }
+
+          return resolve(res as AmsTcpPacket<T>);
+        },
+        timeoutTimerHandle: setTimeout(() => {
+          this.debug(`sendAdsCommand(): Timeout for command ${packet.ams.adsCommandStr} with invokeId ${packet.ams.invokeId} - No response in ${this.settings.timeoutDelay} ms`);
+
+          //Callback is no longer needed, delete it
+          delete this.activeAdsRequests[packet.ams.invokeId];
+
+          //Creating an error object (that mimics ADS error) so it is passed forward
+          const adsError = {
+            ads: {
+              error: true,
+              errorCode: -1,
+              errorStr: `Timeout - no response in ${this.settings.timeoutDelay} ms`
+            } as BaseAdsResponse
+          }
+          return reject(new ClientError(`sendAdsCommand(): Timeout for command ${packet.ams.adsCommandStr} with invokeId ${packet.ams.invokeId} - No response in ${this.settings.timeoutDelay} ms`, adsError));
+
+        }, this.settings.timeoutDelay)
+      };
+
+      //Write the data 
+      try {
+        this.socketWrite(request);
+      } catch (err) {
+        return reject(new ClientError(`sendAdsCommand(): Error - Socket is not available (failed to send data)`, err));
+      }
+    })
   }
 
   /**

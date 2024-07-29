@@ -1,5 +1,5 @@
 import ClientError from "../client-error";
-import { AdsDataType, AdsDeviceInfo, AdsRawInfo, AdsResponse, AdsState, AdsSymbolInfo, AmsAddress, AmsTcpPacket, BaseAdsResponse } from "./ads-protocol-types"
+import { AdsDataType, AdsDeviceInfo, AdsRawAddress, AdsResponse, AdsState, AdsSymbolInfo, AmsAddress, AmsTcpPacket, BaseAdsResponse } from "./ads-protocol-types";
 
 /**
  * Events for the client, for example `client.on('connect', ...)`
@@ -121,7 +121,7 @@ export interface AdsClientSettings {
    * However, if connecting from a system without router (such as Linux), this needs to be changed to be the router/PLC address.
    */
   routerAddress?: string,
-  
+
   /** 
    * **Optional**: Local IP address to use (default: `(empty string)` -> automatic)
    * 
@@ -223,7 +223,7 @@ export interface AdsClientSettings {
    * NOTE: This is not available when using the `rawClient` setting.
    */
   readAndCacheSymbols?: boolean,
-  
+
   /** 
    * **Optional**: If set, all data types from target are read and cached after connecting. (default: `false`)
    * 
@@ -307,6 +307,9 @@ export interface AdsClientSettings {
   disableCaching?: boolean
 }
 
+/**
+ * Internal timer object to keep the timer state saved
+ */
 export interface TimerObject {
   /** Timer ID */
   id: number,
@@ -314,6 +317,9 @@ export interface TimerObject {
   timer?: NodeJS.Timeout
 }
 
+/**
+ * Active client connection
+ */
 export interface AdsClientConnection {
   /** Connection status of the client, true if connected */
   connected: boolean,
@@ -329,16 +335,27 @@ export interface AdsClientConnection {
   targetAdsPort?: number,
 }
 
-/** Object containing all active subscriptions (notification handle as key) */
+/** 
+ * Object containing all active subscriptions for each target address
+ * 
+ * Target address (`amsNetId:port`) is used as a key
+ */
 export interface ActiveSubscriptionContainer {
   [K: string]: TargetActiveSubscriptionContainer
 }
 
+/** 
+ * Object containing all active subscriptions for each notification handle (for one target)
+ * 
+ * Notification handle is used as a key
+ */
 export interface TargetActiveSubscriptionContainer {
   [K: number]: ActiveSubscription
 }
 
-/** Object containing information for an active subscription */
+/** 
+ * Object containing information for a single active subscription 
+ */
 export interface ActiveSubscription<T = any> {
   /** Settings for this subscription */
   settings: SubscriptionSettings<T>,
@@ -360,50 +377,71 @@ export interface ActiveSubscription<T = any> {
   targetOpts?: Partial<AmsAddress>
 }
 
+/**
+ * Subscription data (value and timestamp)
+ */
 export interface SubscriptionData<T = any> {
   timestamp: Date,
   value: T
 }
 
-
-/** Object containing all active ADS requests that are waiting for responses (invoke ID as key) */
+/** 
+ * Object containing all active ADS requests that are waiting for responses 
+ * 
+ * Invoke ID is used as a key
+ */
 export interface ActiveAdsRequestContainer {
   [K: number]: ActiveAdsRequest
 }
 
+/**
+ * Active ADS command that is waiting for answer
+ * Callback is called when response is received
+ */
 export interface ActiveAdsRequest {
   timeoutTimerHandle?: NodeJS.Timeout,
   responseCallback: (packet: AmsTcpPacket<AdsResponse>) => void
 };
 
+/**
+ * Client connection metadata
+ */
 export interface ConnectionMetaData {
   /** Target device information (if available) */
   deviceInfo?: AdsDeviceInfo,
-  /** Target device TwinCAT system state (if available) */
+  /** Target TwinCAT system state (if available) */
   tcSystemState?: AdsState,
-  /** Target PLC runtime state (from target ADS port - if available) */
+  /** Target PLC runtime state (if available) */
   plcRuntimeState?: AdsState,
-  /** Target runtime symbol and datatype count/size information */
+  /** Target PLC runtime symbol and datatype count/size information (if available) */
   uploadInfo?: AdsUploadInfo,
-  /** Actice PLC symbol version in the target runtime - changes when PLC software is updated (symbols change) */
+  /** Target PLC runtime symbol version (if available) */
   plcSymbolVersion?: number,
-  /** True if client has cached all symbols previously - we know to cache all again after a symbol version change */
+  /** Set to `true` if client has cached all symbols */
   allSymbolsCached: boolean,
-  /** All cached target runtime symbols */
+  /** Cached target PLC runtime symbols (if available) */
   symbols: AdsSymbolInfoContainer,
-  /** True if client has cached all data types previously - we know to cache all again after a symbol version change */
+  /** Set to `true` if client has cached all data types */
   allDataTypesCached: boolean,
-  /** All target runtime cached data types (without subitems, full types are built ont request)*/
+  /** Cached target PLC runtime data types without subitems (if available) */
   dataTypes: AdsDataTypeContainer,
   /** Local AMS router state (if available) */
   routerState?: AmsRouterState
 };
 
+/**
+ * AMS router state
+ */
 export interface AmsRouterState {
   state: number,
   stateStr: string
 };
 
+/**
+ * PLC runtime upload info
+ * 
+ * Contains information about symbols and data types
+ */
 export interface AdsUploadInfo {
   /** Number of symbols in the target runtime */
   symbolCount: number,
@@ -419,16 +457,25 @@ export interface AdsUploadInfo {
   extraLength: number
 }
 
+/**
+ * Object containing PLC runtime symbol information objects
+ */
 export interface AdsSymbolInfoContainer {
   [K: string]: AdsSymbolInfo
 }
 
+/**
+ * Object containing PLC runtime data type objects
+ */
 export interface AdsDataTypeContainer {
   [K: string]: AdsDataType
 }
 
+/**
+ * ADS command  
+ */
 export interface AdsCommandToSend {
-  /** Ads command */
+  /** Ads command (see `ADS.ADS_COMMAND`)*/
   adsCommand: number,
   /** Target AmsNetId (receiver) */
   targetAmsNetId?: string,
@@ -448,15 +495,20 @@ export interface AdsCommandToSend {
  */
 export type SubscriptionCallback<T = any> = (data: SubscriptionData<T>, subscription: ActiveSubscription<T>) => void;
 
+/**
+ * Settings for a subscription
+ */
 export interface SubscriptionSettings<T = any> {
   /** 
    * Subscription target (variable name as string or raw ADS address). 
    * 
    * Such as such as `GVL_Test.ExampleStruct` or `{indexGroup, indexOffset, size}` object 
    */
-  target: AdsRawInfo | string,
+  target: AdsRawAddress | string,
+
   /** Callback function that is called when new value is received */
   callback: SubscriptionCallback<T>,
+
   /** 
    * Cycle time for subscription (default: `200 ms`)
    * 
@@ -466,6 +518,7 @@ export interface SubscriptionSettings<T = any> {
    * If `sendOnChange` is `false`, PLC constantly sends the value with `cycleTime` interval. 
    */
   cycleTime?: number,
+
   /** Should the notification be sent only when the value changes? (default: `true`)
    * 
    * If `false`, the value is sent with `cycleTime` interval (even if it doesn't change).
@@ -475,72 +528,122 @@ export interface SubscriptionSettings<T = any> {
    * NOTE: When subscribing, the value is always sent once.
    */
   sendOnChange?: boolean,
+
   /** 
-   * How long the PLC waits before sending the values at maximum? (default: 0 ms --> maximum delay is off)
+   * How long the PLC waits before sending the values at maximum? (default: `0` ms --> maximum delay is off)
    * 
    * If value is not changing, the first notification with active value after subscribing is sent after `maxDelay`.
    * 
    * If the value is changing, the PLC sends one or more notifications every `maxDelay`. 
+   * 
    * So if `cycleTime` is 100 ms, `maxDelay` is 1000 ms and value changes every 100 ms, the PLC sends 10 notifications every 1000 ms.
    * This can be useful for throttling.
    */
   maxDelay?: number,
 }
 
+/**
+ * PLC primitive types (not structs, function blocks etc.)
+ */
 export type PlcPrimitiveType = string | boolean | number | Buffer | Date | BigInt;
 
+/**
+ * Return value of `readSymbol()`
+ * 
+ * @template T - Type of the value
+ */
 export interface ReadSymbolResult<T = any> {
+  /** Value of the symbol as converted Javascript object */
   value: T,
+  /** Raw value as Buffer */
   rawValue: Buffer,
+  /** Data type of the target symbol */
   dataType: AdsDataType,
+  /** Symbol information of the target symbol */
   symbolInfo: AdsSymbolInfo
 }
 
+/**
+ * Return value of `writeSymbol()`
+ */
 export interface WriteSymbolResult<T = any> {
+  /** Value of the symbol as converted Javascript object */
   value: T,
+  /** Raw value as Buffer */
   rawValue: Buffer,
+  /** Data type of the target symbol */
   dataType: AdsDataType,
+  /** Symbol information of the target symbol */
   symbolInfo: AdsSymbolInfo
 }
 
+/** 
+ * Return value of `convertObjectToBuffer()` 
+ */
 export interface ObjectToBufferConversionResult {
+  /** Converted raw value */
   rawValue: Buffer,
+  /** Property key name, if a property is missing from the Javascript object */
   missingProperty?: string
 }
 
+/**
+ * Variable handle object created using `createVariableHandle()` or `createVariableHandleMulti()`
+ */
 export interface VariableHandle {
+  /** Handle number */
   handle: number,
+  /** Data type size */
   size: number,
+  /** Unknown */
   typeDecoration: number,
+  /** Data type name */
   dataType: string
 }
 
+/**
+ * Return value of `invokeRpcMethod()`
+ * 
+ * @template T The type of method return value
+ * @template U The type of method outputs
+ */
 export interface RpcMethodCallResult<T = any, U = Record<string, any>> {
+  /** Method return value (if any - `undefined` if none) */
   returnValue?: T,
+  /** Method outputs (if any - `{}` if none)*/
   outputs: U
 }
 
+/**
+ * Parameter containing all read commands for `readRawMulti()`
+ */
+export interface ReadRawMultiCommand extends Required<AdsRawAddress> { }
 
-export interface ReadRawMultiCommand extends Required<AdsRawInfo> {
-
-}
-
+/**
+ * Return value of `readRawMulti()`
+ */
 export interface ReadRawMultiResult extends BaseAdsResponse {
   /** Command */
   command: ReadRawMultiCommand,
   /** True if reading was successful */
   success: boolean,
-  /** Value if reading was successful */
+  /** Value (if any) */
   value?: Buffer
 }
 
-export interface WriteRawMultiCommand extends AdsRawInfo {
+/**
+ * Parameter containing all write commands for `writeRawMulti()`
+ */
+export interface WriteRawMultiCommand extends AdsRawAddress {
   /** Value to write */
   value: Buffer,
   /** Size (bytes) - optional - as default, size of value is used*/
   size?: number
 }
 
+/**
+ * Return value of `writeRawMulti()`
+ */
 export interface WriteRawMultiResult extends BaseAdsResponse {
   /** Command */
   command: WriteRawMultiCommand,
@@ -548,15 +651,21 @@ export interface WriteRawMultiResult extends BaseAdsResponse {
   success: boolean
 }
 
+/**
+ * Return value of `createVariableHandleMulti()`
+ */
 export interface CreateVariableHandleMultiResult extends BaseAdsResponse {
   /** Full variable path in the PLC (such as `GVL_Test.ExampleStruct`) */
   path: string,
   /** True if handle was created successfully */
   success: boolean,
-  /** Created handle if successful */
+  /** Created handle (if any) */
   handle?: VariableHandle
 }
 
+/**
+ * Return value of `deleteVariableHandleMulti()`
+ */
 export interface DeleteVariableHandleMultiResult extends BaseAdsResponse {
   /** Variable handle */
   handle: VariableHandle | number,
@@ -564,18 +673,24 @@ export interface DeleteVariableHandleMultiResult extends BaseAdsResponse {
   success: boolean
 }
 
-export interface ReadWriteRawMultiCommand extends Required<AdsRawInfo> {
+/**
+ * Parameter containing all read/write commands for `readWriteRawMulti()`
+ */
+export interface ReadWriteRawMultiCommand extends Required<AdsRawAddress> {
   /** Data to write */
   writeData: Buffer,
   /** How many bytes to read */
   size: number
 }
 
+/**
+ * Return value of `readWriteRawMulti()`
+ */
 export interface ReadWriteRawMultiResult extends BaseAdsResponse {
   /** Command */
   command: ReadWriteRawMultiCommand,
-  /** True if ReadWrite command was successful */
+  /** True if command was successful */
   success: boolean,
-  /** Response data */
+  /** Response data (if any) */
   data?: Buffer,
 }
