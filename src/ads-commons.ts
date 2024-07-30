@@ -669,6 +669,48 @@ export const ADS_SYMBOL_FLAGS = {
     return index >= 0 ? Object.keys(this)[index] : "unknown";
   }
 }
+/**
+ * ADS symbol extended flags
+ * 
+ * Source: TwinCAT.Ads.dll By Beckhoff
+ */
+export const ADS_SYMBOL_FLAGS_2 = {
+  //None
+  None: 0,
+  /**  PLC pointer type (ADSSYMBOLFLAG2_PLCPOINTERTYPE, 0x00000001) */
+  PlcPointerType: 1,
+  /**  Ignore symbol while equalizing redundancy projects (ADSSYMBOLFLAG2_RDIGNORE, 0x00000002) */
+  RedundancyIgnore: 2,
+  /**  Contains refactoring information (ADSSYMBOLFLAG2_REFACTORINFO, 0x00000004) */
+  RefactorInfo: 4,
+  /**  Online change PTR reference type (ADSSYMBOLFLAG2_OCPTRREFTYPE, 0x00000008) */
+  OnlineChangePtrRefType: 8,
+  /**  Symbol is a Variant Type (ADSSYMBOLFLAG2_VARIANT, 0x00000010) */
+  VariantType: 16, // 0x0010
+
+  /** Return given flag value as string array */
+  toStringArray: function (flags: number): string[] {
+    const flagsArr: Array<string> = []
+
+    for (const key of Object.keys(this)) {
+      const typedKey = key as keyof typeof ADS_SYMBOL_FLAGS_2
+
+      if (typeof this[typedKey] !== 'number')
+        continue
+
+      //Check if flag is available
+      if ((flags & this[typedKey] as number) === this[typedKey]) {
+        if (flags === 0 || this[typedKey] !== 0) flagsArr.push(key)
+      }
+    }
+
+    return flagsArr
+  },
+  toString: function (flag: number): string {
+    const index = Object.values(this).findIndex(val => val === flag);
+    return index >= 0 ? Object.keys(this)[index] : "unknown";
+  }
+}
 
 /**
  * ADS data type flags
@@ -708,8 +750,8 @@ export const ADS_DATA_TYPE_FLAGS = {
   Aligned: 65536, // 0x00010000
   /**   data item is static - do not use offs (ADSDATATYPEFLAG_STATIC) */
   Static: 131072, // 0x00020000
-  /**   means "ContainSpLevelss" for DATATYPES and "HasSpLevels" for DATAITEMS (ADSDATATYPEFLAG_SPLEVELS) */
-  SpLevels: 262144, // 0x00040000
+  /** Has Software Protection Levels for DataTypes. */
+  SoftwareProtectionLevels: 262144, // 0x00040000
   /**   do not restore persistent data (ADSDATATYPEFLAG_IGNOREPERSIST) */
   IgnorePersist: 524288, // 0x00080000
   /**  Any size array (ADSDATATYPEFLAG_ANYSIZEARRAY) */
@@ -718,19 +760,21 @@ export const ADS_DATA_TYPE_FLAGS = {
   PersistantDatatype: 2097152, // 0x00200000
   /**   Persistent data will not restored after reset (cold) (ADSDATATYPEFLAG_INITONRESET,0x00400000) */
   InitOnReset: 4194304, // 0x00400000
-  /** TODO: Comment */
+  /** Indicates PLC Pointer types (ADSDATATYPEFLAG_PLCPOINTERTYPE, 0x00800000) */
   PlcPointerType: 8388608, // 0x00800000
-  /** TODO: Comment */
+  /** Refactoring information is added (ADSDATATYPEFLAG_REFACTORINFO, 0x01000000) */
   RefactorInfo: 16777216, // 0x01000000
-  /** TODO: Comment */
+  /** SubItems are hidden / will not be evaluated (ADSDATATYPEFLAG_HIDESUBITEMS, 0x02000000) */
   HideSubItems: 33554432, // 0x02000000
-  /** TODO: Comment */
+  /** The Type description is incomplete (ADSDATATYPEFLAG_INCOMPLETE, 0x04000000) */
   Incomplete: 67108864, // 0x04000000
-  /** TODO: Comment */
+  /** Type contains online change PTR reference (ADSDATATYPEFLAG_OCPTRREFTYPE, 0x08000000) */
   ContainsOnlineChangePtrRef: 134217728, // 0x08000000
-  /** TODO: Comment */
-  Variant: 268435456, // 0x10000000
-  /** TODO: Comment */
+  /** Deref Type Item (ADSDATATYPEFLAG_DEREFTYPEITEM, 0x10000000) */
+  DeRefTypeItem: 268435456, // 0x10000000
+  /** Extended Enum Infos. Comment and attributes for enum values (ADSDATATYPEFLAG_EXTENUMINFOS, 0x20000000) */
+  ExtendedEnumInfos: 536870912, // 0x20000000
+  /** Extended Flags used/added (ADSDATATYPEFLAG_EXTENDEDFLAGS, 0x80000000) */
   ExtendedFlags: 2147483648, // 0x80000000
   /**  None / No Flag set */
   None: 0,

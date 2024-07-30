@@ -356,7 +356,7 @@ export interface AdsSymbolInfo {
   typeGuid: string,
   /** Symbol attributes, such as pragmas */
   attributes: Array<AdsAttributeEntry>
-  /* Extended flags (meaning unknown at this point) */
+  /* Extended flags */
   extendedFlags: number,
   /** Rest bytes in the end of data that have no meaning yet */
   reserved: Buffer
@@ -440,7 +440,8 @@ export interface AdsDataType {
   attributes: AdsAttributeEntry[],
   /** Enumeration info */
   enumInfos: AdsEnumInfoEntry[],
-  //TODO: Add missing data, such as extended flags
+  /** Data type extended flags */
+  extendedFlags: number,
   /** Reserved data */
   reserved: Buffer
 }
@@ -465,9 +466,9 @@ export interface AdsRpcMethodEntry {
   returnAdsDataType: number,
   /** Return value ADS data type as string (see `ADS.ADS_DATA_TYPES`) */
   returnAdsDataTypeStr: keyof typeof ADS.ADS_DATA_TYPES | string,
-  /** Data type flags as bit-notation (see `ADS.ADS_RCP_METHOD_FLAGS`) */
+  /** PRC method flags as bit-notation (see `ADS.ADS_RCP_METHOD_FLAGS`) */
   flags: number,
-  /** Data type flags as string array (see `ADS.ADS_RCP_METHOD_FLAGS`) */
+  /** RPC method flags as string array (see `ADS.ADS_RCP_METHOD_FLAGS`) */
   flagsStr: (keyof typeof ADS.ADS_RCP_METHOD_FLAGS | string)[],
   /** RPC method name*/
   name: string,
@@ -493,9 +494,9 @@ export interface AdsRpcMethodParameterEntry {
   adsDataType: number,
   /** ADS data type as string (see `ADS.ADS_DATA_TYPES`) */
   adsDataTypeStr: string,
-  /** Data type flags as bit-notation (see `ADS.RCP_METHOD_PARAM_FLAGS`) */
+  /** RPC method parameter flags as bit-notation (see `ADS.RCP_METHOD_PARAM_FLAGS`) */
   flags: number,
-  /** Data type flags as string array (see `ADS.RCP_METHOD_PARAM_FLAGS`) */
+  /** RPC method parameter flags as string array (see `ADS.RCP_METHOD_PARAM_FLAGS`) */
   flagsStr: (keyof typeof ADS.ADS_RCP_METHOD_PARAM_FLAGS | string)[],
   /** Reserved */
   reserved: number,

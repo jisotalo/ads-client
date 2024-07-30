@@ -897,9 +897,9 @@ export class Client extends EventEmitter<ClientEvents> {
     }
 
     let oldState = this.metaData.plcRuntimeState !== undefined
-    ? { ...this.metaData.plcRuntimeState }
+      ? { ...this.metaData.plcRuntimeState }
       : undefined;
-    
+
     this.metaData.plcRuntimeState = res;
 
     if (stateChanged) {
@@ -1656,7 +1656,7 @@ export class Client extends EventEmitter<ClientEvents> {
     let oldState = this.metaData.routerState !== undefined
       ? { ...this.metaData.routerState }
       : undefined;
-    
+
     this.metaData.routerState = {
       state: state.routerState,
       stateStr: ADS.AMS_ROUTER_STATE.toString(state.routerState)
@@ -2124,11 +2124,14 @@ export class Client extends EventEmitter<ClientEvents> {
 
     //If flag ExtendedFlags is set
     symbol.extendedFlags = 0;
-
-    if (symbol.flagsStr.includes('ExtendedFlags')) {
-      //Add later if required (32 bit integer)
+    if ((symbol.flags & ADS.ADS_SYMBOL_FLAGS.ExtendedFlags) === ADS.ADS_SYMBOL_FLAGS.ExtendedFlags) {
       symbol.extendedFlags = data.readUInt32LE(pos);
       pos += 4;
+    }
+
+    //If extended flag RefactorInfo is set
+    if ((symbol.extendedFlags & ADS.ADS_SYMBOL_FLAGS_2.RefactorInfo) === ADS.ADS_SYMBOL_FLAGS_2.RefactorInfo) {
+      !this.settings.hideConsoleWarnings && console.log(`WARNING: Symbol ${symbol.name} (${symbol.type}) has extended flag "RefactorInfo" which is not supported. Things might not work now. Please open an issue at Github`);
     }
 
     //Reserved, if any
@@ -2526,6 +2529,40 @@ export class Client extends EventEmitter<ClientEvents> {
       }
     }
 
+    //If flag RefactorInfo set
+    if ((dataType.flags & ADS.ADS_DATA_TYPE_FLAGS.RefactorInfo) === ADS.ADS_DATA_TYPE_FLAGS.RefactorInfo) {
+      //TODO: this is not working now
+      //Things probably break now
+      !this.settings.hideConsoleWarnings && console.log(`WARNING: Data type ${dataType.name} (${dataType.type}) has flag "RefactorInfo" which is not supported. Things might not work now. Please open an issue at Github`);
+    }
+
+    //If flag ExtendedFlags set
+    if ((dataType.flags & ADS.ADS_DATA_TYPE_FLAGS.ExtendedFlags) === ADS.ADS_DATA_TYPE_FLAGS.ExtendedFlags) {
+      dataType.extendedFlags = data.readUInt32LE(pos);
+      pos += 4;
+    }
+
+    //If flag DeRefTypeItem set
+    if ((dataType.flags & ADS.ADS_DATA_TYPE_FLAGS.DeRefTypeItem) === ADS.ADS_DATA_TYPE_FLAGS.DeRefTypeItem) {
+      const count = data.readUInt16LE(pos);
+      pos += 2;
+      pos += count * 16;
+    }
+
+    //If flag ExtendedEnumInfos set
+    if ((dataType.flags & ADS.ADS_DATA_TYPE_FLAGS.ExtendedEnumInfos) === ADS.ADS_DATA_TYPE_FLAGS.ExtendedEnumInfos) {
+      //TODO: this is not working now
+      //Things probably break now
+      !this.settings.hideConsoleWarnings && console.log(`WARNING: Data type ${dataType.name} (${dataType.type}) has flag "ExtendedEnumInfos" which is not supported. Things might not work now. Please open an issue at Github`);
+    }
+
+    //If flag SoftwareProtectionLevels set
+    if ((dataType.flags & ADS.ADS_DATA_TYPE_FLAGS.SoftwareProtectionLevels) === ADS.ADS_DATA_TYPE_FLAGS.SoftwareProtectionLevels) {
+      //TODO: this is not working now
+      //Things probably break now
+      !this.settings.hideConsoleWarnings && console.log(`WARNING: Data type ${dataType.name} (${dataType.type}) has flag "SoftwareProtectionLevels" which is not supported. Things might not work now. Please open an issue at Github`);
+    }
+
     //Reserved, if any
     dataType.reserved = data.subarray(pos);
 
@@ -2660,6 +2697,7 @@ export class Client extends EventEmitter<ClientEvents> {
               rpcMethods: [],
               attributes: [],
               enumInfos: [],
+              extendedFlags: 0,
               reserved: Buffer.alloc(0)
             };
           } else {
