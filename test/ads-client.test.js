@@ -1486,10 +1486,20 @@ describe('reading values', () => {
       }
     });
 
+    test(`reading a single BIT`, async () => {
+      {
+        const res = await client.readSymbol('GVL_Read.SpecialTypes.Bits.Bit_10');
+        expect(res.value).toBe(true);
+      }
+      {
+        const res = await client.readSymbol('GVL_Read.SpecialTypes.Bits.Bit_28');
+        expect(res.value).toBe(false);
+      }
+    });
     test(`reading a struct with BIT types`, async () => {
       {
         const res = await client.readSymbol('GVL_Read.SpecialTypes.Bits');
-        
+
         expect(res.value).toStrictEqual({
           Bit_0: true,
           Bit_1: false,
