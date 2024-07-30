@@ -2828,6 +2828,15 @@ export class Client extends EventEmitter<ClientEvents> {
     }
   }
 
+  /**
+   * Converts raw Buffer data to a Javascript object
+   * 
+   * This is called recursively
+   * 
+   * @param data Raw data
+   * @param dataType Data type to convert to
+   * @param isArrayItem If true, this is array item
+   */
   private convertBufferToObject<T = any>(data: Buffer, dataType: AdsDataType, isArrayItem: boolean = false): T {
     let result: any;
 
@@ -2890,6 +2899,17 @@ export class Client extends EventEmitter<ClientEvents> {
         //so empty FB is not { } as we can't detect interface and empty FB from each other
         result = ADS.BASE_DATA_TYPES.fromBuffer(ADS.BASE_DATA_TYPES.getTypeByPseudoType('PVOID', dataType.size)!, data.subarray(dataType.offset, dataType.offset + dataType.size), this.settings.convertDatesToJavascript);
       }
+
+    } else if (dataType.flagsStr.includes('BitValues')) {
+      //This is a BIT (special case) - offset is in bits, instead of bytes
+
+      //First we need to know which byte to read from data (as Buffer has no bit access)
+      const byteNumber = Math.floor(dataType.offset / 8);
+      const byteValue = data.readUint8(byteNumber);
+
+      //Then we need also bit number in this byte. The value is easy
+      const bitNumber = dataType.offset % 8;
+      result = !!(byteValue & 1 << bitNumber);
 
     } else {
       //Primitive type

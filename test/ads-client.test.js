@@ -100,7 +100,7 @@ describe('connection', () => {
 
   test('reconnecting', async () => {
     try {
-      
+
       const ev = jest.fn();
       client.on('reconnect', ev);
       const res = await client.reconnect();
@@ -122,7 +122,7 @@ describe('resetting PLC to original state', () => {
     await client.resetPlc();
 
     await delay(500);
-    
+
     expect(ev).toHaveBeenCalled();
   });
 
@@ -1483,6 +1483,49 @@ describe('reading values', () => {
         //Why is this even allowed? However result is empty array, as in PLC online view
         const res = await client.readSymbol('GVL_Read.SpecialTypes.EmptyArray');
         expect(res.value).toStrictEqual([]);
+      }
+    });
+
+    test(`reading a struct with BIT types`, async () => {
+      {
+        const res = await client.readSymbol('GVL_Read.SpecialTypes.Bits');
+        
+        expect(res.value).toStrictEqual({
+          Bit_0: true,
+          Bit_1: false,
+          Bit_2: false,
+          Bit_3: true,
+          Bit_4: true,
+          Bit_5: false,
+          Bit_6: false,
+          Bit_7: true,
+          Bit_8: false,
+          Bit_9: true,
+          Bit_10: true,
+          Bit_11: false,
+          Bit_12: false,
+          Bit_13: true,
+          Bit_14: true,
+          Bit_15: false,
+          REAL_: expect.closeTo(3.140000104904175),
+          Bit_16: true,
+          Bit_17: true,
+          Bit_18: false,
+          Bit_19: true,
+          Bit_20: true,
+          Bit_21: false,
+          Bit_22: false,
+          Bit_23: true,
+          Bit_24: true,
+          Bit_25: false,
+          Bit_26: true,
+          Bit_27: true,
+          Bit_28: false,
+          Bit_29: true,
+          Bit_30: true,
+          Bit_31: false,
+          Bit_32: true
+        });
       }
     });
   });
@@ -3235,7 +3278,7 @@ describe('miscellaneous', () => {
       expect(res[0].errorCode).toBe(0);
       expect(res[0].errorStr).toBe('No error');
       expect(res[0].data).toStrictEqual(value);
-      
+
       expect(res[1].success).toBe(true);
       expect(res[1].error).toBe(false);
       expect(res[1].errorCode).toBe(0);
