@@ -1066,8 +1066,8 @@ export const BASE_DATA_TYPES = {
       name: ['BOOL', 'BIT', 'BIT8'],
       adsDataType: ADS_DATA_TYPES.ADST_BIT,
       size: 1,
-      toBuffer: (value: boolean | number, buffer: Buffer) => buffer.writeUInt8(value === true || value === 1 ? 1 : 0),
-      fromBuffer: (buffer: Buffer) => buffer.readUInt8(0) === 1
+      toBuffer: (value: boolean | number, buffer: Buffer) => buffer.writeUInt8(value ? 1 : 0),
+      fromBuffer: (buffer: Buffer) => buffer.readUInt8(0) !== 0
     },
     {
       name: ['BYTE', 'USINT', 'BITARR8', 'UINT8'],

@@ -15,6 +15,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Writing a `STRING` or `WSTRING` value that is longer than the target data type causes the string to be truncated.
   - Previously the string end character was lost, which caused "never ending string" and `<Value of the expression cannot be retrieved` in PLC online view.
   - E.g. writing 85 bytes of string to `STRING(80)` variable
+- `BOOL` and `BIT` data values are now true if the value is anything else than 0
+  - In TwinCAT, `BOOL` is true if the value is anything else than zero (see [x_TO_BOOL](https://infosys.beckhoff.com/english.php?content=../content/1033/tc3_plc_intro/2529047435.html&id=))
+  - Before, ads-client set the value to true only if value was true or 1, otherwise it was 0
 
 ### Breaking changes
 - `subscribe()` parameters changed
@@ -42,6 +45,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added support for reading/writing `INTERFACE` data types
 - Added support for reading/writing empty `FUNCTION_BLOCK`s
 - Added `readWriteRawMulti()`
+- Added support for `BIT` data type
 
 
 ## [1.14.1] - 13.09.2022

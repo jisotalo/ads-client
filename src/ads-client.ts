@@ -2907,7 +2907,7 @@ export class Client extends EventEmitter<ClientEvents> {
       const byteNumber = Math.floor(dataType.offset / 8);
       const byteValue = data.readUint8(byteNumber);
 
-      //Then we need also bit number in this byte. The value is easy
+      //Then we need also bit number in this byte, getting the value is easy
       const bitNumber = dataType.offset % 8;
       result = !!(byteValue & 1 << bitNumber);
 
@@ -2919,6 +2919,14 @@ export class Client extends EventEmitter<ClientEvents> {
     return result as T;
   }
 
+  /**
+   * Converts Javascript object to a raw Buffer data
+   * 
+   * @param value Javascript value to convert
+   * @param dataType Data type to convert
+   * @param objectPath Object path that is passed when calling recursively, used for error message if missing property
+   * @param isArrayItem Set if the value/data type is an array subitem
+   */
   private convertObjectToBuffer<T = any>(value: T, dataType: AdsDataType, objectPath: string = '', isArrayItem: boolean = false): ObjectToBufferConversionResult {
     let rawValue = Buffer.alloc(0);
 
@@ -2967,8 +2975,30 @@ export class Client extends EventEmitter<ClientEvents> {
           return res;
         }
 
-        //Add the subitem data to the buffer
-        res.rawValue.copy(rawValue, subItem.offset);
+        if (subItem.flagsStr.includes('BitValues')) {
+          //This is a BIT inside a STRUCT (special case) - offset is in bits, instead of bytes
+
+          //First we need to know which byte to write data (as Buffer has no bit access)
+          const byteNumber = Math.floor(subItem.offset / 8);
+          let byteValue = rawValue.readUint8(byteNumber);
+
+          //Then we need also bit number in this byte
+          const bitNumber = subItem.offset % 8;
+
+          //Using value from convertObjectToBuffer() call above, so that the conversion happens in correct place (= not here)
+          const bitValue = !!res.rawValue.readUint8();
+
+          byteValue = bitValue
+            ? byteValue | (1 << bitNumber) //Set bit
+            : byteValue & ~(1 << bitNumber); //Reset bit
+
+          //Writing the changed byte back to the raw value
+          rawValue.writeUint8(byteValue, byteNumber);
+
+        } else {
+          //Normal subitem - copy the subitem data to the buffer
+          res.rawValue.copy(rawValue, subItem.offset);
+        }
       }
 
     } else if (dataType.arrayInfos.length > 0 && !isArrayItem) {
@@ -3087,7 +3117,6 @@ export class Client extends EventEmitter<ClientEvents> {
           throw new ClientError(`Provided value ${JSON.stringify(value)}${pathInfo} is not valid value for this data type (${dataType.type})`);
         }
       }
-
 
     } else {
       throw new ClientError(`Data type is not known: ${dataType.type}`);

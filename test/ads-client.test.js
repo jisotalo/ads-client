@@ -2800,6 +2800,60 @@ describe('writing values', () => {
         await client.writeSymbol('GVL_Write.SpecialTypes.EmptyStruct', {});
       }
     });
+
+    test(`writing an empty ARRAY`, async () => {
+      {
+        await client.writeSymbol('GVL_Write.SpecialTypes.EmptyArray', []);
+      }
+    });
+
+    test(`writing a single BIT`, async () => {
+      {
+        await client.writeSymbol('GVL_Write.SpecialTypes.Bits.Bit_10', true);
+        const res = await client.readSymbol('GVL_Write.SpecialTypes.Bits.Bit_10');
+        expect(res.value).toBe(true);
+      }
+      {
+        await client.writeSymbol('GVL_Write.SpecialTypes.Bits.Bit_10', false);
+        const res = await client.readSymbol('GVL_Write.SpecialTypes.Bits.Bit_10');
+        expect(res.value).toBe(false);
+      }
+      {
+        await client.writeSymbol('GVL_Write.SpecialTypes.Bits.Bit_28', 12345);
+        const res = await client.readSymbol('GVL_Write.SpecialTypes.Bits.Bit_28');
+        expect(res.value).toBe(true);
+      }
+      {
+        await client.writeSymbol('GVL_Write.SpecialTypes.Bits.Bit_28', 0);
+        const res = await client.readSymbol('GVL_Write.SpecialTypes.Bits.Bit_28');
+        expect(res.value).toBe(false);
+      }
+    });
+    test(`writing a struct with BIT types`, async () => {
+      {
+        const { value } = await client.readSymbol('GVL_Read.SpecialTypes.Bits');
+
+        value.Bit_0 = false;
+        value.Bit_11 = 1245;
+        value.Bit_19 = 0;
+        value.Bit_28 = true;
+        value.Bit_32 = false;
+        value.REAL_ = ST_STANDARD_TYPES_WRITE.REAL_3;
+
+        await client.writeSymbol('GVL_Write.SpecialTypes.Bits', value);
+
+        value.Bit_0 = false;
+        value.Bit_11 = true;
+        value.Bit_19 = false;
+        value.Bit_28 = true;
+        value.Bit_32 = false;
+        value.REAL_ = ST_STANDARD_TYPES.REAL_3;
+
+        const res = await client.readSymbol('GVL_Write.SpecialTypes.Bits');
+
+        expect(res.value).toStrictEqual(value);
+      }
+    });
   });
 
   describe('writing dereferenced POINTER and REFERENCE values', () => {
