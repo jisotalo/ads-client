@@ -1,5 +1,5 @@
 import EventEmitter from "events";
-import type { ActiveAdsRequestContainer, ActiveSubscription, ActiveSubscriptionContainer, AdsClientConnection, AdsClientSettings, AdsCommandToSend, AdsDataTypeContainer, AdsSymbolInfoContainer, AdsUploadInfo, ConnectionMetaData, PlcPrimitiveType, SubscriptionData, SubscriptionSettings, ReadSymbolResult, TimerObject, ObjectToBufferConversionResult, WriteSymbolResult, VariableHandle, RpcMethodCallResult, CreateVariableHandleMultiResult, ReadRawMultiResult, ReadRawMultiCommand, WriteRawMultiResult, DeleteVariableHandleMultiResult, ReadWriteRawMultiResult, ReadWriteRawMultiCommand, WriteRawMultiCommand, ClientEvents } from "./types/ads-client-types";
+import type { ActiveAdsRequestContainer, ActiveSubscription, ActiveSubscriptionContainer, AdsClientConnection, AdsClientSettings, AdsCommandToSend, AdsDataTypeContainer, AdsSymbolInfoContainer, AdsUploadInfo, ConnectionMetaData, PlcPrimitiveType, SubscriptionData, SubscriptionSettings, ReadSymbolResult, TimerObject, ObjectToBufferConversionResult, WriteSymbolResult, VariableHandle, RpcMethodCallResult, CreateVariableHandleMultiResult, ReadRawMultiResult, ReadRawMultiCommand, WriteRawMultiResult, DeleteVariableHandleMultiResult, ReadWriteRawMultiResult, ReadWriteRawMultiCommand, WriteRawMultiCommand, ClientEvents, SubscriptionCallback } from "./types/ads-client-types";
 import { AdsAddNotificationResponse, AdsAddNotificationResponseData, AdsArrayInfoEntry, AdsAttributeEntry, AdsDataType, AdsDeleteNotificationResponse, AdsDeviceInfo, AdsEnumInfoEntry, AdsNotification, AdsNotificationResponse, AdsNotificationSample, AdsNotificationStamp, AdsRawAddress, AdsReadDeviceInfoResponse, AdsReadResponse, AdsReadStateResponse, AdsReadWriteResponse, AdsRequest, AdsResponse, AdsRpcMethodEntry, AdsRpcMethodParameterEntry, AdsState, AdsSymbolInfo, AdsWriteControlResponse, AdsWriteResponse, AmsAddress, AmsHeader, AmsPortRegisteredData, AmsRouterState, AmsRouterStateData, AmsTcpHeader, AmsTcpPacket, BaseAdsResponse, EmptyAdsResponse, UnknownAdsResponse } from "./types/ads-protocol-types";
 import {
   Socket,
@@ -1911,8 +1911,8 @@ export class Client extends EventEmitter<ClientEvents> {
       }
 
     } catch (err) {
-      this.debug(`unsubscribeAll(): Unsubscribing all failed - some subscriptions were not unsubscribed: %o`, err);
-      throw new ClientError(`unsubscribeAll(): Unsubscribing all failed - some subscriptions were not unsubscribed`, err);
+      this.debug(`removeSubscriptions(): Unsubscribing all failed - some subscriptions were not unsubscribed: %o`, err);
+      throw new ClientError(`removeSubscriptions(): Unsubscribing all failed - some subscriptions were not unsubscribed`, err);
     }
   }
 
@@ -2821,8 +2821,10 @@ export class Client extends EventEmitter<ClientEvents> {
   private convertBufferToPrimitiveType(buffer: Buffer, dataType: AdsDataType): PlcPrimitiveType {
     if (dataType.adsDataType === ADS.ADS_DATA_TYPES.ADST_STRING) {
       return ADS.decodePlcStringBuffer(buffer);
+
     } else if (dataType.adsDataType === ADS.ADS_DATA_TYPES.ADST_WSTRING) {
       return ADS.decodePlcWstringBuffer(buffer);
+      
     } else {
       return ADS.BASE_DATA_TYPES.fromBuffer(dataType.type, buffer, this.settings.convertDatesToJavascript);
     }
@@ -3836,11 +3838,137 @@ export class Client extends EventEmitter<ClientEvents> {
   }
 
   /**
+   * Subscribes to variable change notifications (ADS notifications) by symbol path.
+   * 
+   * **NOTE**: Consider using `subscribe()` instead
+   * 
+   * Callback is called with latest value when changed or when cycle time has passed, depending on settings.
+   * 
+   * @param path Variable path in the PLC to subscribe to (such as `GVL_Test.ExampleStruct`)
+   * @param callback Callback function that is called when new value is received
+   * @param cycleTime Cycle time for subscription (default: `200 ms`)
+   * 
+   * If `sendOnChange` is `true` (default), PLC checks if value has changed with `cycleTime` interval. 
+   * If the value has changed, a new value is sent.
+   * 
+   * If `sendOnChange` is `false`, PLC constantly sends the value with `cycleTime` interval. 
+   * 
+   * @param sendOnChange Should the notification be sent only when the value changes? (default: `true`)
+   * 
+   * If `false`, the value is sent with `cycleTime` interval (even if it doesn't change).
+   * 
+   * If `true` (default), the value is checked every `cycleTime` and sent only if it has changed.
+   * 
+   * NOTE: When subscribing, the value is always sent once.
+   * 
+   * @param maxDelay How long the PLC waits before sending the values at maximum? (default: `0` ms --> maximum delay is off)
+   * 
+   * If value is not changing, the first notification with active value after subscribing is sent after `maxDelay`.
+   * 
+   * If the value is changing, the PLC sends one or more notifications every `maxDelay`. 
+   * 
+   * So if `cycleTime` is 100 ms, `maxDelay` is 1000 ms and value changes every 100 ms, the PLC sends 10 notifications every 1000 ms.
+   * This can be useful for throttling.
+   * 
+   * @param targetOpts Optional target settings that override values in `settings` (NOTE: If used, no caching is available -> worse performance)
+   * 
+   * @template T Typescript data type of the PLC data, for example `subscribe<number>(...)` or `subscribe<ST_TypedStruct>(...)`. If target is raw address, use `subscribe<Buffer>`
+   */
+  public subscribeSymbol<T = any>(path: string, callback: SubscriptionCallback<T>, cycleTime?: number, sendOnChange?: boolean, maxDelay?: number, targetOpts: Partial<AmsAddress> = {}): Promise<ActiveSubscription<T>> {
+    if (!this.connection.connected) {
+      throw new ClientError(`subscribeSymbol(): Client is not connected. Use connect() to connect to the target first.`);
+    }
+
+    try {
+      this.debug(`subscribeSymbol(): Subscribing to ${path}`);
+
+      return this.subscribe<T>({
+        target: path,
+        callback,
+        cycleTime,
+        sendOnChange,
+        maxDelay
+      }, targetOpts);
+
+    } catch (err) {
+      this.debug(`subscribeSymbol(): Subscribing to ${path} failed: %o`, err);
+      throw new ClientError(`subscribeSymbol(): Subscribing to ${path} failed`, err);
+    }
+  }
+
+  
+
+  /**
+   * Subscribes to variable change notifications (ADS notifications) by provided index group, index offset and data length (bytes)
+   * 
+   * **NOTE**: Consider using `subscribe()` instead
+   * 
+   * Callback is called with latest value when changed or when cycle time has passed, depending on settings.
+   * 
+   * @param indexGroup Index group (address) of the data to subscribe to
+   * @param indexOffset Index offset (address) of the data to subscribe to
+   * @param size Data length (bytes)
+   * @param callback Callback function that is called when new value is received
+   * @param cycleTime Cycle time for subscription (default: `200 ms`)
+   * 
+   * If `sendOnChange` is `true` (default), PLC checks if value has changed with `cycleTime` interval. 
+   * If the value has changed, a new value is sent.
+   * 
+   * If `sendOnChange` is `false`, PLC constantly sends the value with `cycleTime` interval. 
+   * 
+   * @param sendOnChange Should the notification be sent only when the value changes? (default: `true`)
+   * 
+   * If `false`, the value is sent with `cycleTime` interval (even if it doesn't change).
+   * 
+   * If `true` (default), the value is checked every `cycleTime` and sent only if it has changed.
+   * 
+   * NOTE: When subscribing, the value is always sent once.
+   * 
+   * @param maxDelay How long the PLC waits before sending the values at maximum? (default: `0` ms --> maximum delay is off)
+   * 
+   * If value is not changing, the first notification with active value after subscribing is sent after `maxDelay`.
+   * 
+   * If the value is changing, the PLC sends one or more notifications every `maxDelay`. 
+   * 
+   * So if `cycleTime` is 100 ms, `maxDelay` is 1000 ms and value changes every 100 ms, the PLC sends 10 notifications every 1000 ms.
+   * This can be useful for throttling.
+   * 
+   * @param targetOpts Optional target settings that override values in `settings` (NOTE: If used, no caching is available -> worse performance)
+   * 
+   * @template T Typescript data type of the PLC data, for example `subscribe<number>(...)` or `subscribe<ST_TypedStruct>(...)`. If target is raw address, use `subscribe<Buffer>`
+   */
+  public subscribeRaw(indexGroup: number, indexOffset: number, size: number, callback: SubscriptionCallback<Buffer>, cycleTime?: number, sendOnChange?: boolean, maxDelay?: number, targetOpts: Partial<AmsAddress> = {}): Promise<ActiveSubscription<Buffer>> {
+    if (!this.connection.connected) {
+      throw new ClientError(`subscribeRaw(): Client is not connected. Use connect() to connect to the target first.`);
+    }
+
+    try {
+      this.debug(`subscribeRaw(): Subscribing to ${JSON.stringify({ indexGroup, indexOffset, size })}`);
+
+      return this.subscribe<Buffer>({
+        target: {
+          indexGroup,
+          indexOffset,
+          size
+        },
+        callback,
+        cycleTime,
+        sendOnChange,
+        maxDelay
+      }, targetOpts);
+
+    } catch (err) {
+      this.debug(`subscribeRaw(): Subscribing to ${JSON.stringify({ indexGroup, indexOffset, size })} failed: %o`, err);
+      throw new ClientError(`subscribeRaw(): Subscribing to ${JSON.stringify({ indexGroup, indexOffset, size })} failed`, err);
+    }
+  }
+
+  /**
    * Subscribes to variable or raw ADS address value change notifications (ADS notifications).
    * 
    * Callback is called with latest value when changed or when cycle time has passed, depending on settings.
    * 
-   * @param options - Subscription options
+   * @param options Subscription options
    * @param targetOpts Optional target settings that override values in `settings` (NOTE: If used, no caching is available -> worse performance)
    * 
    * @template T Typescript data type of the PLC data, for example `subscribe<number>(...)` or `subscribe<ST_TypedStruct>(...)`. If target is raw address, use `subscribe<Buffer>`
@@ -3864,7 +3992,7 @@ export class Client extends EventEmitter<ClientEvents> {
   /**
    * Unsubscribes given subscription by notificationHandle or subscription object
    * 
-   * @param target Subscription object to unsubscribe (return value of `subscribe()` call)
+   * @param target Subscription object to unsubscribe (returned by `subscribe()`, `subscribeRaw()` or `subscribeSymbol()`)
    */
   public async unsubscribe(target: ActiveSubscription): Promise<void> {
     if (!this.connection.connected) {

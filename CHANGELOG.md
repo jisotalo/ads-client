@@ -4,49 +4,33 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [2.0.0] - xx.xx.2023
-- Version 2
-### Changed
-- `disableBigInt` setting removed, BigInt is now used always if available
-- Added new setting `disableCaching` to disable all symbol and data type caching
-- Added optional `targetOpts` argument in all methods
-  - Possible to provide different AmsNetId and/or AdsPort than specified in the settings
-  - Symbol and data type caching not used when using `targetOpts` (only for target provided in settings)
+## [2.0.0] - xx.xx.2024
+**IMPORTANT:** This is a major version update. There are lots of **breaking changes**! 
+
+<u>**Updating v1 -> v2 requires manual changes to your codebase!**</u>
+
+See [MIGRATION.md](MIGRATION.md) for all breaking changes and follow the instructions. This changelog does not have those changes listed.
+
+### Changes
+- Everything rewritten in TypeScript
+- Everything is tested before releasing
+- Lots of optimizations
+- Lots of name changes
+- New methods: `resetPlc()`, `readWriteRawMulti()`, `writeRawByPath()`
+- New setting `disableCaching`: disables all symbol and data type caching
+- Added optional `targetOpts` argument in **all methods**
+  - Possible to provide different target address (AmsNetId and/or AdsPort) than specified in the settings
+  - Caching are available only for the target provided in settings (affects performance)
+- Added support for reading/writing `INTERFACE` data types
+- Added support for reading/writing empty `FUNCTION_BLOCK`s
+- Added support for reading/writing `BIT` data type
 - Writing a `STRING` or `WSTRING` value that is longer than the target data type causes the string to be truncated.
   - Previously the string end character was lost, which caused "never ending string" and `<Value of the expression cannot be retrieved` in PLC online view.
   - E.g. writing 85 bytes of string to `STRING(80)` variable
 - `BOOL` and `BIT` data values are now true if the value is anything else than 0
   - In TwinCAT, `BOOL` is true if the value is anything else than zero (see [x_TO_BOOL](https://infosys.beckhoff.com/english.php?content=../content/1033/tc3_plc_intro/2529047435.html&id=))
   - Before, ads-client set the value to true only if value was true or 1, otherwise it was 0
-
-### Breaking changes
-- `subscribe()` parameters changed
-- `unsubscribe()` no longer accepts numerical notification handle (only subscription object)
-- Subscription data `timeStamp`->`timestamp`
-- Removed nameLength, typeLength, commentLength and attributeCount from symbol info object
-- Symbol information `type` property renamed to `dataType`
-- Data type object:
-  - Removed `nameLength`, `typeLength`, `commentLength`, `subItemCount` and `attributeCount` properties
-  - `enumInfo` -> `enumInfos`, `arrayData` -> `arrayInfos`
-  - `type` property renamed to `dataType`
-- ClientException changed to ClientError
-  - Simplified error object, longer stack trace as default
-- setDebugging() -> setDebugLevel()
-  - Possible values 0,1,2,3 instead of 0,1,2,3,4
-- `readSymbolVersion()` removed (active value is available at `client.metaData.symbolVersion`)
-- `readAndCacheSymbols()` changed to `getSymbolInfos()` and `cacheSymbolInfos()`
-- `readAndCacheDataTypes()` changed to `getDataTypes()` and `cacheDataTypes()`
-- `restartPlc()` now also starts the PLC runtime. Previously only did a "reset cold" operation. (new `resetPlc()` does this now) 
-- `readSystemManagerState()` renamed to `readTcSystemState()`
-### Minor changes
-- If read ENUM has a value that has no corresponding string, an object of type `{name: '', value}` is returned instead of name being `null`
-
-### Added
-- Added support for reading/writing `INTERFACE` data types
-- Added support for reading/writing empty `FUNCTION_BLOCK`s
-- Added `readWriteRawMulti()`
-- Added support for `BIT` data type
-
+- `writeControl()` accepts also string values for `adsState`
 
 ## [1.14.1] - 13.09.2022
 ### Changed

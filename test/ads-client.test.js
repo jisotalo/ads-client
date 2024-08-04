@@ -3246,6 +3246,52 @@ describe('subscriptions (ADS notifications)', () => {
 
     await subscription.unsubscribe();
   });
+
+  test('subscribing using subscribeSymbol()', async () => {
+    await new Promise(async (resolve, reject) => {
+      let startTime = Date.now();
+
+      await client.subscribeSymbol(
+        'GVL_Subscription.Numericvalue_Constant',
+        async (data, subscription) => {
+          await subscription.unsubscribe();
+
+          const timeDiff = Date.now() - startTime;
+
+          expect(data.value).toBe(12245);
+
+          //First value should be received after 2000ms at earliest
+          if (timeDiff >= 2000) {
+            resolve();
+          } else {
+            reject(`Failed - value was received after ${timeDiff} ms (should be after 2000 ms)`);
+          }
+
+        },
+        undefined,
+        true,
+        2000
+      );
+    });
+  });
+
+  test('subscribing to a raw ADS address using subscribeRaw()', async () => {
+
+    let subscription = null;
+
+    await new Promise(async (resolve, reject) => {
+      const symbol = await client.getSymbolInfo('GVL_Subscription.NumericValue_100ms');
+
+      let startTime = Date.now();
+
+      subscription = await client.subscribeRaw(symbol.indexGroup, symbol.indexOffset, symbol.size, async (data, subscription) => {
+        expect(Buffer.isBuffer(data.value)).toBe(true);
+        resolve();
+      });
+    });
+
+    await subscription.unsubscribe();
+  });
 });
 
 describe('remote procedure calls (RPC methods)', () => {
