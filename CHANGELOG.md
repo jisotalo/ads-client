@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <u>**Updating v1 -> v2 requires manual changes to your codebase!**</u>
 
-See [MIGRATION.md](MIGRATION.md) for all breaking changes and follow the instructions. This changelog does not have those changes listed.
+See [MIGRATION.md](MIGRATION.md) for all breaking changes and follow the instructions. This changelog does not have breaking changes listed for 2.0.0.
 
 ### Changes
 - Everything rewritten in TypeScript
@@ -20,7 +20,8 @@ See [MIGRATION.md](MIGRATION.md) for all breaking changes and follow the instruc
 - New setting `disableCaching`: disables all symbol and data type caching
 - Added optional `targetOpts` argument in **all methods**
   - Possible to provide different target address (AmsNetId and/or AdsPort) than specified in the settings
-  - Caching are available only for the target provided in settings (affects performance)
+  - Caching is only available for the original target provided in settings
+  - The same client can be used for many different targets at the same time
 - Added support for reading/writing `INTERFACE` data types
 - Added support for reading/writing empty `FUNCTION_BLOCK`s
 - Added support for reading/writing `BIT` data type
