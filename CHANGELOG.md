@@ -33,6 +33,38 @@ See [MIGRATION.md](MIGRATION.md) for all breaking changes and follow the instruc
   - Before, ads-client set the value to true only if value was true or 1, otherwise it was 0
 - `writeControl()` accepts also string values for `adsState`
 
+## [1.14.3] - 23.09.2023
+### Changed
+- Bug fix: Some TwinCAT 2 devices (such as BK9050) do not send data length if answering with error code
+  - This caused `RangeError: Index out of range` exception as there wasn't enough bytes received
+  - See [issue #116](https://github.com/jisotalo/ads-client/issues/116)
+- Bug fix: If using older Node.js versions such as 8.x, connection lost could have caused unhandled exception
+  - Reason was `catch {}` which isn't supported in old versions
+  - See [issue #116](https://github.com/jisotalo/ads-client/issues/116)
+
+### Added
+- Updated readme to include information about TypeScript types
+  - Thanks to [Christian Rishøj](https://github.com/crishoj)
+- Updated readme with FAQ about TwinCAT 2 low-end devices
+- Updated readme about v2 development
+- Added option to run tests with usermode runtime AmsNetId (`192.168.4.1.1.1`) instead of localhost (`npm run test-um`)
+
+## [1.14.2] - 02.05.2023
+### Changed
+- Bug fix: `ADS_DATA_TYPE_FLAGS` (`dataType.flags`) were parsed incorrectly. 
+  - See [issue #109](https://github.com/jisotalo/ads-client/issues/109)
+  - Thank you [Michael Croes](https://github.com/mycroes) for contribution!
+- Bug fix: If calling `unsubcribeAll()` when client is already unsubcribing and disconnecting, an error might be thrown
+  - See [issue #103](https://github.com/jisotalo/ads-client/issues/103#issuecomment-1450640160)
+- Bug fix: Check that subscription callback exists before calling it
+  - Fixes unecessary error if receiving notification data (for subscription) but it's being unsubscribed at the same time
+- Bump json5 from 2.2.1 to 2.2.3
+  - See [pull request 101](https://github.com/jisotalo/ads-client/pull/101)
+  - Not used in production code, only when running tests
+
+### Added
+- New test for [issue #103](https://github.com/jisotalo/ads-client/issues/103)
+
 ## [1.14.1] - 13.09.2022
 ### Changed
 - Bug fix: Connecting to local router failed with ECONNREFUSED error on Node.js version 17 and newer
