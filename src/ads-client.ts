@@ -1,5 +1,5 @@
 import EventEmitter from "events";
-import type { ActiveAdsRequestContainer, ActiveSubscription, ActiveSubscriptionContainer, AdsClientConnection, AdsClientSettings, AdsCommandToSend, AdsDataTypeContainer, AdsSymbolInfoContainer, AdsUploadInfo, ConnectionMetaData, PlcPrimitiveType, SubscriptionData, SubscriptionSettings, ReadSymbolResult, TimerObject, ObjectToBufferConversionResult, WriteSymbolResult, VariableHandle, RpcMethodCallResult, CreateVariableHandleMultiResult, ReadRawMultiResult, ReadRawMultiCommand, WriteRawMultiResult, DeleteVariableHandleMultiResult, ReadWriteRawMultiResult, ReadWriteRawMultiCommand, WriteRawMultiCommand, ClientEvents, SubscriptionCallback } from "./types/ads-client-types";
+import type { ActiveAdsRequestContainer, ActiveSubscription, ActiveSubscriptionContainer, AdsClientConnection, AdsClientSettings, AdsCommandToSend, AdsDataTypeContainer, AdsSymbolInfoContainer, AdsUploadInfo, ConnectionMetaData, PlcPrimitiveType, SubscriptionData, SubscriptionSettings, ReadSymbolResult, TimerObject, ObjectToBufferConversionResult, WriteSymbolResult, VariableHandle, RpcMethodCallResult, CreateVariableHandleMultiResult, ReadRawMultiResult, ReadRawMultiCommand, WriteRawMultiResult, DeleteVariableHandleMultiResult, ReadWriteRawMultiResult, ReadWriteRawMultiCommand, WriteRawMultiCommand, ClientEvents, SubscriptionCallback, DebugLevel } from "./types/ads-client-types";
 import { AdsAddNotificationResponse, AdsAddNotificationResponseData, AdsArrayInfoEntry, AdsAttributeEntry, AdsDataType, AdsDeleteNotificationResponse, AdsDeviceInfo, AdsEnumInfoEntry, AdsNotification, AdsNotificationResponse, AdsNotificationSample, AdsNotificationStamp, AdsRawAddress, AdsReadDeviceInfoResponse, AdsReadResponse, AdsReadStateResponse, AdsReadWriteResponse, AdsRequest, AdsResponse, AdsRpcMethodEntry, AdsRpcMethodParameterEntry, AdsState, AdsSymbolInfo, AdsWriteControlResponse, AdsWriteResponse, AmsAddress, AmsHeader, AmsPortRegisteredData, AmsRouterState, AmsRouterStateData, AmsTcpHeader, AmsTcpPacket, BaseAdsResponse, EmptyAdsResponse, UnknownAdsResponse } from "./types/ads-protocol-types";
 import {
   Socket,
@@ -7,40 +7,178 @@ import {
 } from "net";
 import Debug from "debug";
 import Long from "long";
-
 import * as ADS from './ads-commons';
 import ClientError from "./client-error";
 export * as ADS from './ads-commons';
-export type { AdsClientSettings } from "./types/ads-client-types";
-export type { AdsState, AmsRouterState, AdsResponse, EmptyAdsResponse, UnknownAdsResponse, AdsReadResponse, AdsReadWriteResponse, AdsWriteResponse, AdsReadDeviceInfoResponse, AdsNotificationResponse, AdsAddNotificationResponse, AdsDeleteNotificationResponse, AdsWriteControlResponse } from "./types/ads-protocol-types";
+export type * from "./types/ads-client-types";
+//export type { AdsState, AmsRouterState, AdsResponse, EmptyAdsResponse, UnknownAdsResponse, AdsReadResponse, AdsReadWriteResponse, AdsWriteResponse, AdsReadDeviceInfoResponse, AdsNotificationResponse, AdsAddNotificationResponse, AdsDeleteNotificationResponse, AdsWriteControlResponse } from "./types/ads-protocol-types";
+export type * from './types/ads-protocol-types';
+export type * from './client-error';
 
+/**
+ * A class for handling TwinCAT ADS protocol communication.
+ * 
+ * Settings are provided in constructor - see {@link Client.constructor} and {@link AdsClientSettings}.
+ * 
+ * A client instance should be created for each target, however, a single client
+ * can also be used to communicate with multiple endpoints.
+ * 
+ * **Example:**
+ * 
+ * ```js
+ * const client = new Client({
+ *  targetAmsNetId: "192.168.4.1.1.1",
+ *  targetAdsPort: 851
+ * });
+ * ```
+ */
 export class Client extends EventEmitter<ClientEvents> {
+  /**
+   * Debug instance for debug level 1.
+   */
   private debug = Debug("ads-client");
+
+  /**
+   * Debug instance for debug level 2.
+   */
   private debugD = Debug(`ads-client:details`);
+
+  /**
+   * Debug instance for debug level 3.
+   */
   private debugIO = Debug(`ads-client:raw-data`);
 
   /**
-   * Active debug level
+   * Active debug level.
    */
-  private debugLevel_ = 0;
+  private debugLevel_: DebugLevel = 0;
 
-  /** Active debug level (read-only)
+  /**
+   * Default metadata (when no active connection).
+   */
+  private defaultMetaData: ConnectionMetaData = {
+    deviceInfo: undefined,
+    tcSystemState: undefined,
+    plcRuntimeState: undefined,
+    uploadInfo: undefined,
+    plcSymbolVersion: undefined,
+    allSymbolsCached: false,
+    symbols: {},
+    allDataTypesCached: false,
+    dataTypes: {},
+    routerState: undefined
+  };
+
+  /**
+   * Callback used for AMS/TCP commands, such as port registering.
    * 
-   *  - 0 = no debugging (default)
-   *  - 1 = basic debugging 
-   *    - same as $env:DEBUG='ads-client'
-   *  - 2 = detailed debugging
-   *    - same as $env:DEBUG='ads-client,ads-client:details'
-   *  - 3 = full debugging with raw I/O data
-   *    - same as $env:DEBUG='ads-client,ads-client:details,ads-client:raw-data'
+   * When a response is received, `amsTcpCallback` is called with the response packet.
+   */
+  private amsTcpCallback?: ((packet: AmsTcpPacket) => void);
+
+  /**
+   * Buffer for received data.
+   * 
+   * All received data from TCP socket is copied here for further processing.
+   */
+  private receiveBuffer = Buffer.alloc(0);
+
+  /**
+   * Used TCP socket instance.
+   */
+  private socket?: Socket = undefined;
+
+  /**
+   * Handler for socket error event.
+   * 
+   * Called when the socket emits error event (`socket.on("error")`).
+   */
+  private socketErrorHandler?: (err: Error) => void;
+
+  /**
+   * Handler for socket close event.
+   * 
+   * Called when the socket emits error event (`socket.on("close")`).
+   */
+  private socketConnectionLostHandler?: (hadError: boolean) => void;
+
+  /**
+   * Timer handle and ID of the timer used for automatic reconnecting.
+   */
+  private reconnectionTimer: TimerObject = { id: 0 };
+
+  /**
+   * Timer handle and ID of the timer used for reading TwinCAT system state.
+   */
+  private tcSystemStatePollerTimer: TimerObject = { id: 0 };
+
+  /**
+   * Timer handle of the timer used for detecting ADS port registeration timeout.
+   */
+  private portRegisterTimeoutTimer?: NodeJS.Timeout = undefined;
+
+  /**
+   * Container for all active subscriptions.
+   */
+  private activeSubscriptions: ActiveSubscriptionContainer = {};
+
+  /**
+   * Container for previous subscriptions that were active
+   * before reconnecting or when PLC runtime symbol version changed.
+   */
+  private previousSubscriptions?: ActiveSubscriptionContainer = undefined;
+
+  /**
+   * Active ADS requests that are waiting for responses.
+   */
+  private activeAdsRequests: ActiveAdsRequestContainer = {};
+
+  /**
+   * Next invoke ID to be used for ADS requests.
+   */
+  private nextInvokeId: number = 0;
+
+  /**
+   * Timestamp (epoch) when the conection to the remote was lost for the first time.
+   * 
+   * Used for detecting if the connection has been lost for long enough
+   * for starting the reconnection.
+   */
+  private connectionDownSince?: Date = undefined;
+
+  /** 
+   * Active debug level (read-only).
+   * 
+   * Use {@link Client.setDebugLevel} for setting debug level.
+   * 
+   * Debug levels:
+   *  - 0: no debugging (default)
+   *  - 1: basic debugging (`$env:DEBUG='ads-client'`)
+   *  - 2: detailed debugging (`$env:DEBUG='ads-client,ads-client:details'`)
+   *  - 3: detailed debugging with raw I/O data (`$env:DEBUG='ads-client,ads-client:details,ads-client:raw-data'`)
+   * 
+   * Debug data is available in the console (See [Debug](https://www.npmjs.com/package/debug) library for mode).
   */
-  public get debugLevel(): Readonly<number> {
+  public get debugLevel(): Readonly<DebugLevel> {
     return this.debugLevel_;
   }
 
   /**
-   * Active settings 
-   * Note: Casting default to Required<> even though some settings are missing
+   * Active client settings.
+   * 
+   * You can change some settings directly from this object on the fly, mainly
+   * some non-communication related ones. 
+   * 
+   * If the client is not yet connected, it's OK to change all settings from here. 
+   * 
+   * However, the most correct way is to use the {@link Client.constructor}.
+   * 
+   * **Example:**
+   * 
+   * ```js
+   * client.settings.convertDatesToJavascript = false; //OK
+   * client.settings.targetAdsPort = 852; //Not OK if already connected (some things might break)
+   * ```
    */
   public settings: Required<AdsClientSettings> = {
     routerTcpPort: 48898,
@@ -66,109 +204,36 @@ export class Client extends EventEmitter<ClientEvents> {
   } as Required<AdsClientSettings>;
 
   /**
-   * Active connection information
+   * Active connection information.
+   * 
+   * See {@link AdsClientConnection}
    */
   public connection: AdsClientConnection = {
-    connected: false,
-    isLocal: false
+    connected: false
   };
 
   /**
-   * Local router state (if available and known)
-   */
-  public routerState?: AmsRouterState = undefined;
-
-  /**
-   * Callback used for AMS/TCp commands (like port register)
-   */
-  private amsTcpCallback?: ((packet: AmsTcpPacket) => void);
-
-  /**
-   * Default empty connection metadata
-   */
-  private defaultMetaData: ConnectionMetaData = {
-    deviceInfo: undefined,
-    tcSystemState: undefined,
-    plcRuntimeState: undefined,
-    uploadInfo: undefined,
-    plcSymbolVersion: undefined,
-    allSymbolsCached: false,
-    symbols: {},
-    allDataTypesCached: false,
-    dataTypes: {},
-    routerState: undefined
-  };
-
-  /**
-   * Connection metadata
+   * Active connection metadata.
+   * 
+   * Metadata includes target device information, symbols, data types and so on.
+   * 
+   * Some properties might not be available in all connection setups and setting combinations.
    */
   public metaData: ConnectionMetaData = { ...this.defaultMetaData };
 
   /**
-   * Received data buffer
-   */
-  private receiveBuffer = Buffer.alloc(0);
-
-  /**
-   * Socket instance
-   */
-  private socket?: Socket = undefined;
-
-  /**
-   * Handler for socket error event
-   */
-  private socketErrorHandler?: (err: Error) => void;
-
-  /**
-   * Handler for socket close event
-   */
-  private socketConnectionLostHandler?: (hadError: boolean) => void;
-
-  /**
-   * Timer ID and handle of reconnection timer 
-   */
-  private reconnectionTimer: TimerObject = { id: 0 };
-
-  /**
-   * Timer ID and handle of TwinCAT system state poller timer 
-   */
-  private tcSystemStatePollerTimer: TimerObject = { id: 0 };
-
-  /**
-   * Timer handle for port register timeout
-   */
-  private portRegisterTimeoutTimer?: NodeJS.Timeout = undefined;
-
-  /**
-   * Active subscriptions created using subscribe()
-   */
-  private activeSubscriptions: ActiveSubscriptionContainer = {};
-
-  /**
-   * Backed up / previous subscriptions before reconnecting or after symbol version change
-   */
-  private previousSubscriptions?: ActiveSubscriptionContainer = undefined;
-
-  /**
-   * Active ADS requests that are waiting for responses
-   */
-  private activeAdsRequests: ActiveAdsRequestContainer = {};
-
-  /**
-   * Next invoke ID to be used for ADS requests
-   */
-  private nextInvokeId: number = 0;
-
-  /**
-   * If > 0, epoch timestamp when the connection to target failed for the first time (reading TwinCAT system state failed)
-   * This is used to detect if connection has been down for long enough.
-   */
-  private connectionDownSince: number = 0;
-
-  /**
    * Creates a new ADS client instance.
    * 
-   * Settings are provided as parameter
+   * Settings are provided in `settings` parameter - see {@link AdsClientSettings}.
+   * 
+   * **Example:**
+   * 
+   * ```js
+   * const client = new Client({
+   *  targetAmsNetId: "192.168.4.1.1.1",
+   *  targetAdsPort: 851
+   * });
+   * ```
    */
   public constructor(settings: AdsClientSettings) {
     super();
@@ -178,36 +243,21 @@ export class Client extends EventEmitter<ClientEvents> {
       ...this.settings,
       ...settings
     };
-
-    //Loopback address
-    if (this.settings.targetAmsNetId.toLowerCase() === 'localhost') {
-      this.settings.targetAmsNetId = '127.0.0.1.1.1';
-    }
-
-    //Checking that router address is 127.0.0.1 instead of localhost
-    //to prevent problem like https://github.com/nodejs/node/issues/40702
-    if (this.settings.routerAddress.toLowerCase() === 'localhost') {
-      this.settings.routerAddress = '127.0.0.1';
-    }
   };
 
   /**
-   * Clears given timer if it's available and increases the id
+   * Clears given timer if it's available and increases the ID.
+   * 
    * @param timerObject Timer object
    */
   private clearTimer(timerObject: TimerObject) {
-    //Clearing timer
     timerObject.timer && clearTimeout(timerObject.timer);
     timerObject.timer = undefined;
-
-    //Increasing timer id
     timerObject.id = timerObject.id < Number.MAX_SAFE_INTEGER ? timerObject.id + 1 : 0;
   }
 
   /**
    * Returns target AMS address as a string in a format `amsNetId:port`.
-   * 
-   * Uses values from settings unless targetOpts fields are defined
    * 
    * @param targetOpts Optional target settings that override values in `settings`
    */
@@ -221,12 +271,14 @@ export class Client extends EventEmitter<ClientEvents> {
   }
 
   /**
-   * Writes given data buffer to the socket
+   * Writes given data buffer to the socket.
+   * 
    * @param data Data to write
    */
   private socketWrite(data: Buffer) {
     if (this.debugIO.enabled) {
       this.debugIO(`IO out ------> ${data.byteLength} bytes : ${data.toString('hex')}`);
+
     } else {
       this.debugD(`IO out ------> ${data.byteLength} bytes`);
     }
@@ -237,7 +289,7 @@ export class Client extends EventEmitter<ClientEvents> {
   /**
    * Connects to the target.
    * 
-   * @param isReconnecting If true, reconnecting in progress
+   * @param isReconnecting If `true`, reconnecting is in progress
    */
   private connectToTarget(isReconnecting = false) {
     return new Promise<Required<AdsClientConnection>>(async (resolve, reject) => {
@@ -247,6 +299,16 @@ export class Client extends EventEmitter<ClientEvents> {
       }
       if (this.settings.targetAdsPort === undefined) {
         return reject(new ClientError(`connectToTarget(): Required setting "targetAdsPort" is missing`));
+      }
+
+      //Loopback AMS address
+      if (this.settings.targetAmsNetId.toLowerCase() === 'localhost') {
+        this.settings.targetAmsNetId = '127.0.0.1.1.1';
+      }
+
+      //Using 127.0.0.1 instead of localhost (https://github.com/nodejs/node/issues/40702)
+      if (this.settings.routerAddress.toLowerCase() === 'localhost') {
+        this.settings.routerAddress = '127.0.0.1';
       }
 
       if (this.socket) {
@@ -438,10 +500,10 @@ export class Client extends EventEmitter<ClientEvents> {
   }
 
   /**
-   * Unregisters ADS port from router (if it was registered) and disconnects
+   * Unregisters ADS port from the router (if required and disconnects from the target.
    *
-   * @param forceDisconnect If true, the connection is dropped immediately (default: false)
-   * @param isReconnecting If true, call is made during reconnecting (default: false)
+   * @param forceDisconnect If `true`, the connection is dropped immediately (default: `false`)
+   * @param isReconnecting If `true`, reconnecting is in progress (default: `false`)
    */
   private disconnectFromTarget(forceDisconnect = false, isReconnecting = false) {
     return new Promise<void>(async (resolve, reject) => {
@@ -530,10 +592,13 @@ export class Client extends EventEmitter<ClientEvents> {
   }
 
   /**
-   * Disconnects and reconnects again
+   * Backups subscriptions, disconnects from the target, connects again to the target 
+   * and restores the subscriptions.
    *
-   * @param forceDisconnect If true, the connection is dropped immediately (default: false)
-   * @param isReconnecting If true, call is made during reconnecting (default: false)
+   * @param forceDisconnect If `true`, the connection is dropped immediately (default: `false`)
+   * @param isReconnecting If `true`, reconnecting is in progress (default: `false`)
+   * 
+   * @throws Throws an error if connecting fails
    */
   private reconnectToTarget(forceDisconnect = false, isReconnecting = false) {
     return new Promise<AdsClientConnection>(async (resolve, reject) => {
@@ -573,7 +638,9 @@ export class Client extends EventEmitter<ClientEvents> {
   }
 
   /**
-   * Registers a new ADS port from AMS router
+   * Registers a free ADS port from the AMS router.
+   * 
+   * If the `settings.localAmsNetId` and `settings.localAdsPort` are set, does nothing.
    */
   private registerAdsPort() {
     return new Promise<AmsTcpPacket>(async (resolve, reject) => {
@@ -660,8 +727,10 @@ export class Client extends EventEmitter<ClientEvents> {
   }
 
   /**
-   * Unregisters previously registered ADS port from AMS router.
-   * Connection is usually also closed by remote during unregistering
+   * Unregisters a previously registered ADS port from the AMS router.
+   * 
+   * The remote seems to drop TCP connection after unregistering, 
+   * so basically calling this always disconnects too.
    */
   private unregisterAdsPort() {
     return new Promise<void>(async (resolve, reject) => {
@@ -728,8 +797,10 @@ export class Client extends EventEmitter<ClientEvents> {
   }
 
   /**
-   * Configures internals for TwinCAT PLC connection
+   * Configures the connection to handle a TwinCAT PLC connection, which is the default
+   * assumption when using ads-client.
    * 
+   * This is not called if the `settings.rawClient` is `true`.
    */
   private async setupPlcConnection() {
     //Read system state
@@ -778,8 +849,11 @@ export class Client extends EventEmitter<ClientEvents> {
   }
 
   /**
-   * Starts a poller that will check TwinCAT system state every x milliseconds
-   * to detect if connection is working or if system state has changed
+   * Starts a poller that will read TwinCAT system state every `settings.connectionCheckInterval` milliseconds.
+   *  
+   * This is used to detect connection operation and if the target TwinCAT system state has changed.
+   *
+   * This is not called if the `settings.rawClient` is `true`.
    */
   private startTcSystemStatePoller() {
     this.clearTimer(this.tcSystemStatePollerTimer);
@@ -791,10 +865,11 @@ export class Client extends EventEmitter<ClientEvents> {
   }
 
   /**
-   * Function that is called from TwinCAT system state poller
-   * Reads active TwinCAT system state and detects if it has changed (or if connection is down)
+   * Reads active TwinCAT system state and detects if it has changed or if the connection is down.
    * 
-   * Starts the timer again
+   * This is called from timer started by `startTcSystemStatePoller()`.
+   * 
+   * Afterwards starts the poller timer again.
    */
   private async checkTcSystemState(timerId: number) {
     //If the timer has changed, quit here (to prevent multiple timers)
@@ -811,7 +886,7 @@ export class Client extends EventEmitter<ClientEvents> {
 
       const state = await this.readTcSystemState();
 
-      this.connectionDownSince = 0;
+      this.connectionDownSince = undefined;
 
       if (!oldState || state.adsState !== oldState.adsState) {
         this.debug(`checkTcSystemState(): TwinCAT system state has changed from ${oldState?.adsStateStr} to ${state.adsStateStr}`)
@@ -838,10 +913,10 @@ export class Client extends EventEmitter<ClientEvents> {
       //Reading state failed. 
       //If this happens for long enough, connection is determined to be down
       if (!this.connectionDownSince) {
-        this.connectionDownSince = Date.now();
+        this.connectionDownSince = new Date();
       }
 
-      const time = Date.now() - this.connectionDownSince;
+      const time = Date.now() - this.connectionDownSince.getTime();
 
       if (time >= this.settings.connectionDownDelay) {
         this.debug(`checkTcSystemState(): No connection for longer than ${this.settings.connectionDownDelay} ms. Connection is lost.`)
@@ -865,10 +940,12 @@ export class Client extends EventEmitter<ClientEvents> {
   }
 
   /**
-   * Callback that is called when target PLC runtime state has changed
+   * A subscription callback that is called when the target PLC runtime state has changed.
    * 
-   * @param data Data as buffer
-   * @param subscription Subscription object
+   * This is not called if the `settings.rawClient` is `true`.
+   * 
+   * @param data Received data
+   * @param subscription The subscription object (unused here)
    */
   private onPlcRuntimeStateChanged(data: SubscriptionData<Buffer>, subscription: ActiveSubscription<Buffer>) {
     const res = {} as AdsState;
@@ -908,10 +985,10 @@ export class Client extends EventEmitter<ClientEvents> {
   }
 
   /**
-   * Callback that is called when target PLC runtime symbol version has changed
+   * A subscription callback that is called when the target PLC runtime symbol version has changed.
    * 
-   * @param data Data as buffer
-   * @param subscription Subscription object
+   * @param data Received data
+   * @param subscription The subscription object (unused here)
    */
   private async onPlcSymbolVersionChanged(data: SubscriptionData<Buffer> | Buffer, subscription?: ActiveSubscription<Buffer>) {
     let pos = 0;
@@ -982,7 +1059,9 @@ export class Client extends EventEmitter<ClientEvents> {
   }
 
   /**
-   * Event listener for socket errors
+   * Event listener callback for TCP socket error event.
+   * 
+   * See also {@link Client.socketErrorHandler} which is `onSocketError.bind(this)`
    */
   private onSocketError(err: Error) {
     !this.settings.hideConsoleWarnings && console.log(`WARNING: Socket connection to target closed to an an error, disconnecting: ${JSON.stringify(err)}`);
@@ -990,9 +1069,12 @@ export class Client extends EventEmitter<ClientEvents> {
   }
 
   /**
-   * Called when connection to the remote is lost. Handles automatic reconnecting (if enabled)
+   * Handles a lost connection, called when connection to the remote is lost. 
    * 
-   * @param socketFailure If true, connection was lost due to a socket/tcp problem (default: false)
+   * The connection might be lost for example due to a closed socket, socket error,
+   * TwinCAT system state change or local router state change.
+   * 
+   * @param socketFailure If `true`, the connection was lost due to a TCP socket problem (default: `false`)
    */
   private async onConnectionLost(socketFailure = false) {
     this.debug(`onConnectionLost(): Connection was lost. Socket failure: ${socketFailure}`);
@@ -1054,7 +1136,7 @@ export class Client extends EventEmitter<ClientEvents> {
   }
 
   /**
-   * Creates an AMS/TCP request from given packet object
+   * Creates an AMS/TCP request from given packet object.
    * 
    * @param packet Object containing the full AMS/TCP packet
    */
@@ -1077,7 +1159,7 @@ export class Client extends EventEmitter<ClientEvents> {
   }
 
   /**
-   * Creates an AMS header from given packet object
+   * Creates an AMS header from given packet object.
    * 
    * @param packet Object containing the full AMS/TCP packet
    */
@@ -1160,8 +1242,12 @@ export class Client extends EventEmitter<ClientEvents> {
   }
 
   /**
-   * Checks received data buffer for full AMS packets. If full packet is found, it is parsed and handled.
-   * Calls itself recursively if multiple packets available. Added also setImmediate calls to prevent event loop from blocking
+   * Checks received data buffer for full AMS packets. 
+   * 
+   * If a full packet is found, it is passed forward.
+   * 
+   * Calls itself recursively if multiple packets available. 
+   * If so, calls also `setImmediate()` to prevent blocking the event loop.
    */
   private handleReceivedData() {
     //If we haven't enough data to determine packet size, quit
@@ -1189,7 +1275,7 @@ export class Client extends EventEmitter<ClientEvents> {
   }
 
   /**
-   * Parses an AMS/TCP packet from given buffer and then handles it
+   * Parses an AMS/TCP packet from given buffer and then handles it.
    * 
    * @param data Buffer that contains data for a single full AMS/TCP packet
    */
@@ -1214,9 +1300,9 @@ export class Client extends EventEmitter<ClientEvents> {
   }
 
   /**
-   * Parses an AMS/TCP header from given buffer
+   * Parses an AMS/TCP header from given buffer.
    * 
-   * Returns the rest of the payload as data
+   * Returns the rest of the payload as data,
    * 
    * @param data Buffer that contains data for a single full AMS/TCP packet
    */
@@ -1252,9 +1338,9 @@ export class Client extends EventEmitter<ClientEvents> {
   }
 
   /**
-   * Parses an AMS header from given buffer
+   * Parses an AMS header from given buffer.
    * 
-   * Returns the rest of the payload as data
+   * Returns the rest of the payload as data.
    * 
    * @param data Buffer that contains data for a single AMS packet (without AMS/TCP header)
    */
@@ -1325,7 +1411,9 @@ export class Client extends EventEmitter<ClientEvents> {
   }
 
   /**
-   * Parses ADS data from given buffer. Uses `packet.ams` to determine the ADS command.
+   * Parses ADS data from given buffer. 
+   * 
+   * Uses `packet.ams` to determine the ADS command.
   * 
   * @param data Buffer that contains data for a single ADS packet (without AMS/TCP header and AMS header)
   */
@@ -1503,7 +1591,7 @@ export class Client extends EventEmitter<ClientEvents> {
   }
 
   /**
-   * Handles the parsed AMS/TCP packet and actions/callbacks etc. related to it.
+   * Handles the parsed AMS/TCP packet and actions/callbacks related to it.
    * 
    * @param packet Fully parsed AMS/TCP packet, includes AMS/TCP header and if available, also AMS header and ADS data
    */
@@ -1586,7 +1674,7 @@ export class Client extends EventEmitter<ClientEvents> {
   }
 
   /**
-   * Handles received ADS command
+   * Handles received ADS command.
    * 
    * @param packet Fully parsed AMS/TCP packet, includes AMS/TCP header, AMS header and ADS data
    */
@@ -1647,8 +1735,13 @@ export class Client extends EventEmitter<ClientEvents> {
   }
 
   /**
-   * Called when local AMS router status has changed (Router notification received)
-   * For example router state changes when local TwinCAT system switches from Config to Run state and vice-versa
+   * Called when local AMS router state has changed (router notification is received).
+   * 
+   * Router state changes multiple times for example when local TwinCAT system 
+   * is changed from `Config` -> `Run` and vice-versa. If connected to a local system, router state changes might also cause
+   * client the reconnect automatically.
+   * 
+   * Router state is received from the router with AMS command `AMS_TCP_PORT_ROUTER_NOTE` (see {@link ADS.AMS_HEADER_FLAG.AMS_TCP_PORT_ROUTER_NOTE})
    * 
    * @param state New router state
    */
@@ -1684,7 +1777,7 @@ export class Client extends EventEmitter<ClientEvents> {
   }
 
   /**
-   * Parses received ADS notification data (stamps) from given (byte) Buffer
+   * Parses received ADS notification data (stamps) from given data.
    * 
    * @param data Raw data to convert
    */
@@ -1738,14 +1831,14 @@ export class Client extends EventEmitter<ClientEvents> {
     return packet;
   }
 
-
   /**
-   * Adds a new subscription (ADS device notification)
+   * Adds a new subscription to the target (an ADS device notification).
    * 
-   * @param target 
-   * @param callback 
-   * @param settings 
-   * @param targetOpts Optional target settings that override values in `settings` (NOTE: If used, no caching is available -> worse performance)
+   * Sends a `AddNotification` ADS command.
+   * 
+   * @param settings Subscription settings / subscription to add
+   * @param internal If `true`, this is an internal subscription of the client
+   * @param targetOpts Optional target settings that override values in `settings` (**NOTE:** If used, no caching is available -> possible performance impact)
    */
   private async addSubscription<T = any>(settings: SubscriptionSettings<T>, internal: boolean, targetOpts: Partial<AmsAddress> = {}): Promise<ActiveSubscription<T>> {
     this.debugD(`addSubscription(): Subscribing %o (internal: ${internal})`, settings);
@@ -1870,9 +1963,9 @@ export class Client extends EventEmitter<ClientEvents> {
   }
 
   /**
-   * Unsubscribes from all active subscriptions
+   * Unsubscribes from all active subscriptions.
    * 
-   * @param internals If true, also internal subscriptions are unsubscribed
+   * @param internals If `true`, also internal subscriptions are unsubscribed
    */
   private async removeSubscriptions(internals: boolean): Promise<void> {
     if (!this.connection.connected) {
@@ -1917,11 +2010,11 @@ export class Client extends EventEmitter<ClientEvents> {
   }
 
   /**
-   * Backups active subscriptions for resubscribing.
+   * Backups active subscriptions for restoring them later (after reconnecting).
    * 
-   * Returns number of backed up subscriptions.
+   * Returns number of subscriptions that were saved for restoring.
    * 
-   * @param unsubscribe If true, unsubscribeAll() is also called 
+   * @param unsubscribe If `true`, {@link Client.unsubscribeAll()} is also called after saving
    */
   private async backupSubscriptions(unsubscribe: boolean) {
     let count = 0;
@@ -1965,12 +2058,13 @@ export class Client extends EventEmitter<ClientEvents> {
   }
 
   /**
-   * Restores all previously backed up subscriptions
+   * Restores all previously backed up subscriptions.
    * 
-   * Returns array of failed subscriptions, empty array if all were successful
+   * Returns array of subscription targets that failed to be subscribed
+   * (empty array if all were restored successfully).
    */
   private async restoreSubscriptions() {
-    let failedTargets: string[] = [];
+    const failedTargets: string[] = [];
     let totalCount = 0;
     let successCount = 0;
 
@@ -2011,9 +2105,9 @@ export class Client extends EventEmitter<ClientEvents> {
   }
 
   /**
-   * Parses symbol information from raw ADS response payload
+   * Parses symbol information from raw ADS response payload.
    * 
-   * @param data Buffer object containing symbol information (without first 4 bytes of ADS payload containing entry length)
+   * @param data Data containing symbol information (without first 4 bytes of ADS payload containing entry length)
    */
   private parseAdsResponseSymbolInfo(data: Buffer): AdsSymbolInfo {
     this.debugD(`parseAdsResponseSymbolInfo(): Parsing symbol info from data (${data.byteLength} bytes)`);
@@ -2142,9 +2236,9 @@ export class Client extends EventEmitter<ClientEvents> {
   }
 
   /**
-   * Parses data type declaration from raw ADS response payload
+   * Parses data type declaration from raw ADS response payload.
    * 
-   * @param data Buffer object containing data type declaration (without first 4 bytes of ADS payload containing entry length)
+   * @param data Data containing data type declaration (without first 4 bytes of ADS payload containing entry length)
    */
   private parseAdsResponseDataType(data: Buffer): AdsDataType {
     this.debugD(`parseAdsResponseDataType(): Parsing data type from ADS response (${data.byteLength} bytes)`);
@@ -2572,12 +2666,14 @@ export class Client extends EventEmitter<ClientEvents> {
   }
 
   /**
-   * Gets data type declaration for requested type
-   * NOTE: Only returns the requested data type and its direct children. Not the children of children.
-   * The full datatype should be built using buildDataType()
+   * Gets data type declaration for requested data type.
+   * 
+   * **NOTE:** Only returns the requested data type and its direct children. Not the children of children.
+   * 
+   * To get the full datatype with all items, use {@link Client.buildDataType()}.
    * 
    * @param name Data type name in the PLC (such as `ST_Struct`)
-   * @param targetOpts Optional target settings that override values in `settings` (NOTE: If used, no caching is available -> worse performance)
+   * @param targetOpts Optional target settings that override values in `settings` (**NOTE:** If used, no caching is available -> possible performance impact)
    */
   private async getDataTypeDeclaration(name: string, targetOpts: Partial<AmsAddress> = {}): Promise<AdsDataType> {
     this.debug(`getDataTypeDeclaration(): Data type declaration requested for "${name}"`);
@@ -2645,11 +2741,11 @@ export class Client extends EventEmitter<ClientEvents> {
   }
 
   /**
-   * Builds data type declaration for requested type with all children and their children
+   * Builds full data type declaration for requested data type with all children (and their children and so on).
    * 
    * @param name Data type name in the PLC (such as `ST_Struct`)
-   * @param targetOpts Optional target settings that override values in `settings` (NOTE: If used, no caching is available -> worse performance)
-   * @param isRootType If true, this is the root type / first call / not recursive call (default: true)
+   * @param targetOpts Optional target settings that override values in `settings` (**NOTE:** If used, no caching is available -> possible performance impact)
+   * @param isRootType If `true`, this is the root type / first call / not recursive call (default: `true`)
    * @param knownSize Data type size (if known) - used with pseudo data types and TwinCAT 2 primite types
    */
   private async buildDataType(name: string, targetOpts: Partial<AmsAddress> = {}, isRootType = true, knownSize?: number): Promise<AdsDataType> {
@@ -2813,9 +2909,9 @@ export class Client extends EventEmitter<ClientEvents> {
   }
 
   /**
-   * Converts given Buffer data to primitive PLC type
+   * Converts raw data to Javascript object (primitive PLC types only)
    * 
-   * @param buffer Buffer containing the raw data
+   * @param buffer The raw data to convert
    * @param dataType Target data type
    */
   private convertBufferToPrimitiveType(buffer: Buffer, dataType: AdsDataType): PlcPrimitiveType {
@@ -2824,20 +2920,20 @@ export class Client extends EventEmitter<ClientEvents> {
 
     } else if (dataType.adsDataType === ADS.ADS_DATA_TYPES.ADST_WSTRING) {
       return ADS.decodePlcWstringBuffer(buffer);
-      
+
     } else {
       return ADS.BASE_DATA_TYPES.fromBuffer(dataType.type, buffer, this.settings.convertDatesToJavascript);
     }
   }
 
   /**
-   * Converts raw Buffer data to a Javascript object
+   * Converts raw data to Javascript object.
    * 
-   * This is called recursively
+   * This is usually called recursively.
    * 
-   * @param data Raw data
-   * @param dataType Data type to convert to
-   * @param isArrayItem If true, this is array item
+   * @param data The raw data to convert
+   * @param dataType Target data type
+   * @param isArrayItem If `true`, this is an array item (default: `false`)
    */
   private convertBufferToObject<T = any>(data: Buffer, dataType: AdsDataType, isArrayItem: boolean = false): T {
     let result: any;
@@ -2922,12 +3018,12 @@ export class Client extends EventEmitter<ClientEvents> {
   }
 
   /**
-   * Converts Javascript object to a raw Buffer data
+   * Converts a Javascript object to raw data.
    * 
-   * @param value Javascript value to convert
-   * @param dataType Data type to convert
-   * @param objectPath Object path that is passed when calling recursively, used for error message if missing property
-   * @param isArrayItem Set if the value/data type is an array subitem
+   * @param value Javascript object to convert
+   * @param dataType Target data type
+   * @param objectPath Object path that is passed forward when calling recursively. This is used for error reporting if a property is missing
+   * @param isArrayItem If `true`, this is an array item (default: `false`)
    */
   private convertObjectToBuffer<T = any>(value: T, dataType: AdsDataType, objectPath: string = '', isArrayItem: boolean = false): ObjectToBufferConversionResult {
     let rawValue = Buffer.alloc(0);
@@ -3130,11 +3226,11 @@ export class Client extends EventEmitter<ClientEvents> {
   }
 
   /**
-   * Converts a primitive type value to raw value
+   * Converts a Javascript object (that is PLC primitive type) to raw data
    * 
-   * @param value Value to convert, such as number, date, string etc.
-   * @param dataType Data type of the value
-   * @param buffer Buffer where to write that raw value (reference)
+   * @param value Javascript object to convert
+   * @param dataType Data type
+   * @param buffer Reference to Buffer object where to write the raw value
    */
   private convertPrimitiveTypeToBuffer(value: PlcPrimitiveType, dataType: AdsDataType, buffer: Buffer) {
     if (dataType.size === 0) {
@@ -3157,14 +3253,14 @@ export class Client extends EventEmitter<ClientEvents> {
   /**
    * Merges objects recursively. 
    * 
-   * Used for example in `writeSymbol()` when `autoFill` is used 
-   * to merge active values (missing properties) and user-defined properties.
+   * Used for example in {@link Client.writeSymbol()} when `autoFill` setting is used 
+   * to merge active values (missing properties) to user-provided properties.
    * 
    * This is based on https://stackoverflow.com/a/34749873/8140625 
-   * and https://stackoverflow.com/a/49727784/8140625 but with some changes.
+   * and https://stackoverflow.com/a/49727784/8140625 with some changes.
    * 
-   * @param caseSensitive If true, property keys are handled as case-sensitive (as they normally are). In TwinCAT, they are case-insensitive --> using `false`.
-   * @param target Target object where to merge source objects (the value provide by user)
+   * @param caseSensitive If `true`, the property keys are handled as case-sensitive (as they normally are). In TwinCAT everything is case-insensitive --> `false`.
+   * @param target Target object where to merge source objects (this is the value provide by user)
    * @param sources One or more source object, which keys are merged to target if target is missing them
    */
   private deepMergeObjects(caseSensitive: boolean, target: any, ...sources: any[]): any {
@@ -3245,48 +3341,82 @@ export class Client extends EventEmitter<ClientEvents> {
   }
 
   /**
-   * Connects to the 
+   * Connects to the target that is configured in {@link Client.settings} (set in {@link Client.constructor}).
    * 
-   * Returns active connection information
+   * If success, returns the connection information (see {@link AdsClientConnection})
+   * 
+   * @throws Throws an error if connecting fails
+   * 
+   * **Example:**
+   * ```js
+   * try {
+   *  const res = await client.connect();
+   * 
+   *  console.log(`Connected to the ${res.targetAmsNetId}`);
+   *  console.log(`Router assigned us AmsNetId ${res.localAmsNetId} and port ${res.localAdsPort}`);
+   * } catch (err) {
+   *  console.log("Connecting failed:", err);
+   * }
+   * ```
    */
   public connect(): Promise<Required<AdsClientConnection>> {
     return this.connectToTarget();
   }
 
   /**
-   * Disconnects from the target
+   * Disconnects from the target and closes active connection.
    * 
-   * @param force If true, connection is dropped immediately. Should be used only if a very fast exit is needed. (default: false)
+   * Subscriptions are deleted in a handled manner and ADS port is unregisterd.
+   * 
+   * **WARNING:** If `force` is used, active subscriptions are not deleted!
+   * This affects PLCs performance in the long run.
+   * 
+   * @param force If `true`, the connection is dropped immediately (uncontrolled) - use only in special "emergency" cases (default: `false`)
+   * 
+   * @throws Throws an error if disconnecting fails. However the connection stil ended.
+   * 
+   * **Example:**
+   * ```js
+   * try {
+   *  const res = await client.disconnect();
+   *  console.log("Disconnected");
+   * } catch (err) {
+   *  console.log("Disconnected with error:", err);
+   * }
+   * ```
    */
   public disconnect(force: boolean = false): Promise<void> {
     return this.disconnectFromTarget(force);
   }
 
   /**
-   * Reconnects to the target
+   * Reconnects to the target (disconnects and then connects again).
    * 
-   * Saves existing subscriptions, disconnects, connects and then subscribes again.
+   * Active subscriptions are saved and restored automatically after reconnecting.
    * 
-   * @param forceDisconnect If true, connection is dropped immediately. Should be used only if a very fast exit is needed. (default: false)
+   * **WARNING:** If `forceDisconnect` is used, active subscriptions are not deleted!
+   * This affects PLCs performance in the long run.
+   * 
+   * @param forceDisconnect If `true`, the connection is dropped immediately (uncontrolled - as `force` in {@link Client.disconnect()}) - use only in special "emergency" cases (default: `false`)
+   * 
+   * @throws Throws an error if connecting fails
    */
   public reconnect(forceDisconnect: boolean = false): Promise<Required<AdsClientConnection>> {
     return this.reconnectToTarget(forceDisconnect) as Promise<Required<AdsClientConnection>>;
   }
 
   /**
-   * Sets client debug level
+   * Sets active debug level.
    * 
-   *  - 0 = no debugging (default)
-   *  - 1 = basic debugging 
-   *    - same as $env:DEBUG='ads-client'
-   *  - 2 = detailed debugging
-   *    - same as $env:DEBUG='ads-client,ads-client:details'
-   *  - 3 = full debugging with raw I/O data
-   *    - same as $env:DEBUG='ads-client,ads-client:details,ads-client:raw-data'
+   * Debug levels:
+   *  - 0: no debugging (default)
+   *  - 1: basic debugging (`$env:DEBUG='ads-client'`)
+   *  - 2: detailed debugging (`$env:DEBUG='ads-client,ads-client:details'`)
+   *  - 3: detailed debugging with raw I/O data (`$env:DEBUG='ads-client,ads-client:details,ads-client:raw-data'`)
    * 
-   * @param level 0 = none, 1 = basic, 2 = detailed, 3 = detailed + raw data
+   * Debug data is available in the console (See [Debug](https://www.npmjs.com/package/debug) library for mode).
    */
-  setDebugLevel(level: number): void {
+  setDebugLevel(level: DebugLevel): void {
     this.debugLevel_ = level;
 
     this.debug.enabled = level >= 1;
@@ -3297,9 +3427,28 @@ export class Client extends EventEmitter<ClientEvents> {
   }
 
   /**
-   * Sends a raw ADS command to the target
+   * Sends a raw ADS command to the target.
    * 
-   * @template T ADS response type. If omitted, generic AdsResponse is used
+   * This can be useful in some special cases or custom system. See {@link ADS.ADS_COMMAND} for common commands.
+   * 
+   * **NOTE:** Client already includes all the most common commands:
+   * - {@link Client.readRaw}() - `Read` command
+   * - {@link Client.writeRaw}() - `Write` command
+   * - {@link Client.readDeviceInfo}() - `ReadDeviceInfo` command
+   * - {@link Client.readPlcRuntimeState}() - `ReadState` command (override target if needed)
+   * - {@link Client.writeControl}() - `WriteControl` command
+   * - {@link Client.subscribe}() - `AddNotification` command
+   * - {@link Client.unsubscribe}() - `DeleteNotification` command
+   * - {@link Client.readWriteRaw}() - `ReadWrite` command
+   * 
+   * @template T ADS response type. If omitted, generic {@link AdsResponse} type is used
+   * 
+   * @throws Throws an error if sending the command fails or if target responds with an error
+   * 
+   * **Example:**
+   * ```js
+   * (TODO)
+   * ```
    */
   public async sendAdsCommand<T = AdsResponse>(command: AdsCommandToSend) {
     return new Promise<AmsTcpPacket<T>>(async (resolve, reject) => {
@@ -3394,14 +3543,26 @@ export class Client extends EventEmitter<ClientEvents> {
   }
 
   /**
-   * Sends ADS Write Control command to the target
+   * Sends an ADS `WriteControl` command to the target.
    * 
-   * See Write Control ADS specification: https://infosys.beckhoff.com/content/1033/tc3_ads_intro/115879947.html?id=4720330147059483431
+   * More info: [Beckhoff documentation](https://infosys.beckhoff.com/content/1033/tc3_ads_intro/115879947.html?id=4720330147059483431)
    * 
-   * @param adsState Requested ADS state - see `ADS.ADS_STATE` object from `ads-commons.ts`. Can be a number or a valid string, such as `Config`
-   * @param deviceState  Requested device state (default: 0)
+   * @param adsState Requested ADS state - see {@link ADS.ADS_STATE}. Can be a number or a valid string, such as `Config`
+   * @param deviceState  Requested device state (default: `0`)
    * @param data Additional data to send (if any)
    * @param targetOpts Optional target settings that override values in `settings`
+   * 
+   * @throws Throws an error if sending the command fails or if target responds with an error.
+   * 
+   * **Example:**
+   * ```js
+   * try {
+   *  //Set target (PLC) to run
+   *  await client.writeControl("Run");
+   * } catch (err) {
+   *  console.log("Error:", err);
+   * }
+   * ```
    */
   public async writeControl(adsState: keyof typeof ADS.ADS_STATE | number, deviceState: number = 0, data: Buffer = Buffer.alloc(0), targetOpts: Partial<AmsAddress> = {}): Promise<void> {
     if (!this.connection.connected) {
@@ -3457,9 +3618,22 @@ export class Client extends EventEmitter<ClientEvents> {
   }
 
   /**
-   * Starts the PLC runtime (same as green play button in TwinCAT XAE)
+   * Starts the target PLC runtime. Same as pressing the green play button in TwinCAT XAE.
+   * 
+   * **NOTE:** This requires that the target is a PLC runtime.
    * 
    * @param targetOpts Optional target settings that override values in `settings`
+   * 
+   * @throws Throws an error if sending the command fails or if target responds with an error
+   * 
+   * **Example:**
+   * ```js
+   * try {
+   *  await client.startPlc();
+   * } catch (err) {
+   *  console.log("Error:", err);
+   * }
+   * ```
    */
   public async startPlc(targetOpts: Partial<AmsAddress> = {}): Promise<void> {
     if (!this.connection.connected) {
@@ -3482,9 +3656,20 @@ export class Client extends EventEmitter<ClientEvents> {
   }
 
   /**
-   * Resets the PLC runtime (Same as reset cold in TwinCAT XAE)
+   * Resets the target PLC runtime. Same as reset cold in TwinCAT XAE.
    * 
    * @param targetOpts Optional target settings that override values in `settings`
+   * 
+   * @throws Throws an error if sending the command fails or if target responds with an error.
+   * 
+   * **Example:**
+   * ```js
+   * try {
+   *  await client.resetPlc();
+   * } catch (err) {
+   *  console.log("Error:", err);
+   * }
+   * ```
    */
   public async resetPlc(targetOpts: Partial<AmsAddress> = {}): Promise<void> {
     if (!this.connection.connected) {
@@ -3507,9 +3692,20 @@ export class Client extends EventEmitter<ClientEvents> {
   }
 
   /**
-   * Stops the PLC runtime. Same as pressing the red stop button in TwinCAT XAE
+   * Stops the target PLC runtime. Same as pressing the red stop button in TwinCAT XAE.
    * 
    * @param targetOpts Optional target settings that override values in `settings`
+   *  
+   * @throws Throws an error if sending the command fails or if target responds with an error.
+   * 
+   * **Example:**
+   * ```js
+   * try {
+   *  await client.stopPlc();
+   * } catch (err) {
+   *  console.log("Error:", err);
+   * }
+   * ```
    */
   public async stopPlc(targetOpts: Partial<AmsAddress> = {}): Promise<void> {
     if (!this.connection.connected) {
@@ -3532,9 +3728,20 @@ export class Client extends EventEmitter<ClientEvents> {
   }
 
   /**
-   * Restarts the PLC runtime. Same as calling first `resetPlc()` and then `startPlc()`
+   * Restarts the PLC runtime. Same as calling first {@link resetPlc}() and then {@link startPlc}()`
    * 
    * @param targetOpts Optional target settings that override values in `settings`
+   *  
+   * @throws Throws an error if sending the command fails or if target responds with an error.
+   * 
+   * **Example:**
+   * ```js
+   * try {
+   *  await client.restartPlc();
+   * } catch (err) {
+   *  console.log("Error:", err);
+   * }
+   * ```
    */
   public async restartPlc(targetOpts: Partial<AmsAddress> = {}): Promise<void> {
     if (!this.connection.connected) {
@@ -3555,12 +3762,27 @@ export class Client extends EventEmitter<ClientEvents> {
   }
 
   /**
-   * Sets TwinCAT system to run mode
+   * Sets the target TwinCAT system to run mode. Same as **Restart TwinCAT system** in TwinCAT XAE.
    * 
-   * NOTE: As default, restarts also the ads-client connection
+   * **NOTE:** As default, also reconnects the client afterwards to restore subscriptions.
    * 
-   * @param reconnect If true (default), ads-client connection is reconnected after restarting (to restore subscriptions etc.)
+   * @param reconnect If `true`, connection is reconnected afterwards to restore subscriptions etc. (default: `true`)
    * @param targetOpts Optional target settings that override values in `settings`
+   * 
+   * @throws Throws an error if sending the command fails or if target responds with an error.
+   * 
+   * **Example:**
+   * ```js
+   * try {
+   *  //Reconnect the client
+   *  await client.setTcSystemToRun();
+   * 
+   *  //Don't reconnect the client
+   *  await client.setTcSystemToRun(false);
+   * } catch (err) {
+   *  console.log("Error:", err);
+   * }
+   * ```
    */
   public async setTcSystemToRun(reconnect: boolean = true, targetOpts: Partial<AmsAddress> = {}): Promise<void> {
     if (!this.connection.connected) {
@@ -3590,9 +3812,22 @@ export class Client extends EventEmitter<ClientEvents> {
   }
 
   /**
-   * Sets TwinCAT system to config mode
+   * Sets the target TwinCAT system to config mode. Same as **Restart TwinCAT (Config mode)** in TwinCAT XAE.
+   * 
+   * **NOTE:** If the target is a PLC runtime, the connection might be lost.
    * 
    * @param targetOpts Optional target settings that override values in `settings`
+   * 
+   * @throws Throws an error if sending the command fails or if target responds with an error.
+   * 
+   * **Example:**
+   * ```js
+   * try {
+   *  await client.setTcSystemToConfig();
+   * } catch (err) {
+   *  console.log("Error:", err);
+   * }
+   * ```
    */
   public async setTcSystemToConfig(targetOpts: Partial<AmsAddress> = {}): Promise<void> {
     if (!this.connection.connected) {
@@ -3616,12 +3851,29 @@ export class Client extends EventEmitter<ClientEvents> {
   }
 
   /**
-   * Restarts TwinCAT system to run mode. Actually just a wrapper for `setTcSystemToRun()`
+   * Restarts the target TwinCAT system. 
    * 
-   * NOTE: As default, restarts also the ads-client connection
+   * Actually just a wrapper for {@link setTcSystemToRun}() - the operation is the same.
    * 
-   * @param reconnect If true (default), ads-client connection is reconnected after restarting (to restore subscriptions etc.)
+   * **NOTE:** As default, also reconnects the client afterwards to restore subscriptions.
+   * 
+   * @param reconnect If `true`, connection is reconnected afterwards to restore subscriptions etc. (default: `true`)
    * @param targetOpts Optional target settings that override values in `settings`
+   * 
+   * @throws Throws an error if sending the command fails or if target responds with an error.
+   * 
+   * **Example:**
+   * ```js
+   * try {
+   *  //Reconnect the client
+   *  await client.restartTcSystem();
+   * 
+   *  //Don't reconnect the client
+   *  await client.restartTcSystem(false);
+   * } catch (err) {
+   *  console.log("Error:", err);
+   * }
+   * ```
    */
   public async restartTcSystem(reconnect: boolean = true, targetOpts: Partial<AmsAddress> = {}): Promise<void> {
     if (!this.connection.connected) {
@@ -3638,7 +3890,7 @@ export class Client extends EventEmitter<ClientEvents> {
    * Saved to cache if target is not overridden.
    * 
    * @param path Full variable path in the PLC (such as `GVL_Test.ExampleStruct`)
-   * @param targetOpts Optional target settings that override values in `settings` (NOTE: If used, no caching is available -> worse performance)
+   * @param targetOpts Optional target settings that override values in `settings` (**NOTE:** If used, no caching is available -> possible performance impact)
    */
   public async getSymbolInfo(path: string, targetOpts: Partial<AmsAddress> = {}): Promise<AdsSymbolInfo> {
     if (!this.connection.connected) {
@@ -3714,7 +3966,7 @@ export class Client extends EventEmitter<ClientEvents> {
    * Returns full built data type declaration with subitems for given data type
    * 
    * @param name Data type name in the PLC (such as `ST_Struct`)
-   * @param targetOpts Optional target settings that override values in `settings` (NOTE: If used, no caching is available -> worse performance)
+   * @param targetOpts Optional target settings that override values in `settings` (**NOTE:** If used, no caching is available -> possible performance impact)
    */
   public async getDataType(name: string, targetOpts: Partial<AmsAddress> = {}): Promise<AdsDataType> {
     if (!this.connection.connected) {
@@ -3870,7 +4122,7 @@ export class Client extends EventEmitter<ClientEvents> {
    * So if `cycleTime` is 100 ms, `maxDelay` is 1000 ms and value changes every 100 ms, the PLC sends 10 notifications every 1000 ms.
    * This can be useful for throttling.
    * 
-   * @param targetOpts Optional target settings that override values in `settings` (NOTE: If used, no caching is available -> worse performance)
+   * @param targetOpts Optional target settings that override values in `settings` (**NOTE:** If used, no caching is available -> possible performance impact)
    * 
    * @template T Typescript data type of the PLC data, for example `subscribe<number>(...)` or `subscribe<ST_TypedStruct>(...)`. If target is raw address, use `subscribe<Buffer>`
    */
@@ -3896,7 +4148,7 @@ export class Client extends EventEmitter<ClientEvents> {
     }
   }
 
-  
+
 
   /**
    * Subscribes to variable change notifications (ADS notifications) by provided index group, index offset and data length (bytes)
@@ -3933,7 +4185,7 @@ export class Client extends EventEmitter<ClientEvents> {
    * So if `cycleTime` is 100 ms, `maxDelay` is 1000 ms and value changes every 100 ms, the PLC sends 10 notifications every 1000 ms.
    * This can be useful for throttling.
    * 
-   * @param targetOpts Optional target settings that override values in `settings` (NOTE: If used, no caching is available -> worse performance)
+   * @param targetOpts Optional target settings that override values in `settings` (**NOTE:** If used, no caching is available -> possible performance impact)
    * 
    * @template T Typescript data type of the PLC data, for example `subscribe<number>(...)` or `subscribe<ST_TypedStruct>(...)`. If target is raw address, use `subscribe<Buffer>`
    */
@@ -3969,7 +4221,7 @@ export class Client extends EventEmitter<ClientEvents> {
    * Callback is called with latest value when changed or when cycle time has passed, depending on settings.
    * 
    * @param options Subscription options
-   * @param targetOpts Optional target settings that override values in `settings` (NOTE: If used, no caching is available -> worse performance)
+   * @param targetOpts Optional target settings that override values in `settings` (**NOTE:** If used, no caching is available -> possible performance impact)
    * 
    * @template T Typescript data type of the PLC data, for example `subscribe<number>(...)` or `subscribe<ST_TypedStruct>(...)`. If target is raw address, use `subscribe<Buffer>`
    */
@@ -5212,7 +5464,7 @@ export class Client extends EventEmitter<ClientEvents> {
    * 
    * **NOTE:** Do not use `autoFill` for `UNION` types, it works without errors but the result isn't probably the desired one
    * 
-   * @param value Javascript object that represents the `dataType´ in target system
+   * @param value Javascript object that represents the `dataType` in target system
    * @param dataType Data type name in the PLC as string (such as `ST_Struct`) or `AdsDataType` object
    * @param autoFill If true and data type is a container (`STRUCT`, `FUNCTION_BLOCK` etc.), missing properties are automatically **set to default values** (usually `0` or `''`) 
    * @param targetOpts Optional target settings that override values in `settings`
@@ -5290,7 +5542,7 @@ export class Client extends EventEmitter<ClientEvents> {
    * Variable value can be accessed by using the handle with `readRawByHandle()` and `writeRawByHandle()`
    * 
    * @param path Full variable path in the PLC (such as `GVL_Test.ExampleStruct`)
-   * @param targetOpts Optional target settings that override values in `settings` (NOTE: If used, no caching is available -> worse performance)
+   * @param targetOpts Optional target settings that override values in `settings` (**NOTE:** If used, no caching is available -> possible performance impact)
    */
   public async createVariableHandle(path: string, targetOpts: Partial<AmsAddress> = {}): Promise<VariableHandle> {
     if (!this.connection.connected) {
@@ -5374,7 +5626,7 @@ export class Client extends EventEmitter<ClientEvents> {
    * 
    * Uses ADS sum command under the hood (better perfomance)
    * 
-   * @param targets Array of full variable paths in the PLC (such as `GVL_Test.ExampleStruct`)
+   * @param paths Array of full variable paths in the PLC (such as `GVL_Test.ExampleStruct`)
    * @param targetOpts Optional target settings that override values in `settings`
    */
   public async createVariableHandleMulti(paths: string[], targetOpts: Partial<AmsAddress> = {}): Promise<CreateVariableHandleMultiResult[]> {
@@ -5511,7 +5763,7 @@ export class Client extends EventEmitter<ClientEvents> {
    * Deletes a variable handle that was previously created using `createVariableHandle()`
    * 
    * @param handle Variable handle to delete
-   * @param targetOpts Optional target settings that override values in `settings` (NOTE: If used, no caching is available -> worse performance)
+   * @param targetOpts Optional target settings that override values in `settings` (**NOTE:** If used, no caching is available -> possible performance impact)
    */
   public async deleteVariableHandle(handle: VariableHandle | number, targetOpts: Partial<AmsAddress> = {}): Promise<void> {
     if (!this.connection.connected) {
@@ -5660,7 +5912,7 @@ export class Client extends EventEmitter<ClientEvents> {
    * 
    * @param handle Variable handle
    * @param size Optional data length to read (bytes) - as default, size in handle is used if available. Uses 0xFFFFFFFF as fallback.
-   * @param targetOpts Optional target settings that override values in `settings` (NOTE: If used, no caching is available -> worse performance)
+   * @param targetOpts Optional target settings that override values in `settings` (**NOTE:** If used, no caching is available -> possible performance impact)
    */
   public async readRawByHandle(handle: VariableHandle | number, size?: number, targetOpts: Partial<AmsAddress> = {}): Promise<Buffer> {
     if (!this.connection.connected) {
@@ -5693,7 +5945,7 @@ export class Client extends EventEmitter<ClientEvents> {
    * 
    * @param handle Variable handle
    * @param value Data to write
-   * @param targetOpts Optional target settings that override values in `settings` (NOTE: If used, no caching is available -> worse performance)
+   * @param targetOpts Optional target settings that override values in `settings` (**NOTE:** If used, no caching is available -> possible performance impact)
    */
   public async writeRawByHandle(handle: VariableHandle | number, value: Buffer, targetOpts: Partial<AmsAddress> = {}): Promise<void> {
     if (!this.connection.connected) {
@@ -5718,7 +5970,7 @@ export class Client extends EventEmitter<ClientEvents> {
    * Reads raw data by symbol
    * 
    * @param symbol Symbol information (acquired using `getSymbolInfo()`)
-   * @param targetOpts Optional target settings that override values in `settings` (NOTE: If used, no caching is available -> worse performance)
+   * @param targetOpts Optional target settings that override values in `settings` (**NOTE:** If used, no caching is available -> possible performance impact)
    */
   public async readRawBySymbol(symbol: AdsSymbolInfo, targetOpts: Partial<AmsAddress> = {}): Promise<Buffer> {
     if (!this.connection.connected) {

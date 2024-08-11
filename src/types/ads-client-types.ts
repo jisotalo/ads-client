@@ -1,5 +1,7 @@
 import ClientError from "../client-error";
-import { AdsDataType, AdsDeviceInfo, AdsRawAddress, AdsResponse, AdsState, AdsSymbolInfo, AmsAddress, AmsTcpPacket, BaseAdsResponse } from "./ads-protocol-types";
+import { AdsDataType, AdsDeviceInfo, AdsRawAddress, AdsResponse, AdsState, AdsSymbolInfo, AmsAddress, AmsRouterState, AmsTcpPacket, BaseAdsResponse } from "./ads-protocol-types";
+
+export type DebugLevel = 0 | 1 | 2 | 3;
 
 /**
  * Events for the client, for example `client.on('connect', ...)`
@@ -427,14 +429,6 @@ export interface ConnectionMetaData {
   dataTypes: AdsDataTypeContainer,
   /** Local AMS router state (if available) */
   routerState?: AmsRouterState
-};
-
-/**
- * AMS router state
- */
-export interface AmsRouterState {
-  state: number,
-  stateStr: string
 };
 
 /**
