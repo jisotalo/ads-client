@@ -325,9 +325,9 @@ export interface AdsRawAddress{
 }
 
 /**
- * ADS symbol information object
+ * ADS symbol object
  */
-export interface AdsSymbolInfo {
+export interface AdsSymbol {
   /** Symbol address indexGroup */
   indexGroup: number,
   /** Symbol address indexOffset */

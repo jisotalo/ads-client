@@ -1,5 +1,5 @@
 import ClientError from "../client-error";
-import { AdsDataType, AdsDeviceInfo, AdsRawAddress, AdsResponse, AdsState, AdsSymbolInfo, AmsAddress, AmsRouterState, AmsTcpPacket, BaseAdsResponse } from "./ads-protocol-types";
+import { AdsDataType, AdsDeviceInfo, AdsRawAddress, AdsResponse, AdsState, AdsSymbol, AmsAddress, AmsRouterState, AmsTcpPacket, BaseAdsResponse } from "./ads-protocol-types";
 
 export type DebugLevel = 0 | 1 | 2 | 3;
 
@@ -367,8 +367,8 @@ export interface ActiveSubscription<T = any> {
   remoteAddress: AmsAddress,
   /** Notification handle (number) of this subscription's ADS device notification */
   notificationHandle: number,
-  /** Symbol info of the target variable (if any) */
-  symbolInfo?: AdsSymbolInfo,
+  /** Symbo of the target variable (if any) */
+  symbol?: AdsSymbol,
   /** Function that can be called to unsubscribe (same as `client.unsubscribe(...)`) */
   unsubscribe: () => Promise<void>,
   /** Function that parses received raw data to a variable */
@@ -424,7 +424,7 @@ export interface ConnectionMetaData {
   /** Set to `true` if client has cached all symbols */
   allPlcSymbolsCached: boolean,
   /** Cached target PLC runtime symbols (if available) */
-  plcSymbols: AdsSymbolInfoContainer,
+  plcSymbols: AdsSymbolContainer,
   /** Set to `true` if client has cached all data types */
   allPlcDataTypesCached: boolean,
   /** Cached target PLC runtime data types without subitems (if available) */
@@ -454,8 +454,8 @@ export interface AdsUploadInfo {
 /**
  * Object containing PLC runtime symbol information objects
  */
-export interface AdsSymbolInfoContainer {
-  [K: string]: AdsSymbolInfo
+export interface AdsSymbolContainer {
+  [K: string]: AdsSymbol
 }
 
 /**
@@ -542,25 +542,25 @@ export interface SubscriptionSettings<T = any> {
 export type PlcPrimitiveType = string | boolean | number | Buffer | Date | BigInt;
 
 /**
- * Return value of `readSymbolValue()`
+ * Return value of `readValue()` and `readValueBySymbol()`
  * 
  * @template T - Type of the value
  */
-export interface ReadSymbolValueResult<T = any> {
+export interface ReadValueResult<T = any> {
   /** Value of the symbol as converted Javascript object */
   value: T,
   /** Raw value as Buffer */
   rawValue: Buffer,
   /** Data type of the target symbol */
   dataType: AdsDataType,
-  /** Symbol information of the target symbol */
-  symbolInfo: AdsSymbolInfo
+  /** Target symbol */
+  symbol: AdsSymbol
 }
 
 /**
- * Return value of `writeSymbolValue()`
+ * Return value of `writeValue()` and `writeValueBySymbol()`
  */
-export interface WriteSymbolValueResult<T = any> {
+export interface WriteValueResult<T = any> {
   /** Value of the symbol as converted Javascript object */
   value: T,
   /** Raw value as Buffer */
@@ -568,7 +568,7 @@ export interface WriteSymbolValueResult<T = any> {
   /** Data type of the target symbol */
   dataType: AdsDataType,
   /** Symbol information of the target symbol */
-  symbolInfo: AdsSymbolInfo
+  symbol: AdsSymbol
 }
 
 /** 

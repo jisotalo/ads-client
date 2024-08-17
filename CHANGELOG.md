@@ -16,7 +16,7 @@ See [MIGRATION.md](MIGRATION.md) for all breaking changes and follow the instruc
 - Everything is tested before releasing
 - Lots of optimizations
 - Lots of name changes
-- New methods: `resetPlc()`, `readWriteRawMulti()`, `writeRawByPath()`
+- New methods: `resetPlc()`, `readWriteRawMulti()`, `writeRawByPath()`, `readValueBySymbol()`, `writeValueBySymbol()`
 - New setting `disableCaching`: disables all symbol and data type caching
 - Added optional `targetOpts` argument in **all methods**
   - Possible to provide different target address (AmsNetId and/or AdsPort) than specified in the settings

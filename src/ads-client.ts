@@ -1,6 +1,6 @@
 import EventEmitter from "events";
-import type { ActiveAdsRequestContainer, ActiveSubscription, ActiveSubscriptionContainer, AdsClientConnection, AdsClientSettings, AdsCommandToSend, AdsDataTypeContainer, AdsSymbolInfoContainer, AdsUploadInfo, ConnectionMetaData, PlcPrimitiveType, SubscriptionData, SubscriptionSettings, ReadSymbolValueResult, TimerObject, ObjectToBufferConversionResult, WriteSymbolValueResult, VariableHandle, RpcMethodCallResult, CreateVariableHandleMultiResult, ReadRawMultiResult, ReadRawMultiCommand, WriteRawMultiResult, DeleteVariableHandleMultiResult, ReadWriteRawMultiResult, ReadWriteRawMultiCommand, WriteRawMultiCommand, ClientEvents, SubscriptionCallback, DebugLevel } from "./types/ads-client-types";
-import { AdsAddNotificationResponse, AdsAddNotificationResponseData, AdsArrayInfoEntry, AdsAttributeEntry, AdsDataType, AdsDeleteNotificationResponse, AdsDeviceInfo, AdsEnumInfoEntry, AdsNotification, AdsNotificationResponse, AdsNotificationSample, AdsNotificationStamp, AdsRawAddress, AdsReadDeviceInfoResponse, AdsReadResponse, AdsReadStateResponse, AdsReadWriteResponse, AdsRequest, AdsResponse, AdsRpcMethodEntry, AdsRpcMethodParameterEntry, AdsState, AdsSymbolInfo, AdsWriteControlResponse, AdsWriteResponse, AmsAddress, AmsHeader, AmsPortRegisteredData, AmsRouterState, AmsRouterStateData, AmsTcpHeader, AmsTcpPacket, BaseAdsResponse, EmptyAdsResponse, UnknownAdsResponse } from "./types/ads-protocol-types";
+import type { ActiveAdsRequestContainer, ActiveSubscription, ActiveSubscriptionContainer, AdsClientConnection, AdsClientSettings, AdsCommandToSend, AdsDataTypeContainer, AdsSymbolContainer, AdsUploadInfo, ConnectionMetaData, PlcPrimitiveType, SubscriptionData, SubscriptionSettings, ReadValueResult, TimerObject, ObjectToBufferConversionResult, WriteValueResult, VariableHandle, RpcMethodCallResult, CreateVariableHandleMultiResult, ReadRawMultiResult, ReadRawMultiCommand, WriteRawMultiResult, DeleteVariableHandleMultiResult, ReadWriteRawMultiResult, ReadWriteRawMultiCommand, WriteRawMultiCommand, ClientEvents, SubscriptionCallback, DebugLevel } from "./types/ads-client-types";
+import { AdsAddNotificationResponse, AdsAddNotificationResponseData, AdsArrayInfoEntry, AdsAttributeEntry, AdsDataType, AdsDeleteNotificationResponse, AdsDeviceInfo, AdsEnumInfoEntry, AdsNotification, AdsNotificationResponse, AdsNotificationSample, AdsNotificationStamp, AdsRawAddress, AdsReadDeviceInfoResponse, AdsReadResponse, AdsReadStateResponse, AdsReadWriteResponse, AdsRequest, AdsResponse, AdsRpcMethodEntry, AdsRpcMethodParameterEntry, AdsState, AdsSymbol, AdsWriteControlResponse, AdsWriteResponse, AmsAddress, AmsHeader, AmsPortRegisteredData, AmsRouterState, AmsRouterStateData, AmsTcpHeader, AmsTcpPacket, BaseAdsResponse, EmptyAdsResponse, UnknownAdsResponse } from "./types/ads-protocol-types";
 import {
   Socket,
   SocketConnectOpts
@@ -839,7 +839,7 @@ export class Client extends EventEmitter<ClientEvents> {
 
     //Pre-cache symbols
     if (this.settings.readAndCacheSymbols || this.metaData.allPlcSymbolsCached) {
-      await this.cacheSymbolInfos();
+      await this.cacheSymbols();
     }
 
     //Pre-cache data types
@@ -1008,7 +1008,7 @@ export class Client extends EventEmitter<ClientEvents> {
     } else if (this.metaData.plcSymbolVersion !== symbolVersion) {
       this.debug(`onPlcSymbolVersionChanged(): PLC runtime symbol version changed from ${this.metaData.plcSymbolVersion === undefined ? 'UNKNOWN' : this.metaData.plcSymbolVersion} to ${symbolVersion} -> Refreshing all cached data and subscriptions`);
 
-      //Clear all cached symbol infos and data types etc.
+      //Clear all cached symbol and data types etc.
       this.metaData.plcDataTypes = {};
       this.metaData.plcSymbols = {};
       this.metaData.plcUploadInfo = undefined;
@@ -1024,7 +1024,7 @@ export class Client extends EventEmitter<ClientEvents> {
       //Refreshing symbol cache (if needed)
       if (this.metaData.allPlcSymbolsCached) {
         try {
-          await this.cacheSymbolInfos();
+          await this.cacheSymbols();
 
         } catch (err) {
           this.debug(`onPlcSymbolVersionChanged(): Failed to refresh symbol cache`);
@@ -1844,23 +1844,23 @@ export class Client extends EventEmitter<ClientEvents> {
     this.debugD(`addSubscription(): Subscribing %o (internal: ${internal})`, settings);
 
     let targetAddress = {} as AdsRawAddress;
-    let symbolInfo: AdsSymbolInfo | undefined = undefined;
+    let symbol: AdsSymbol | undefined = undefined;
 
     if (typeof settings.target === "string") {
       try {
-        symbolInfo = await this.getSymbolInfo(settings.target, targetOpts);
+        symbol = await this.getSymbol(settings.target, targetOpts);
 
         //Read symbol datatype to cache -> It's cached when we start getting notifications
         //Otherwise with large structs and fast cycle times there might be some issues
         //NOTE: Only when we are targetted to original target system, otherwise we don't have caching so no need to
         if (!this.settings.disableCaching && !targetOpts.adsPort && !targetOpts.amsNetId) {
-          await this.getDataType(symbolInfo.type, targetOpts);
+          await this.getDataType(symbol.type, targetOpts);
         }
 
         targetAddress = {
-          indexGroup: symbolInfo.indexGroup,
-          indexOffset: symbolInfo.indexOffset,
-          size: symbolInfo.size
+          indexGroup: symbol.indexGroup,
+          indexOffset: symbol.indexOffset,
+          size: symbol.size
         };
 
       } catch (err) {
@@ -1923,7 +1923,7 @@ export class Client extends EventEmitter<ClientEvents> {
         internal,
         remoteAddress: res.ams.sourceAmsAddress,
         notificationHandle: res.ads.payload.notificationHandle,
-        symbolInfo,
+        symbol,
         unsubscribe: async function () {
           await clientRef.unsubscribe(this);
         },
@@ -1933,8 +1933,8 @@ export class Client extends EventEmitter<ClientEvents> {
             value: data as T
           };
 
-          if (this.symbolInfo) {
-            const dataType = await clientRef.getDataType(this.symbolInfo.type, this.targetOpts);
+          if (this.symbol) {
+            const dataType = await clientRef.getDataType(this.symbol.type, this.targetOpts);
             result.value = clientRef.convertBufferToObject<T>(data, dataType);
           }
 
@@ -2105,14 +2105,14 @@ export class Client extends EventEmitter<ClientEvents> {
   }
 
   /**
-   * Parses symbol information from raw ADS response payload.
+   * Parses symbol from raw ADS response payload.
    * 
-   * @param data Data containing symbol information (without first 4 bytes of ADS payload containing entry length)
+   * @param data Data containing ADS symbol (without first 4 bytes of ADS payload containing entry length)
    */
-  private parseAdsResponseSymbolInfo(data: Buffer): AdsSymbolInfo {
-    this.debugD(`parseAdsResponseSymbolInfo(): Parsing symbol info from data (${data.byteLength} bytes)`);
+  private parseAdsResponseSymbol(data: Buffer): AdsSymbol {
+    this.debugD(`parseAdsResponseSymbol(): Parsing symbol from data (${data.byteLength} bytes)`);
 
-    const symbol = {} as AdsSymbolInfo;
+    const symbol = {} as AdsSymbol;
     let pos = 0;
 
     //0..3 Index group
@@ -2231,7 +2231,7 @@ export class Client extends EventEmitter<ClientEvents> {
     //Reserved, if any
     symbol.reserved = data.subarray(pos);
 
-    this.debugD(`parseAdsResponseSymbolInfo(): Symbol info parsed for ${symbol.name} (${symbol.type})`);
+    this.debugD(`parseAdsResponseSymbol(): Symbol parsed for ${symbol.name} (${symbol.type})`);
     return symbol;
   }
 
@@ -2683,7 +2683,7 @@ export class Client extends EventEmitter<ClientEvents> {
    * @param targetOpts Optional target settings that override values in `settings` (**NOTE:** If used, no caching is available -> possible performance impact)
    */
   private async getDataTypeDeclaration(name: string, targetOpts: Partial<AmsAddress> = {}): Promise<AdsDataType> {
-    this.debug(`getDataTypeDeclaration(): Data type declaration requested for "${name}"`);
+    this.debug(`getDataTypeDeclaration(): Data type declaration requested for ${name}`);
 
     //Is this data type already cached? Skip check if we have different target
     if (!this.settings.disableCaching
@@ -2691,12 +2691,12 @@ export class Client extends EventEmitter<ClientEvents> {
       && !targetOpts.amsNetId
       && this.metaData.plcDataTypes[name.toLowerCase()]) {
 
-      this.debug(`getDataTypeDeclaration(): Data type declaration found from cache for "${name}"`);
+      this.debug(`getDataTypeDeclaration(): Data type declaration found from cache for ${name}`);
       return this.metaData.plcDataTypes[name.toLowerCase()];
     }
 
     //Reading from target
-    this.debug(`getDataTypeDeclaration(): Data type declaration for "${name}" not cached, reading from target`);
+    this.debug(`getDataTypeDeclaration(): Data type declaration for ${name} not cached, reading from target`);
 
     //Allocating bytes for request
     const data = Buffer.alloc(16 + name.length + 1);
@@ -2737,13 +2737,13 @@ export class Client extends EventEmitter<ClientEvents> {
       if (!this.settings.disableCaching && !targetOpts.adsPort && !targetOpts.amsNetId) {
         this.metaData.plcDataTypes[name.toLowerCase()] = dataType;
       }
-      this.debug(`getDataTypeDeclaration(): Data type declaration read and parsed for "${name}"`);
+      this.debug(`getDataTypeDeclaration(): Data type declaration read and parsed for ${name}`);
 
       return dataType;
 
     } catch (err) {
-      this.debug(`getDataTypeDeclaration(): Reading data type declaration for "${name} failed: %o`, err);
-      throw new ClientError(`getDataTypeDeclaration(): Reading data type declaration for "${name}" failed`, err);
+      this.debug(`getDataTypeDeclaration(): Reading data type declaration for ${name} failed: %o`, err);
+      throw new ClientError(`getDataTypeDeclaration(): Reading data type declaration for ${name} failed`, err);
     }
   }
 
@@ -2764,7 +2764,7 @@ export class Client extends EventEmitter<ClientEvents> {
    */
   private async buildDataType(name: string, targetOpts: Partial<AmsAddress> = {}, isRootType = true, knownSize?: number): Promise<AdsDataType> {
     try {
-      this.debug(`buildDataType(): Building data type for "${name}"`);
+      this.debug(`buildDataType(): Building data type for ${name}`);
 
       let dataType: AdsDataType | undefined;
 
@@ -2917,8 +2917,8 @@ export class Client extends EventEmitter<ClientEvents> {
       return builtType;
 
     } catch (err) {
-      this.debug(`buildDataType(): Building data type for "${name}" failed: %o`, err);
-      throw new ClientError(`buildDataType(): Building data type for "${name}" failed`, err);
+      this.debug(`buildDataType(): Building data type for ${name} failed: %o`, err);
+      throw new ClientError(`buildDataType(): Building data type for ${name} failed`, err);
     }
   }
 
@@ -3267,7 +3267,7 @@ export class Client extends EventEmitter<ClientEvents> {
   /**
    * Merges objects recursively. 
    * 
-   * Used for example in {@link Client.writeSymbolValue()} when `autoFill` setting is used 
+   * Used for example in {@link Client.writeValue()} when `autoFill` setting is used 
    * to merge active values (missing properties) to user-provided properties.
    * 
    * This is based on https://stackoverflow.com/a/34749873/8140625 
@@ -3900,7 +3900,7 @@ export class Client extends EventEmitter<ClientEvents> {
   }
 
   /**
-   * Returns symbol information for given variable path, such as `GVL_Test.ExampleStruct`.
+   * Returns symbol for given variable path, such as `GVL_Test.ExampleStruct`.
    * 
    * Returns previously cached value if available, otherwise reads it from the target
    * and caches it. 
@@ -3916,13 +3916,13 @@ export class Client extends EventEmitter<ClientEvents> {
    * 
    * @throws Throws an error if sending the command fails or if the target responds with an error.
    */
-  public async getSymbolInfo(path: string, targetOpts: Partial<AmsAddress> = {}): Promise<AdsSymbolInfo> {
+  public async getSymbol(path: string, targetOpts: Partial<AmsAddress> = {}): Promise<AdsSymbol> {
     if (!this.connection.connected) {
-      throw new ClientError(`getSymbolInfo(): Client is not connected. Use connect() to connect to the target first.`);
+      throw new ClientError(`getSymbol(): Client is not connected. Use connect() to connect to the target first.`);
     }
     path = path.trim();
 
-    this.debug(`getSymbolInfo(): Symbol info requested for "${path}"`);
+    this.debug(`getSymbol(): Symbol requested for ${path}`);
 
     //Is this symbol already cached? Skip check if we have different target
     if (!this.settings.disableCaching
@@ -3930,12 +3930,12 @@ export class Client extends EventEmitter<ClientEvents> {
       && !targetOpts.amsNetId
       && this.metaData.plcSymbols[path.toLowerCase()]) {
 
-      this.debug(`getSymbolInfo(): Symbol info found from cache for "${path}"`);
+      this.debug(`getSymbol(): Symbol found from cache for ${path}`);
       return this.metaData.plcSymbols[path.toLowerCase()];
     }
 
     //Reading from target
-    this.debug(`getSymbolInfo(): Symbol info for "${path}" not cached, reading from target`);
+    this.debug(`getSymbol(): Symbol for ${path} not cached, reading from target`);
 
     //Allocating bytes for request
     const data = Buffer.alloc(16 + path.length + 1);
@@ -3970,19 +3970,19 @@ export class Client extends EventEmitter<ClientEvents> {
       });
 
       //Parsing the symbol, first 4 bytes can be skipped (data length)
-      const symbol = this.parseAdsResponseSymbolInfo(res.ads.payload.subarray(4));
+      const symbol = this.parseAdsResponseSymbol(res.ads.payload.subarray(4));
 
       //Only cache when original target
       if (!this.settings.disableCaching && !targetOpts.adsPort && !targetOpts.amsNetId) {
         this.metaData.plcSymbols[path.toLowerCase()] = symbol;
       }
 
-      this.debug(`getSymbolInfo(): Symbol info read and parsed for "${path}"`);
+      this.debug(`getSymbol(): Symbol read and parsed for ${path}`);
       return symbol;
 
     } catch (err) {
-      this.debug(`getSymbolInfo(): Reading symbol info for "${path}" failed: %o`, err);
-      throw new ClientError(`getSymbolInfo(): Reading symbol info for "${path} failed`, err);
+      this.debug(`getSymbol(): Reading symbol for ${path} failed: %o`, err);
+      throw new ClientError(`getSymbol(): Reading symbol for ${path} failed`, err);
     }
   }
 
@@ -4007,9 +4007,9 @@ export class Client extends EventEmitter<ClientEvents> {
     }
     name = name.trim();
 
-    this.debug(`getDataType(): Data type requested for "${name}"`);
+    this.debug(`getDataType(): Data type requested for ${name}`);
     const dataType = await this.buildDataType(name, targetOpts);
-    this.debug(`getDataType(): Data type read and built for "${name}"`);
+    this.debug(`getDataType(): Data type read and built for ${name}`);
 
     return dataType;
 
@@ -4194,7 +4194,7 @@ export class Client extends EventEmitter<ClientEvents> {
    * await client.subscribeSymbol(
    *  'GVL_Test.ExampleStruct.',
    *  (data, subscription) => {
-   *   console.log(`Value of ${subscription.symbolInfo.name} has changed: ${data.value}`);
+   *   console.log(`Value of ${subscription.symbol.name} has changed: ${data.value}`);
    *  },
    *  100
    * );
@@ -4605,7 +4605,7 @@ export class Client extends EventEmitter<ClientEvents> {
   }
 
   /**
-   * Returns symbol information for all available symbols/variables in the target PLC runtime.
+   * Returns all symbols in the target PLC runtime.
    * 
    * **NOTE:** This requires that the target is a PLC runtime.
    * 
@@ -4617,7 +4617,7 @@ export class Client extends EventEmitter<ClientEvents> {
    * @example
    * ```js
    * try {
-   *  const symbolInfos = await client.getSymbolInfos();
+   *  const symbols = await client.getSymbols();
    * } catch (err) {
    *  console.log("Error:", err);
    * }
@@ -4627,21 +4627,21 @@ export class Client extends EventEmitter<ClientEvents> {
    * 
    * @param targetOpts Optional target settings that override values in `settings`
    */
-  public async getSymbolInfos(targetOpts: Partial<AmsAddress> = {}): Promise<AdsSymbolInfoContainer> {
+  public async getSymbols(targetOpts: Partial<AmsAddress> = {}): Promise<AdsSymbolContainer> {
     if (!this.connection.connected) {
-      throw new ClientError(`getSymbolInfos(): Client is not connected. Use connect() to connect to the target first.`);
+      throw new ClientError(`getSymbols(): Client is not connected. Use connect() to connect to the target first.`);
     }
-    this.debug(`getSymbolInfos(): Reading symbol information`);
+    this.debug(`getSymbols(): Reading symbol`);
 
     let uploadInfo: AdsUploadInfo;
     try {
-      this.debug(`getSymbolInfos(): Updating upload info (needed for symbol reading)`)
+      this.debug(`getSymbols(): Updating upload info (needed for symbol reading)`)
 
       uploadInfo = await this.readPlcUploadInfo(targetOpts);
 
     } catch (err) {
-      this.debug(`getSymbolInfos(): Reading upload info failed`)
-      throw new ClientError(`getSymbolInfos(): Reading upload info failed`, err);
+      this.debug(`getSymbols(): Reading upload info failed`)
+      throw new ClientError(`getSymbols(): Reading upload info failed`, err);
     }
 
     //Allocating bytes for request
@@ -4668,7 +4668,7 @@ export class Client extends EventEmitter<ClientEvents> {
         payload: data
       });
 
-      const symbols = {} as AdsSymbolInfoContainer;
+      const symbols = {} as AdsSymbolContainer;
 
       let response = res.ads.payload;
       let count = 0;
@@ -4676,11 +4676,11 @@ export class Client extends EventEmitter<ClientEvents> {
       while (response.byteLength > 0) {
         let pos = 0;
 
-        //0..3 Symbol information bytelength
+        //0..3 Symbol bytelength
         const len = response.readUInt32LE(pos);
         pos += 4;
 
-        const symbol = this.parseAdsResponseSymbolInfo(response.subarray(pos, pos + len));
+        const symbol = this.parseAdsResponseSymbol(response.subarray(pos, pos + len));
         symbols[symbol.name.trim().toLowerCase()] = symbol;
 
         response = response.subarray(len);
@@ -4691,39 +4691,39 @@ export class Client extends EventEmitter<ClientEvents> {
         //Target is not overridden -> save to metadata
         this.metaData.plcSymbols = symbols;
         this.metaData.allPlcSymbolsCached = true;
-        this.debug(`getSymbolInfos(): All symbols read and cached (symbol count ${count})`);
+        this.debug(`getSymbols(): All symbols read and cached (symbol count ${count})`);
 
       } else {
-        this.debug(`getSymbolInfos(): All symbols read (symbol count ${count})`);
+        this.debug(`getSymbols(): All symbols read (symbol count ${count})`);
       }
 
       return symbols;
 
     } catch (err) {
-      this.debug(`getSymbolInfos(): Reading symbol information failed: %o`, err);
-      throw new ClientError(`getSymbolInfos(): Reading symbol information failed`, err);
+      this.debug(`getSymbols(): Reading symbols failed: %o`, err);
+      throw new ClientError(`getSymbols(): Reading symbols failed`, err);
     }
   }
 
   /**
-   * Caches all symbol information data from target PLC runtime
+   * Caches all symbols from target PLC runtime
    * 
    * Can be used to pre-cache all symbols to speed up communication. 
    * Caching is only available for the original target configured in settings. 
    * 
-   * Wrapper for `getSymbolInfos()` (calling it without overridden target has the same effect)
+   * Wrapper for `getSymbols()` (calling it without overridden target has the same effect)
    */
-  public async cacheSymbolInfos() {
-    this.debug(`cacheSymbolInfos(): Caching all symbol information`);
+  public async cacheSymbols() {
+    this.debug(`cacheSymbols(): Caching all symbols`);
 
     try {
-      await this.getSymbolInfos();
+      await this.getSymbols();
 
-      this.debug(`cacheSymbolInfos(): All symbol information is now cached`);
+      this.debug(`cacheSymbols(): All symbols are now cached`);
 
     } catch (err) {
-      this.debug(`cacheSymbolInfos(): Caching symbol information failed: %o`, err);
-      throw new ClientError(`cacheSymbolInfos(): Caching symbol information failed`, err);
+      this.debug(`cacheSymbols(): Caching symbols failed: %o`, err);
+      throw new ClientError(`cacheSymbols(): Caching symbols failed`, err);
     }
   }
 
@@ -5407,80 +5407,98 @@ export class Client extends EventEmitter<ClientEvents> {
   }
 
   /**
-   * Reads a PLC symbol value by symbol path and converts the value to a Javascript object.
+   * Reads a value by a variable path (such as `GVL_Test.ExampleStruct`) and converts the value to a Javascript object.
    * 
-   * Returns the converted value, the raw value, the symbol data type and the symbol information object.
+   * Returns the converted value, the raw value, the data type and the symbol.
    * 
    * @param path Variable path in the PLC to read (such as `GVL_Test.ExampleStruct`)
    * @param targetOpts Optional target settings that override values in `settings`
    * 
-   * @template T Typescript data type of the PLC data, for example `readSymbol<number>(...)` or `readSymbolValue<ST_TypedStruct>(...)`
+   * @template T In Typescript, the data type of the value, for example `readValue<number>(...)` or `readValue<ST_TypedStruct>(...)` (default: `any`)
    */
-  public async readSymbolValue<T = any>(path: string, targetOpts: Partial<AmsAddress> = {}): Promise<ReadSymbolValueResult<T>> {
+  public async readValue<T = any>(path: string, targetOpts: Partial<AmsAddress> = {}): Promise<ReadValueResult<T>> {
     if (!this.connection.connected) {
-      throw new ClientError(`readSymbolValue(): Client is not connected. Use connect() to connect to the target first.`);
+      throw new ClientError(`readValue(): Client is not connected. Use connect() to connect to the target first.`);
     }
 
-    this.debug(`readSymbolValue(): Reading symbol value for ${path}`);
+    this.debug(`readValue(): Reading value from ${path}`);
 
-    //Getting the symbol information
-    let symbolInfo: AdsSymbolInfo;
+    //Getting the symbol
+    let symbol: AdsSymbol;
     try {
-      this.debugD(`readSymbolValue(): Getting symbol information for ${path}`);
-      symbolInfo = await this.getSymbolInfo(path, targetOpts);
+      this.debugD(`readValue(): Getting symbol for ${path}`);
+      symbol = await this.getSymbol(path, targetOpts);
 
     } catch (err) {
-      this.debug(`readSymbolValue(): Getting symbol information for ${path} failed: %o`, err);
-      throw new ClientError(`readSymbolValue(): Getting symbol information for ${path} failed`, err);
+      this.debug(`readValue(): Getting symbol for ${path} failed: %o`, err);
+      throw new ClientError(`readValue(): Getting symbol for ${path} failed`, err);
     }
 
     //Getting the symbol data type
     let dataType: AdsDataType;
     try {
-      this.debugD(`readSymbolValue(): Getting data type for ${path}`);
-      dataType = await this.buildDataType(symbolInfo.type, targetOpts);
+      this.debugD(`readValue(): Getting data type for ${path}`);
+      dataType = await this.buildDataType(symbol.type, targetOpts);
 
     } catch (err) {
-      this.debug(`readSymbolValue(): Getting symbol information for ${path} failed: %o`, err);
-      throw new ClientError(`readSymbolValue(): Getting symbol information for ${path} failed`, err);
+      this.debug(`readValue(): Getting data type for ${path} failed: %o`, err);
+      throw new ClientError(`readValue(): Getting data type for ${path} failed`, err);
     }
 
     //Reading value by the symbol address
     let rawValue: Buffer;
     try {
-      this.debugD(`readSymbolValue(): Reading raw value for ${path}`);
-      rawValue = await this.readRaw(symbolInfo.indexGroup, symbolInfo.indexOffset, symbolInfo.size, targetOpts);
+      this.debugD(`readValue(): Reading raw value from ${path}`);
+      rawValue = await this.readRaw(symbol.indexGroup, symbol.indexOffset, symbol.size, targetOpts);
 
     } catch (err) {
-      this.debug(`readSymbolValue(): Reading raw value for ${path} failed: %o`, err);
-      throw new ClientError(`readSymbolValue(): Reading raw value for ${path} failed`, err);
+      this.debug(`readValue(): Reading raw value from ${path} failed: %o`, err);
+      throw new ClientError(`readValue(): Reading raw value from ${path} failed`, err);
     }
 
     //Converting byte data to javascript object
     let value: T;
     try {
-      this.debugD(`readSymbolValue(): Converting raw value to object for ${path}`);
+      this.debugD(`readValue(): Converting raw value to object for ${path}`);
       value = await this.convertBufferToObject<T>(rawValue, dataType);
 
     } catch (err) {
-      this.debug(`readSymbolValue(): Converting raw value to object for ${path} failed: %o`, err);
-      throw new ClientError(`readSymbolValue(): Converting raw value to object for ${path} failed`, err);
+      this.debug(`readValue(): Converting raw value to object for ${path} failed: %o`, err);
+      throw new ClientError(`readValue(): Converting raw value to object for ${path} failed`, err);
     }
 
-    this.debug(`readSymbolValue(): Reading symbol for ${path} done`);
+    this.debug(`readValue(): Reading value from ${path} done`);
 
     return {
       value,
       rawValue,
       dataType,
-      symbolInfo
+      symbol
     };
   }
 
   /**
-   * Writes a PLC symbol value by symbol path. Converts the value from a Javascript object to raw value.
+   * Reads a value by a symbol and converts the value to a Javascript object.
    * 
-   * Returns the converted value, the raw value, the symbol data type and the symbol information object.
+   * Returns the converted value, the raw value, the data type and the symbol.
+   * 
+   * @param symbol Symbol (acquired using `getSymbol()`)
+   * @param targetOpts Optional target settings that override values in `settings`
+   * 
+   * @template T In Typescript, the data type of the value, for example `readValueBySymbol<number>(...)` or `readValueBySymbol<ST_TypedStruct>(...)` (default: `any`)
+   */
+  public async readValueBySymbol<T = any>(symbol: AdsSymbol, targetOpts: Partial<AmsAddress> = {}): Promise<ReadValueResult<T>> {
+    if (!this.connection.connected) {
+      throw new ClientError(`readValueBySymbol(): Client is not connected. Use connect() to connect to the target first.`);
+    }
+
+    return this.readValue<T>(symbol.name, targetOpts);
+  }
+
+  /**
+   * Writes a value by a variable path (such as `GVL_Test.ExampleStruct`). Converts the value from a Javascript object to a raw value.
+   * 
+   * Returns the converted value, the raw value, the data type and the symbol.
    * 
    * **NOTE:** Do not use `autoFill` for `UNION` types, it works without errors but the result isn't probably the desired one
    * 
@@ -5488,35 +5506,35 @@ export class Client extends EventEmitter<ClientEvents> {
    * @param targetOpts Optional target settings that override values in `settings`
    * @param autoFill If true and data type is a container (`STRUCT`, `FUNCTION_BLOCK` etc.), missing properties are automatically **set to default values** (usually `0` or `''`) 
    * 
-   * @template T Typescript data type of the PLC data, for example `writeSymbol<number>(...)` or `writeSymbol<ST_TypedStruct>(...)`
+   * @template T In Typescript, the data type of the value, for example `writeValue<number>(...)` or `writeValue<ST_TypedStruct>(...)`
    */
-  public async writeSymbolValue<T = any>(path: string, value: T, autoFill: boolean = false, targetOpts: Partial<AmsAddress> = {}): Promise<WriteSymbolValueResult<T>> {
+  public async writeValue<T = any>(path: string, value: T, autoFill: boolean = false, targetOpts: Partial<AmsAddress> = {}): Promise<WriteValueResult<T>> {
     if (!this.connection.connected) {
-      throw new ClientError(`writeSymbolValue(): Client is not connected. Use connect() to connect to the target first.`);
+      throw new ClientError(`writeValue(): Client is not connected. Use connect() to connect to the target first.`);
     }
 
-    this.debug(`writeSymbolValue(): Writing symbol value for ${path}`);
+    this.debug(`writeValue(): Writing value to ${path}`);
 
-    //Getting the symbol information
-    let symbolInfo: AdsSymbolInfo;
+    //Getting the symbol
+    let symbol: AdsSymbol;
     try {
-      this.debugD(`writeSymbolValue(): Getting symbol information for ${path}`);
-      symbolInfo = await this.getSymbolInfo(path, targetOpts);
+      this.debugD(`writeValue(): Getting symbol for ${path}`);
+      symbol = await this.getSymbol(path, targetOpts);
 
     } catch (err) {
-      this.debug(`writeSymbolValue(): Getting symbol information for ${path} failed: %o`, err);
-      throw new ClientError(`writeSymbolValue(): Getting symbol information for ${path} failed`, err);
+      this.debug(`writeValue(): Getting symbol for ${path} failed: %o`, err);
+      throw new ClientError(`writeValue(): Getting symbol for ${path} failed`, err);
     }
 
     //Getting the symbol data type
     let dataType: AdsDataType;
     try {
-      this.debugD(`writeSymbolValue(): Getting data type for ${path}`);
-      dataType = await this.buildDataType(symbolInfo.type, targetOpts);
+      this.debugD(`writeValue(): Getting data type for ${path}`);
+      dataType = await this.buildDataType(symbol.type, targetOpts);
 
     } catch (err) {
-      this.debug(`writeSymbolValue(): Getting symbol information for ${path} failed: %o`, err);
-      throw new ClientError(`writeSymbolValue(): Getting symbol information for ${path} failed`, err);
+      this.debug(`writeValue(): Getting data type for ${path} failed: %o`, err);
+      throw new ClientError(`writeValue(): Getting data type for ${path} failed`, err);
     }
 
     //Creating raw data from object
@@ -5526,12 +5544,12 @@ export class Client extends EventEmitter<ClientEvents> {
 
       if (res.missingProperty && autoFill) {
         //Some fields are missing and autoFill is used -> try to auto fill missing values
-        this.debug(`writeSymbolValue(): Autofilling missing fields with active values`);
+        this.debug(`writeValue(): Autofilling missing fields with active values`);
 
-        this.debugD(`writeSymbolValue(): Reading active value`);
-        const valueNow = await this.readSymbolValue(path, targetOpts);
+        this.debugD(`writeValue(): Reading active value`);
+        const valueNow = await this.readValue(path, targetOpts);
 
-        this.debugD(`writeSymbolValue(): Merging objects (adding missing fields)`);
+        this.debugD(`writeValue(): Merging objects (adding missing fields)`);
         value = this.deepMergeObjects(false, valueNow.value, value);
 
         //Try conversion again - should work now
@@ -5540,12 +5558,12 @@ export class Client extends EventEmitter<ClientEvents> {
         if (res.missingProperty) {
           //This shouldn't really happen
           //However, if it happened, the merge isn't working as it should
-          throw new ClientError(`writeSymbolValue(): Converting object to raw value for ${path} failed. The object is missing key/value for "${res.missingProperty}". NOTE: autoFill failed - please report an issue at GitHub`);
+          throw new ClientError(`writeValue(): Converting object to raw value for ${path} failed. The object is missing key/value for "${res.missingProperty}". NOTE: autoFill failed - please report an issue at GitHub`);
         }
 
       } else if (res.missingProperty) {
         //Some fields are missing and no autoFill -> failed
-        throw new ClientError(`writeSymbolValue(): Converting object to raw value for ${path} failed. The object is missing key/value for "${res.missingProperty}". Hint: Use autoFill parameter to add missing fields automatically`);
+        throw new ClientError(`writeValue(): Converting object to raw value for ${path} failed. The object is missing key/value for "${res.missingProperty}". Hint: Use autoFill parameter to add missing fields automatically`);
       }
 
       //We are here -> success!
@@ -5557,28 +5575,49 @@ export class Client extends EventEmitter<ClientEvents> {
         throw err;
       }
 
-      this.debug(`writeSymbolValue(): Converting object to raw value for ${path} failed: %o`, err);
-      throw new ClientError(`writeSymbolValue(): Converting object to raw value for ${path} failed`, err);
+      this.debug(`writeValue(): Converting object to raw value for ${path} failed: %o`, err);
+      throw new ClientError(`writeValue(): Converting object to raw value for ${path} failed`, err);
     }
 
     //Writing value by the symbol address
     try {
-      this.debugD(`writeSymbolValue(): Writing raw value for ${path}`);
-      await this.writeRaw(symbolInfo.indexGroup, symbolInfo.indexOffset, rawValue, targetOpts);
+      this.debugD(`writeValue(): Writing raw value to ${path}`);
+      await this.writeRaw(symbol.indexGroup, symbol.indexOffset, rawValue, targetOpts);
 
     } catch (err) {
-      this.debug(`writeSymbolValue(): Writing raw value for ${path} failed: %o`, err);
-      throw new ClientError(`writeSymbolValue(): Writing raw value for ${path} failed`, err);
+      this.debug(`writeValue(): Writing raw value to ${path} failed: %o`, err);
+      throw new ClientError(`writeValue(): Writing raw value to ${path} failed`, err);
     }
 
-    this.debug(`writeSymbolValue(): Writing symbol for ${path} done`);
+    this.debug(`writeValue(): Writing value to ${path} done`);
 
     return {
       value,
       rawValue,
       dataType,
-      symbolInfo
+      symbol
     };
+  }
+
+  /**
+   * Writes a value by symbol. Converts the value from a Javascript object to a raw value.
+   * 
+   * Returns the converted value, the raw value, the data type and the symbol.
+   * 
+   * **NOTE:** Do not use `autoFill` for `UNION` types, it works without errors but the result isn't probably the desired one
+   * 
+   * @param path Variable path in the PLC to read (such as `GVL_Test.ExampleStruct`)
+   * @param targetOpts Optional target settings that override values in `settings`
+   * @param autoFill If true and data type is a container (`STRUCT`, `FUNCTION_BLOCK` etc.), missing properties are automatically **set to default values** (usually `0` or `''`) 
+   * 
+   * @template T In Typescript, the data type of the value, for example `writeValue<number>(...)` or `writeValue<ST_TypedStruct>(...)`
+   */
+  public async writeValueBySymbol<T = any>(symbol: AdsSymbol, value: T, autoFill: boolean = false, targetOpts: Partial<AmsAddress> = {}): Promise<WriteValueResult<T>> {
+    if (!this.connection.connected) {
+      throw new ClientError(`writeValue(): Client is not connected. Use connect() to connect to the target first.`);
+    }
+
+    return this.writeValue<T>(symbol.name, value, autoFill, targetOpts);
   }
 
   /**
@@ -5587,7 +5626,7 @@ export class Client extends EventEmitter<ClientEvents> {
    * @param dataType Data type name in the PLC as string (such as `ST_Struct`) or `AdsDataType` object 
    * @param targetOpts Optional target settings that override values in `settings` 
    * 
-   * @template T Typescript data type of the PLC data, for example `readSymbolValue<number>(...)` or `readSymbolValue<ST_TypedStruct>(...)`
+   * @template T Typescript data type of the PLC data, for example `readValue<number>(...)` or `readValue<ST_TypedStruct>(...)`
    */
   public async getDefaultPlcObject<T = any>(dataType: string | AdsDataType, targetOpts: Partial<AmsAddress> = {}): Promise<T> {
     if (!this.connection.connected) {
@@ -6168,10 +6207,10 @@ export class Client extends EventEmitter<ClientEvents> {
   /**
    * Reads raw data by symbol
    * 
-   * @param symbol Symbol information (acquired using `getSymbolInfo()`)
+   * @param symbol Symbol (acquired using `getSymbol()`)
    * @param targetOpts Optional target settings that override values in `settings` (**NOTE:** If used, no caching is available -> possible performance impact)
    */
-  public async readRawBySymbol(symbol: AdsSymbolInfo, targetOpts: Partial<AmsAddress> = {}): Promise<Buffer> {
+  public async readRawBySymbol(symbol: AdsSymbol, targetOpts: Partial<AmsAddress> = {}): Promise<Buffer> {
     if (!this.connection.connected) {
       throw new ClientError(`readRawBySymbol(): Client is not connected. Use connect() to connect to the target first.`);
     }
@@ -6193,11 +6232,11 @@ export class Client extends EventEmitter<ClientEvents> {
   /**
    * Writes raw data by symbol
    * 
-   * @param symbol Symbol information (acquired using `getSymbolInfo()`)
+   * @param symbol Symbol (acquired using `getSymbol()`)
    * @param value Data to write
    * @param targetOpts Optional target settings that override values in `settings`
    */
-  public async writeRawBySymbol(symbol: AdsSymbolInfo, value: Buffer, targetOpts: Partial<AmsAddress> = {}): Promise<void> {
+  public async writeRawBySymbol(symbol: AdsSymbol, value: Buffer, targetOpts: Partial<AmsAddress> = {}): Promise<void> {
     if (!this.connection.connected) {
       throw new ClientError(`writeRawBySymbol(): Client is not connected. Use connect() to connect to the target first.`);
     }
@@ -6239,26 +6278,26 @@ export class Client extends EventEmitter<ClientEvents> {
     this.debug(`invokeRpcMethod(): Calling RPC method ${debugPath}`);
 
     try {
-      //Getting the symbol information
-      let symbolInfo: AdsSymbolInfo;
+      //Getting the symbol
+      let symbol: AdsSymbol;
       try {
-        this.debugD(`invokeRpcMethod(): Getting symbol information for ${path}`);
-        symbolInfo = await this.getSymbolInfo(path, targetOpts);
+        this.debugD(`invokeRpcMethod(): Getting symbol for ${path}`);
+        symbol = await this.getSymbol(path, targetOpts);
 
       } catch (err) {
-        this.debug(`invokeRpcMethod(): Getting symbol information for ${path} failed: %o`, err);
-        throw new ClientError(`invokeRpcMethod(): Getting symbol information for ${path} failed`, err);
+        this.debug(`invokeRpcMethod(): Getting symbol for ${path} failed: %o`, err);
+        throw new ClientError(`invokeRpcMethod(): Getting symbol for ${path} failed`, err);
       }
 
       //Getting the symbol data type
       let dataType: AdsDataType;
       try {
         this.debugD(`invokeRpcMethod(): Getting data type for ${path}`);
-        dataType = await this.buildDataType(symbolInfo.type, targetOpts);
+        dataType = await this.buildDataType(symbol.type, targetOpts);
 
       } catch (err) {
-        this.debug(`invokeRpcMethod(): Getting symbol information for ${path} failed: %o`, err);
-        throw new ClientError(`invokeRpcMethod(): Getting symbol information for ${path} failed`, err);
+        this.debug(`invokeRpcMethod(): Getting data type for ${path} failed: %o`, err);
+        throw new ClientError(`invokeRpcMethod(): Getting data type for ${path} failed`, err);
       }
 
 

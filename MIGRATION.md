@@ -122,7 +122,7 @@ This document contains breaking changes between ads-client major versions.
     </tr>
     <tr>
       <td valign="top">
-        Symbol information object (e.g. from <code>getSymbolInfo()</code>)
+        Symbol object (e.g. from <code>getSymbol()</code>)
       </td>
       <td valign="top">
         <ul>
@@ -274,14 +274,12 @@ This document contains breaking changes between ads-client major versions.
       </td>
       <td valign="top">
         <ul>
-          <li>Renamed to <code>readSymbolValue()</code></li>
-          <li>Return value property <code>symbol</code> renamed to <code>symbolInfo</code></li>
+          <li>Renamed to <code>readValue()</code></li>
         </ul>
       </td>
       <td valign="top">
         <ul>
-          <li>Rename all <code>readSymbol()</code> calls to <code>readSymbolValue()</code></li>
-          <li>If return value <code>symbol</code> was used -> rename to <code>symbolInfo</code></li>
+          <li>Rename all <code>readSymbol()</code> calls to <code>readValue()</code></li>
         </ul>
       </td>
     </tr>
@@ -310,14 +308,12 @@ This document contains breaking changes between ads-client major versions.
       </td>
       <td valign="top">
         <ul>
-          <li>Renamed to <code>writeSymbolValue()</code></li>
-          <li>Return value property <code>symbol</code> renamed to <code>symbolInfo</code></li>
+          <li>Renamed to <code>writeValue()</code></li>
         </ul>
       </td>
       <td valign="top">
         <ul>
-          <li>Rename all <code>writeSymbol()</code> calls to <code>writeSymbolValue()</code></li>
-          <li>If return value <code>symbol</code> was used -> rename to <code>symbolInfo</code></li>
+          <li>Rename all <code>writeSymbol()</code> calls to <code>writeValue()</code></li>
         </ul>
       </td>
     </tr>
@@ -448,6 +444,21 @@ This document contains breaking changes between ads-client major versions.
     </tr>
     <tr>
       <td valign="top">
+        <code>getSymbolInfo()</code>
+      </td>
+      <td valign="top">
+        <ul>
+          <li>Renamed to <code>getSymbols()</code></li>
+        </ul>
+      </td>
+      <td valign="top">
+        <ul>
+          <li>Rename all <code>getSymbolInfo()</code> calls to <code>getSymbols()</code></li>
+        </ul>
+      </td>
+    </tr>
+    <tr>
+      <td valign="top">
         <code>readAndCacheSymbols()</code>
       </td>
       <td valign="top">
@@ -457,8 +468,8 @@ This document contains breaking changes between ads-client major versions.
       </td>
       <td valign="top">
         <ul>
-          <li>Use <code>cacheSymbolInfos()</code> to cache all symbols</li>
-          <li>Use <code>getSymbolInfos()</code> to get all symbols</li>
+          <li>Use <code>cacheSymbols()</code> to cache all symbols</li>
+          <li>Use <code>getSymbols()</code> to get all symbols</li>
         </ul>
       </td>
     </tr>
