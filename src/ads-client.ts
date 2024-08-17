@@ -1,5 +1,5 @@
 import EventEmitter from "events";
-import type { ActiveAdsRequestContainer, ActiveSubscription, ActiveSubscriptionContainer, AdsClientConnection, AdsClientSettings, AdsCommandToSend, AdsDataTypeContainer, AdsSymbolInfoContainer, AdsUploadInfo, ConnectionMetaData, PlcPrimitiveType, SubscriptionData, SubscriptionSettings, ReadSymbolResult, TimerObject, ObjectToBufferConversionResult, WriteSymbolResult, VariableHandle, RpcMethodCallResult, CreateVariableHandleMultiResult, ReadRawMultiResult, ReadRawMultiCommand, WriteRawMultiResult, DeleteVariableHandleMultiResult, ReadWriteRawMultiResult, ReadWriteRawMultiCommand, WriteRawMultiCommand, ClientEvents, SubscriptionCallback, DebugLevel } from "./types/ads-client-types";
+import type { ActiveAdsRequestContainer, ActiveSubscription, ActiveSubscriptionContainer, AdsClientConnection, AdsClientSettings, AdsCommandToSend, AdsDataTypeContainer, AdsSymbolInfoContainer, AdsUploadInfo, ConnectionMetaData, PlcPrimitiveType, SubscriptionData, SubscriptionSettings, ReadSymbolValueResult, TimerObject, ObjectToBufferConversionResult, WriteSymbolValueResult, VariableHandle, RpcMethodCallResult, CreateVariableHandleMultiResult, ReadRawMultiResult, ReadRawMultiCommand, WriteRawMultiResult, DeleteVariableHandleMultiResult, ReadWriteRawMultiResult, ReadWriteRawMultiCommand, WriteRawMultiCommand, ClientEvents, SubscriptionCallback, DebugLevel } from "./types/ads-client-types";
 import { AdsAddNotificationResponse, AdsAddNotificationResponseData, AdsArrayInfoEntry, AdsAttributeEntry, AdsDataType, AdsDeleteNotificationResponse, AdsDeviceInfo, AdsEnumInfoEntry, AdsNotification, AdsNotificationResponse, AdsNotificationSample, AdsNotificationStamp, AdsRawAddress, AdsReadDeviceInfoResponse, AdsReadResponse, AdsReadStateResponse, AdsReadWriteResponse, AdsRequest, AdsResponse, AdsRpcMethodEntry, AdsRpcMethodParameterEntry, AdsState, AdsSymbolInfo, AdsWriteControlResponse, AdsWriteResponse, AmsAddress, AmsHeader, AmsPortRegisteredData, AmsRouterState, AmsRouterStateData, AmsTcpHeader, AmsTcpPacket, BaseAdsResponse, EmptyAdsResponse, UnknownAdsResponse } from "./types/ads-protocol-types";
 import {
   Socket,
@@ -23,7 +23,7 @@ export type * from './client-error';
  * A client instance should be created for each target, however, a single client
  * can also be used to communicate with multiple endpoints.
  * 
- * **Example:**
+ * @example
  * 
  * ```js
  * const client = new Client({
@@ -57,16 +57,16 @@ export class Client extends EventEmitter<ClientEvents> {
    * Default metadata (when no active connection).
    */
   private defaultMetaData: ConnectionMetaData = {
-    deviceInfo: undefined,
+    routerState: undefined,
     tcSystemState: undefined,
+    plcDeviceInfo: undefined,
     plcRuntimeState: undefined,
-    uploadInfo: undefined,
+    plcUploadInfo: undefined,
     plcSymbolVersion: undefined,
-    allSymbolsCached: false,
-    symbols: {},
-    allDataTypesCached: false,
-    dataTypes: {},
-    routerState: undefined
+    allPlcSymbolsCached: false,
+    plcSymbols: {},
+    allPlcDataTypesCached: false,
+    plcDataTypes: {},
   };
 
   /**
@@ -173,7 +173,7 @@ export class Client extends EventEmitter<ClientEvents> {
    * 
    * However, the most correct way is to use the {@link Client.constructor}.
    * 
-   * **Example:**
+   * @example
    * 
    * ```js
    * client.settings.convertDatesToJavascript = false; //OK
@@ -226,7 +226,7 @@ export class Client extends EventEmitter<ClientEvents> {
    * 
    * Settings are provided in `settings` parameter - see {@link AdsClientSettings}.
    * 
-   * **Example:**
+   * @example
    * 
    * ```js
    * const client = new Client({
@@ -824,7 +824,7 @@ export class Client extends EventEmitter<ClientEvents> {
     await this.readDeviceInfo();
 
     //Reading target runtime upload info
-    await this.readUploadInfo();
+    await this.readPlcUploadInfo();
 
     //Subscribe to PLC symbol version changes (detect PLC software updates etc.)
     await this.addSubscription<Buffer>({
@@ -838,12 +838,12 @@ export class Client extends EventEmitter<ClientEvents> {
     }, true);
 
     //Pre-cache symbols
-    if (this.settings.readAndCacheSymbols || this.metaData.allSymbolsCached) {
+    if (this.settings.readAndCacheSymbols || this.metaData.allPlcSymbolsCached) {
       await this.cacheSymbolInfos();
     }
 
     //Pre-cache data types
-    if (this.settings.readAndCacheDataTypes || this.metaData.allDataTypesCached) {
+    if (this.settings.readAndCacheDataTypes || this.metaData.allPlcDataTypesCached) {
       await this.cacheDataTypes();
     }
   }
@@ -1009,20 +1009,20 @@ export class Client extends EventEmitter<ClientEvents> {
       this.debug(`onPlcSymbolVersionChanged(): PLC runtime symbol version changed from ${this.metaData.plcSymbolVersion === undefined ? 'UNKNOWN' : this.metaData.plcSymbolVersion} to ${symbolVersion} -> Refreshing all cached data and subscriptions`);
 
       //Clear all cached symbol infos and data types etc.
-      this.metaData.dataTypes = {};
-      this.metaData.symbols = {};
-      this.metaData.uploadInfo = undefined;
+      this.metaData.plcDataTypes = {};
+      this.metaData.plcSymbols = {};
+      this.metaData.plcUploadInfo = undefined;
 
       //Refreshing upload info
       try {
-        await this.readUploadInfo();
+        await this.readPlcUploadInfo();
 
       } catch (err) {
         this.debug(`onPlcSymbolVersionChanged(): Failed to refresh upload info`);
       }
 
       //Refreshing symbol cache (if needed)
-      if (this.metaData.allSymbolsCached) {
+      if (this.metaData.allPlcSymbolsCached) {
         try {
           await this.cacheSymbolInfos();
 
@@ -1032,7 +1032,7 @@ export class Client extends EventEmitter<ClientEvents> {
       }
 
       //Refreshing data type cache (if needed)
-      if (this.metaData.allDataTypesCached) {
+      if (this.metaData.allPlcDataTypesCached) {
         try {
           await this.cacheDataTypes();
 
@@ -2672,6 +2672,13 @@ export class Client extends EventEmitter<ClientEvents> {
    * 
    * To get the full datatype with all items, use {@link Client.buildDataType()}.
    * 
+   * Returns previously cached value if available, otherwise reads it from the target
+   * and caches it.  
+   * 
+   * If caching is disabled using `settings.disableCaching`, data is always read from the target.
+   * 
+   * If `targetOpts` is used to override target, caching is always disabled.
+   * 
    * @param name Data type name in the PLC (such as `ST_Struct`)
    * @param targetOpts Optional target settings that override values in `settings` (**NOTE:** If used, no caching is available -> possible performance impact)
    */
@@ -2682,10 +2689,10 @@ export class Client extends EventEmitter<ClientEvents> {
     if (!this.settings.disableCaching
       && !targetOpts.adsPort
       && !targetOpts.amsNetId
-      && this.metaData.dataTypes[name.toLowerCase()]) {
+      && this.metaData.plcDataTypes[name.toLowerCase()]) {
 
       this.debug(`getDataTypeDeclaration(): Data type declaration found from cache for "${name}"`);
-      return this.metaData.dataTypes[name.toLowerCase()];
+      return this.metaData.plcDataTypes[name.toLowerCase()];
     }
 
     //Reading from target
@@ -2728,7 +2735,7 @@ export class Client extends EventEmitter<ClientEvents> {
 
       //Only cache when original target
       if (!this.settings.disableCaching && !targetOpts.adsPort && !targetOpts.amsNetId) {
-        this.metaData.dataTypes[name.toLowerCase()] = dataType;
+        this.metaData.plcDataTypes[name.toLowerCase()] = dataType;
       }
       this.debug(`getDataTypeDeclaration(): Data type declaration read and parsed for "${name}"`);
 
@@ -2742,6 +2749,13 @@ export class Client extends EventEmitter<ClientEvents> {
 
   /**
    * Builds full data type declaration for requested data type with all children (and their children and so on).
+   *
+   * If available, previously cached data is used for building the full data type. Otherwise data is read from the target
+   * and cached. 
+   * 
+   * If caching is disabled using `settings.disableCaching`, data is always read from the target.
+   * 
+   * If `targetOpts` is used to override target, caching is always disabled. 
    * 
    * @param name Data type name in the PLC (such as `ST_Struct`)
    * @param targetOpts Optional target settings that override values in `settings` (**NOTE:** If used, no caching is available -> possible performance impact)
@@ -3253,7 +3267,7 @@ export class Client extends EventEmitter<ClientEvents> {
   /**
    * Merges objects recursively. 
    * 
-   * Used for example in {@link Client.writeSymbol()} when `autoFill` setting is used 
+   * Used for example in {@link Client.writeSymbolValue()} when `autoFill` setting is used 
    * to merge active values (missing properties) to user-provided properties.
    * 
    * This is based on https://stackoverflow.com/a/34749873/8140625 
@@ -3347,7 +3361,7 @@ export class Client extends EventEmitter<ClientEvents> {
    * 
    * @throws Throws an error if connecting fails
    * 
-   * **Example:**
+   * @example
    * ```js
    * try {
    *  const res = await client.connect();
@@ -3375,7 +3389,7 @@ export class Client extends EventEmitter<ClientEvents> {
    * 
    * @throws Throws an error if disconnecting fails. However the connection stil ended.
    * 
-   * **Example:**
+   * @example
    * ```js
    * try {
    *  const res = await client.disconnect();
@@ -3435,7 +3449,7 @@ export class Client extends EventEmitter<ClientEvents> {
    * - {@link Client.readRaw}() - `Read` command
    * - {@link Client.writeRaw}() - `Write` command
    * - {@link Client.readDeviceInfo}() - `ReadDeviceInfo` command
-   * - {@link Client.readPlcRuntimeState}() - `ReadState` command (override target if needed)
+   * - {@link Client.readState}() - `ReadState` command
    * - {@link Client.writeControl}() - `WriteControl` command
    * - {@link Client.subscribe}() - `AddNotification` command
    * - {@link Client.unsubscribe}() - `DeleteNotification` command
@@ -3445,7 +3459,7 @@ export class Client extends EventEmitter<ClientEvents> {
    * 
    * @throws Throws an error if sending the command fails or if target responds with an error
    * 
-   * **Example:**
+   * @example
    * ```js
    * (TODO)
    * ```
@@ -3552,9 +3566,9 @@ export class Client extends EventEmitter<ClientEvents> {
    * @param data Additional data to send (if any)
    * @param targetOpts Optional target settings that override values in `settings`
    * 
-   * @throws Throws an error if sending the command fails or if target responds with an error.
+   * @throws Throws an error if sending the command fails or if the target responds with an error.
    * 
-   * **Example:**
+   * @example
    * ```js
    * try {
    *  //Set target (PLC) to run
@@ -3626,7 +3640,7 @@ export class Client extends EventEmitter<ClientEvents> {
    * 
    * @throws Throws an error if sending the command fails or if target responds with an error
    * 
-   * **Example:**
+   * @example
    * ```js
    * try {
    *  await client.startPlc();
@@ -3660,9 +3674,9 @@ export class Client extends EventEmitter<ClientEvents> {
    * 
    * @param targetOpts Optional target settings that override values in `settings`
    * 
-   * @throws Throws an error if sending the command fails or if target responds with an error.
+   * @throws Throws an error if sending the command fails or if the target responds with an error.
    * 
-   * **Example:**
+   * @example
    * ```js
    * try {
    *  await client.resetPlc();
@@ -3696,9 +3710,9 @@ export class Client extends EventEmitter<ClientEvents> {
    * 
    * @param targetOpts Optional target settings that override values in `settings`
    *  
-   * @throws Throws an error if sending the command fails or if target responds with an error.
+   * @throws Throws an error if sending the command fails or if the target responds with an error.
    * 
-   * **Example:**
+   * @example
    * ```js
    * try {
    *  await client.stopPlc();
@@ -3732,9 +3746,9 @@ export class Client extends EventEmitter<ClientEvents> {
    * 
    * @param targetOpts Optional target settings that override values in `settings`
    *  
-   * @throws Throws an error if sending the command fails or if target responds with an error.
+   * @throws Throws an error if sending the command fails or if the target responds with an error.
    * 
-   * **Example:**
+   * @example
    * ```js
    * try {
    *  await client.restartPlc();
@@ -3769,9 +3783,9 @@ export class Client extends EventEmitter<ClientEvents> {
    * @param reconnect If `true`, connection is reconnected afterwards to restore subscriptions etc. (default: `true`)
    * @param targetOpts Optional target settings that override values in `settings`
    * 
-   * @throws Throws an error if sending the command fails or if target responds with an error.
+   * @throws Throws an error if sending the command fails or if the target responds with an error.
    * 
-   * **Example:**
+   * @example
    * ```js
    * try {
    *  //Reconnect the client
@@ -3818,9 +3832,9 @@ export class Client extends EventEmitter<ClientEvents> {
    * 
    * @param targetOpts Optional target settings that override values in `settings`
    * 
-   * @throws Throws an error if sending the command fails or if target responds with an error.
+   * @throws Throws an error if sending the command fails or if the target responds with an error.
    * 
-   * **Example:**
+   * @example
    * ```js
    * try {
    *  await client.setTcSystemToConfig();
@@ -3853,16 +3867,16 @@ export class Client extends EventEmitter<ClientEvents> {
   /**
    * Restarts the target TwinCAT system. 
    * 
-   * Actually just a wrapper for {@link setTcSystemToRun}() - the operation is the same.
+   * Just a wrapper for {@link setTcSystemToRun}() - the operation is the same.
    * 
    * **NOTE:** As default, also reconnects the client afterwards to restore subscriptions.
    * 
    * @param reconnect If `true`, connection is reconnected afterwards to restore subscriptions etc. (default: `true`)
    * @param targetOpts Optional target settings that override values in `settings`
    * 
-   * @throws Throws an error if sending the command fails or if target responds with an error.
+   * @throws Throws an error if sending the command fails or if the target responds with an error.
    * 
-   * **Example:**
+   * @example
    * ```js
    * try {
    *  //Reconnect the client
@@ -3886,11 +3900,21 @@ export class Client extends EventEmitter<ClientEvents> {
   }
 
   /**
-   * Reads and parses symbol information for given variable path
-   * Saved to cache if target is not overridden.
+   * Returns symbol information for given variable path, such as `GVL_Test.ExampleStruct`.
    * 
-   * @param path Full variable path in the PLC (such as `GVL_Test.ExampleStruct`)
-   * @param targetOpts Optional target settings that override values in `settings` (**NOTE:** If used, no caching is available -> possible performance impact)
+   * Returns previously cached value if available, otherwise reads it from the target
+   * and caches it. 
+   * 
+   * If caching is disabled using `settings.disableCaching`, data is always read from the target.
+   * 
+   * If `targetOpts` is used to override target, caching is always disabled.
+   * 
+   * **NOTE:** This requires that the target is a PLC runtime.
+   * 
+   * @param path Symbol variable path at the target (such as `GVL_Test.ExampleStruct`)
+   * @param targetOpts Optional target settings that override values in `settings`. If used, caching is disabled -> possible performance impact.
+   * 
+   * @throws Throws an error if sending the command fails or if the target responds with an error.
    */
   public async getSymbolInfo(path: string, targetOpts: Partial<AmsAddress> = {}): Promise<AdsSymbolInfo> {
     if (!this.connection.connected) {
@@ -3904,10 +3928,10 @@ export class Client extends EventEmitter<ClientEvents> {
     if (!this.settings.disableCaching
       && !targetOpts.adsPort
       && !targetOpts.amsNetId
-      && this.metaData.symbols[path.toLowerCase()]) {
+      && this.metaData.plcSymbols[path.toLowerCase()]) {
 
       this.debug(`getSymbolInfo(): Symbol info found from cache for "${path}"`);
-      return this.metaData.symbols[path.toLowerCase()];
+      return this.metaData.plcSymbols[path.toLowerCase()];
     }
 
     //Reading from target
@@ -3950,7 +3974,7 @@ export class Client extends EventEmitter<ClientEvents> {
 
       //Only cache when original target
       if (!this.settings.disableCaching && !targetOpts.adsPort && !targetOpts.amsNetId) {
-        this.metaData.symbols[path.toLowerCase()] = symbol;
+        this.metaData.plcSymbols[path.toLowerCase()] = symbol;
       }
 
       this.debug(`getSymbolInfo(): Symbol info read and parsed for "${path}"`);
@@ -3963,10 +3987,19 @@ export class Client extends EventEmitter<ClientEvents> {
   }
 
   /**
-   * Returns full built data type declaration with subitems for given data type
+   * Returns full data type declaration for requested data type (such as `ST_Struct`) with all children (and their children and so on).
    * 
-   * @param name Data type name in the PLC (such as `ST_Struct`)
-   * @param targetOpts Optional target settings that override values in `settings` (**NOTE:** If used, no caching is available -> possible performance impact)
+   * If available, previously cached data is used for building the full data type. Otherwise data is read from the target
+   * and cached. 
+   * 
+   * If caching is disabled using `settings.disableCaching`, data is always read from the target.
+   * 
+   * If `targetOpts` is used to override target, caching is always disabled.
+   * 
+   * @param name Data type name at the target (such as `ST_Struct`)
+   * @param targetOpts Optional target settings that override values in `settings`. If used, caching is disabled -> possible performance impact.
+   * 
+   * @throws Throws an error if sending the command fails or if the target responds with an error.
    */
   public async getDataType(name: string, targetOpts: Partial<AmsAddress> = {}): Promise<AdsDataType> {
     if (!this.connection.connected) {
@@ -3983,12 +4016,53 @@ export class Client extends EventEmitter<ClientEvents> {
   }
 
   /**
-    * Reads target PLC runtime state
-    * 
-    * If original target, the state is also saved to the `metaData.plcRuntimeStatus`
-    * 
-    * @param targetOpts Optional target settings that override values in `settings`
-    */
+   * Reads target ADS state - see {@link ADS.ADS_STATE}).
+   * 
+   * This is the ADS protocol `ReadState` command.
+   * 
+   * See also {@link readPlcRuntimeState}() and {@link readTcSystemState}().
+   * 
+   * @param targetOpts Optional target settings that override values in `settings`
+   * 
+   * @throws Throws an error if sending the command fails or if the target responds with an error.
+   */
+  public async readState(targetOpts: Partial<AmsAddress> = {}): Promise<AdsState> {
+    if (!this.connection.connected) {
+      throw new ClientError(`readState(): Client is not connected. Use connect() to connect to the target first.`);
+    }
+
+    try {
+      this.debug(`readState(): Reading target ADS state`);
+
+      const res = await this.sendAdsCommand<AdsReadStateResponse>({
+        adsCommand: ADS.ADS_COMMAND.ReadState,
+        targetAmsNetId: targetOpts.amsNetId,
+        targetAdsPort: targetOpts.adsPort
+      });
+
+      this.debug(`readState(): Target ADS state read successfully. State is %o`, res.ads.payload);
+
+      return res.ads.payload;
+
+    } catch (err) {
+      this.debug(`readState(): Reading target ADS state failed: %o`, err);
+      throw new ClientError(`readState(): Reading target ADS state failed`, err);
+    }
+  }
+
+  /**
+   * Reads target PLC runtime state (usually `Run`, `Stop` etc. - see {@link ADS.ADS_STATE})
+   *
+   * If `targetOpts` is not used to override target, the state is also
+   * saved to the `metaData.plcRuntimeState`.
+   * 
+   * This is the same as {@link readState}(), except that the result is saved to
+   * the `metaData.plcRuntimeState`.
+   *
+   * @param targetOpts Optional target settings that override values in `settings`
+   * 
+   * @throws Throws an error if sending the command fails or if the target responds with an error.
+   */
   public async readPlcRuntimeState(targetOpts: Partial<AmsAddress> = {}): Promise<AdsState> {
     if (!this.connection.connected) {
       throw new ClientError(`readPlcRuntimeState(): Client is not connected. Use connect() to connect to the target first.`);
@@ -4019,12 +4093,18 @@ export class Client extends EventEmitter<ClientEvents> {
   }
 
   /**
-    * Reads target TwinCAT system state (usually `Run` or `Config`, ADS port 10000)
-    * 
-    * If original target, the state is also saved to the `metaData.tcSystemState`
-    * 
-    * @param targetOpts Optional target settings that override values in `settings`
-    */
+   * Reads target TwinCAT system state from ADS port 10000 (usually `Run` or `Config`).
+   *
+   * If `targetOpts` is not used to override target, the state is also
+   * saved to the `metaData.tcSystemState`.
+   * 
+   * This is the same as {@link readState}(), except that the result is saved to
+   * the `metaData.tcSystemState`.
+   *
+   * @param targetOpts Optional target settings that override values in `settings`
+   * 
+   * @throws Throws an error if sending the command fails or if the target responds with an error.
+   */
   public async readTcSystemState(targetOpts: Partial<AmsAddress> = {}): Promise<AdsState> {
     if (!this.connection.connected) {
       throw new ClientError(`readTcSystemState(): Client is not connected. Use connect() to connect to the target first.`);
@@ -4055,14 +4135,23 @@ export class Client extends EventEmitter<ClientEvents> {
   }
 
   /**
-    * Reads PLC runtime symbol version (only works if target is a PLC runtime).
-    * 
-    * Symbol version usually changes when PLC software is updated
-    * 
-    * If original target, the symbol version is also updated to the `metaData.plcSymbolVersion`
-    * 
-    * @param targetOpts Optional target settings that override values in `settings`
-    */
+   * Reads target PLC runtime symbol version.
+   * 
+   * Symbol version usually changes when the PLC software is updated with download.
+   *
+   * **NOTE:** This requires that the target is a PLC runtime.
+   * 
+   * Note that if `settings.rawClient` is not used, the symbol version should 
+   * already be up-to-date in `metaData.plcSymbolVersion`, as the client
+   * subscribes to its changes during connecting.
+   * 
+   * If `targetOpts` is not used to override target, the state is also
+   * saved to the `metaData.plcSymbolVersion`.
+   *
+   * @param targetOpts Optional target settings that override values in `settings`
+   * 
+   * @throws Throws an error if sending the command fails or if the target responds with an error.
+   */
   public async readPlcSymbolVersion(targetOpts: Partial<AmsAddress> = {}): Promise<number> {
     if (!this.connection.connected) {
       throw new ClientError(`readPlcSymbolVersion(): Client is not connected. Use connect() to connect to the target first.`);
@@ -4090,41 +4179,59 @@ export class Client extends EventEmitter<ClientEvents> {
   }
 
   /**
-   * Subscribes to variable change notifications (ADS notifications) by symbol path.
+   * Subscribes to symbol value change notifications (ADS notifications) by variable path,
+   * such as `GVL_Test.ExampleStruct`.
    * 
-   * **NOTE**: Consider using `subscribe()` instead
+   * Provided callback is called with the latest value of the symbol when the value changes or when
+   * enough time has passed (depending on settings).
    * 
-   * Callback is called with latest value when changed or when cycle time has passed, depending on settings.
+   * **NOTE**: Consider using `subscribe()` instead, this is just a wrapper for it.
    * 
-   * @param path Variable path in the PLC to subscribe to (such as `GVL_Test.ExampleStruct`)
-   * @param callback Callback function that is called when new value is received
+   * @example
+   * ```js
+   * //Checks if value has changed every 100ms
+   * //Callback is called only when the value has changed
+   * await client.subscribeSymbol(
+   *  'GVL_Test.ExampleStruct.',
+   *  (data, subscription) => {
+   *   console.log(`Value of ${subscription.symbolInfo.name} has changed: ${data.value}`);
+   *  },
+   *  100
+   * );
+   * ```
+   * 
+   * @param path Variable path in the PLC  (such as `GVL_Test.ExampleStruct`)
+   * @param callback Callback function to call when a new value is received (`(data, subscription) => {}`)
    * @param cycleTime Cycle time for subscription (default: `200 ms`)
    * 
-   * If `sendOnChange` is `true` (default), PLC checks if value has changed with `cycleTime` interval. 
-   * If the value has changed, a new value is sent.
+   * - If `sendOnChange` is `true` (default), PLC checks if value has changed with `cycleTime` interval. 
+   * If the value has changed, the PLC sends the value and the callback is called.
+   * - If `sendOnChange` is `false`, PLC constantly sends the value with `cycleTime` interval
+   * and the callback is called.
    * 
-   * If `sendOnChange` is `false`, PLC constantly sends the value with `cycleTime` interval. 
+   * @param sendOnChange Send a new value only when the value has changed (default: `true`)
    * 
-   * @param sendOnChange Should the notification be sent only when the value changes? (default: `true`)
-   * 
-   * If `false`, the value is sent with `cycleTime` interval (even if it doesn't change).
-   * 
-   * If `true` (default), the value is checked every `cycleTime` and sent only if it has changed.
+   * - If `true` (default), the PLC checks the value for changes every `cycleTime` milliseconds. If the value has changed, PLC sends the new value and the callback is called.
+   * - If `false`, the PLC sends the value cyclically every `cycleTime` milliseconds (and the callback is called)
    * 
    * NOTE: When subscribing, the value is always sent once.
    * 
-   * @param maxDelay How long the PLC waits before sending the values at maximum? (default: `0` ms --> maximum delay is off)
+   * @param maxDelay How long the PLC waits before sending the value at maximum? (default: `0` ms --> maximum delay is off)
    * 
-   * If value is not changing, the first notification with active value after subscribing is sent after `maxDelay`.
+   * If the value is not changing, the first notification with the active value after subscribing is sent after `maxDelay`.
    * 
    * If the value is changing, the PLC sends one or more notifications every `maxDelay`. 
    * 
    * So if `cycleTime` is 100 ms, `maxDelay` is 1000 ms and value changes every 100 ms, the PLC sends 10 notifications every 1000 ms.
    * This can be useful for throttling.
    * 
-   * @param targetOpts Optional target settings that override values in `settings` (**NOTE:** If used, no caching is available -> possible performance impact)
+   * @param targetOpts Optional target settings that override values in `settings`. If used, caching
+   * is disabled -> possible performance impact.
    * 
-   * @template T Typescript data type of the PLC data, for example `subscribe<number>(...)` or `subscribe<ST_TypedStruct>(...)`. If target is raw address, use `subscribe<Buffer>`
+   * @throws Throws an error if sending the command fails or if the target responds with an error.
+   * 
+   * @template T In Typescript, the data type of the value, for example `subscribeSymbol<number>(...)` or `subscribeSymbol<ST_TypedStruct>(...)`. (default: `any`)
+   * 
    */
   public subscribeSymbol<T = any>(path: string, callback: SubscriptionCallback<T>, cycleTime?: number, sendOnChange?: boolean, maxDelay?: number, targetOpts: Partial<AmsAddress> = {}): Promise<ActiveSubscription<T>> {
     if (!this.connection.connected) {
@@ -4148,46 +4255,54 @@ export class Client extends EventEmitter<ClientEvents> {
     }
   }
 
-
-
   /**
-   * Subscribes to variable change notifications (ADS notifications) by provided index group, index offset and data length (bytes)
+   * Subscribes to raw value change notifications (ADS notifications) by raw ADS address (index group, index offset and data length).
    * 
-   * **NOTE**: Consider using `subscribe()` instead
-   * 
-   * Callback is called with latest value when changed or when cycle time has passed, depending on settings.
+   * Provided callback is called with the latest value when the value changes or when
+   * enough time has passed (depending on settings).
+   *
+   * **NOTE**: Consider using `subscribe()` instead, this is just a wrapper for it.
+   *
+   * @example
+   * ```js
+   * //Checks if value has changed every 100ms
+   * //Callback is called only when the value has changed
+   * await client.subscribeRaw(16448, 414816, 2, (data, subscription) => {
+   *   console.log(`Value has changed: ${data.value.toString('hex')}`);
+   *  }, 100);
+   * ```
    * 
    * @param indexGroup Index group (address) of the data to subscribe to
    * @param indexOffset Index offset (address) of the data to subscribe to
    * @param size Data length (bytes)
-   * @param callback Callback function that is called when new value is received
+   * @param callback Callback function to call when a new value is received (`(data, subscription) => {}`)
    * @param cycleTime Cycle time for subscription (default: `200 ms`)
    * 
-   * If `sendOnChange` is `true` (default), PLC checks if value has changed with `cycleTime` interval. 
-   * If the value has changed, a new value is sent.
+   * - If `sendOnChange` is `true` (default), PLC checks if value has changed with `cycleTime` interval. 
+   * If the value has changed, the PLC sends the value and the callback is called.
+   * - If `sendOnChange` is `false`, PLC constantly sends the value with `cycleTime` interval
+   * and the callback is called.
    * 
-   * If `sendOnChange` is `false`, PLC constantly sends the value with `cycleTime` interval. 
+   * @param sendOnChange Send a new value only when the value has changed (default: `true`)
    * 
-   * @param sendOnChange Should the notification be sent only when the value changes? (default: `true`)
-   * 
-   * If `false`, the value is sent with `cycleTime` interval (even if it doesn't change).
-   * 
-   * If `true` (default), the value is checked every `cycleTime` and sent only if it has changed.
+   * - If `true` (default), the PLC checks the value for changes every `cycleTime` milliseconds. If the value has changed, PLC sends the new value and the callback is called.
+   * - If `false`, the PLC sends the value cyclically every `cycleTime` milliseconds (and the callback is called)
    * 
    * NOTE: When subscribing, the value is always sent once.
    * 
-   * @param maxDelay How long the PLC waits before sending the values at maximum? (default: `0` ms --> maximum delay is off)
+   * @param maxDelay How long the PLC waits before sending the value at maximum? (default: `0` ms --> maximum delay is off)
    * 
-   * If value is not changing, the first notification with active value after subscribing is sent after `maxDelay`.
+   * If the value is not changing, the first notification with the active value after subscribing is sent after `maxDelay`.
    * 
    * If the value is changing, the PLC sends one or more notifications every `maxDelay`. 
    * 
    * So if `cycleTime` is 100 ms, `maxDelay` is 1000 ms and value changes every 100 ms, the PLC sends 10 notifications every 1000 ms.
    * This can be useful for throttling.
    * 
-   * @param targetOpts Optional target settings that override values in `settings` (**NOTE:** If used, no caching is available -> possible performance impact)
+   * @param targetOpts Optional target settings that override values in `settings`. If used, caching
+   * is disabled -> possible performance impact.
    * 
-   * @template T Typescript data type of the PLC data, for example `subscribe<number>(...)` or `subscribe<ST_TypedStruct>(...)`. If target is raw address, use `subscribe<Buffer>`
+   * @throws Throws an error if sending the command fails or if the target responds with an error.
    */
   public subscribeRaw(indexGroup: number, indexOffset: number, size: number, callback: SubscriptionCallback<Buffer>, cycleTime?: number, sendOnChange?: boolean, maxDelay?: number, targetOpts: Partial<AmsAddress> = {}): Promise<ActiveSubscription<Buffer>> {
     if (!this.connection.connected) {
@@ -4216,14 +4331,19 @@ export class Client extends EventEmitter<ClientEvents> {
   }
 
   /**
-   * Subscribes to variable or raw ADS address value change notifications (ADS notifications).
+   * Subscribes to value change notifications (ADS notifications) by variable path 
+   * (such as `GVL_Test.ExampleStruct`) or raw ADS address (index group, index offset and data length).
    * 
-   * Callback is called with latest value when changed or when cycle time has passed, depending on settings.
+   * Provided callback is called with the latest value when the value changes or when
+   * enough time has passed (depending on settings).
    * 
    * @param options Subscription options
-   * @param targetOpts Optional target settings that override values in `settings` (**NOTE:** If used, no caching is available -> possible performance impact)
+   * @param targetOpts Optional target settings that override values in `settings`. If used, caching
+   * is disabled -> possible performance impact.
    * 
-   * @template T Typescript data type of the PLC data, for example `subscribe<number>(...)` or `subscribe<ST_TypedStruct>(...)`. If target is raw address, use `subscribe<Buffer>`
+   * @throws Throws an error if sending the command fails or if the target responds with an error.
+   * 
+   * @template T In Typescript, the data type of the value, for example `subscribe<number>(...)` or `subscribe<ST_TypedStruct>(...)`. If the target is a raw address, use `subscribe<Buffer>`. (default: `any`)
    */
   public subscribe<T = any>(options: SubscriptionSettings<T>, targetOpts: Partial<AmsAddress> = {}): Promise<ActiveSubscription<T>> {
     if (!this.connection.connected) {
@@ -4242,40 +4362,56 @@ export class Client extends EventEmitter<ClientEvents> {
   }
 
   /**
-   * Unsubscribes given subscription by notificationHandle or subscription object
+   * Unsubscribes the subscription (deletes ADS notification).
    * 
-   * @param target Subscription object to unsubscribe (returned by `subscribe()`, `subscribeRaw()` or `subscribeSymbol()`)
+   * PLC stops checking the value for changes (if configured so) and no longer sends new values.
+   * 
+   * @example
+   * ```js
+   * const sub = await client.subscribe(...);
+   * 
+   * //later
+   * try {
+   *  await client.unsubscribe(sub);
+   * } catch (err) {
+   *  console.log("Error:", err);
+   * }
+   * ```
+   * 
+   * @param subscription Subscription to unsubscribe (created previously by subscribing for example using `subscribe()`)
+   * 
+   * @throws Throws an error if sending the command fails or if the target responds with an error.
    */
-  public async unsubscribe(target: ActiveSubscription): Promise<void> {
+  public async unsubscribe(subscription: ActiveSubscription): Promise<void> {
     if (!this.connection.connected) {
       throw new ClientError(`unsubscribe(): Client is not connected. Use connect() to connect to the target first.`);
     }
 
-    this.debug(`unsubscribe(): Unsubscribing %o`, target);
+    this.debug(`unsubscribe(): Unsubscribing %o`, subscription);
 
     //Allocating bytes for request
     const data = Buffer.alloc(4);
     let pos = 0;
 
     //0..3 Notification handle
-    data.writeUInt32LE(target.notificationHandle, pos);
+    data.writeUInt32LE(subscription.notificationHandle, pos);
     pos += 4;
 
     try {
       const res = await this.sendAdsCommand<AdsDeleteNotificationResponse>({
         adsCommand: ADS.ADS_COMMAND.DeleteNotification,
-        targetAmsNetId: target.remoteAddress.amsNetId,
-        targetAdsPort: target.remoteAddress.adsPort,
+        targetAmsNetId: subscription.remoteAddress.amsNetId,
+        targetAdsPort: subscription.remoteAddress.adsPort,
         payload: data
       });
 
-      const address = ADS.amsAddressToString(target.remoteAddress);
+      const address = ADS.amsAddressToString(subscription.remoteAddress);
 
       if (this.activeSubscriptions[address]) {
-        delete this.activeSubscriptions[address][target.notificationHandle];
+        delete this.activeSubscriptions[address][subscription.notificationHandle];
       }
 
-      this.debug(`unsubscribe(): Subscription with handle ${target.notificationHandle} unsubscribed from ${address}`);
+      this.debug(`unsubscribe(): Subscription with handle ${subscription.notificationHandle} unsubscribed from ${address}`);
 
     } catch (err) {
       this.debug(`unsubscribe(): Unsubscribing failed: %o`, err);
@@ -4284,7 +4420,24 @@ export class Client extends EventEmitter<ClientEvents> {
   }
 
   /**
-   * Unsubscribes from all active subscriptions
+   * Unsubscribes all active subscription (deletes all ADS notifications).
+   * 
+   * PLC stops checking the values for changes (if configured so) and no longer sends new values.
+   * 
+   * @example
+   * ```js
+   * const sub = await client.subscribe(...);
+   * const sub2 = await client.subscribe(...);
+   * 
+   * //later
+   * try {
+   *  await client.unsubscribeAll();
+   * } catch (err) {
+   *  console.log("Error:", err);
+   * }
+   * ```
+   * 
+   * @throws Throws an error if sending the command fails or if the target responds with an error.
    */
   public async unsubscribeAll(): Promise<void> {
     if (!this.connection.connected) {
@@ -4305,11 +4458,26 @@ export class Client extends EventEmitter<ClientEvents> {
   }
 
   /**
-    * Reads target device / system manager information
-    * If original target, the state is also saved to the `metaData.deviceInfo`
-    * 
-    * @param targetOpts Optional target settings that override values in `settings`
-    */
+   * Reads target device information.
+   * 
+   * This is the ADS protocol `ReadDeviceInfo` command.
+   * 
+   * If `targetOpts` is not used to override target, the state is also
+   * saved to the `metaData.deviceInfo`.
+   * 
+   * @example
+   * ```js
+   * try {
+   *  const deviceInfo = await client.readDeviceInfo();
+   * } catch (err) {
+   *  console.log("Error:", err);
+   * }
+   * ```
+   * 
+   * @param targetOpts Optional target settings that override values in `settings`
+   * 
+   * @throws Throws an error if sending the command fails or if the target responds with an error.
+   */
   public async readDeviceInfo(targetOpts: Partial<AmsAddress> = {}): Promise<AdsDeviceInfo> {
     if (!this.connection.connected) {
       throw new ClientError(`readDeviceInfo(): Client is not connected. Use connect() to connect to the target first.`);
@@ -4328,7 +4496,7 @@ export class Client extends EventEmitter<ClientEvents> {
 
       if (!targetOpts.adsPort && !targetOpts.amsNetId) {
         //Target is not overridden -> save to metadata
-        this.metaData.deviceInfo = res.ads.payload;
+        this.metaData.plcDeviceInfo = res.ads.payload;
       }
 
       return res.ads.payload;
@@ -4340,17 +4508,34 @@ export class Client extends EventEmitter<ClientEvents> {
   }
 
   /**
-   * Reads target PLC runtime upload information 
-   * Info about data types and symbols
+   * Reads target PLC runtime upload information.
+   * 
+   * Upload information includes information about target PLC runtime data types and symbols (count and total data length).
+   * 
+   * **NOTE:** This requires that the target is a PLC runtime.
+   * 
+   * If `targetOpts` is not used to override target, the upload info is also
+   * saved to the `metaData.plcUploadInfo`.
+   * 
+   * @example
+   * ```js
+   * try {
+   *  const uploadInfo = await client.readPlcUploadInfo();
+   * } catch (err) {
+   *  console.log("Error:", err);
+   * }
+   * ```
    * 
    * @param targetOpts Optional target settings that override values in `settings`
+   * 
+   * @throws Throws an error if sending the command fails or if the target responds with an error.
    */
-  public async readUploadInfo(targetOpts: Partial<AmsAddress> = {}): Promise<AdsUploadInfo> {
+  public async readPlcUploadInfo(targetOpts: Partial<AmsAddress> = {}): Promise<AdsUploadInfo> {
     if (!this.connection.connected) {
-      throw new ClientError(`readUploadInfo(): Client is not connected. Use connect() to connect to the target first.`);
+      throw new ClientError(`readPlcUploadInfo(): Client is not connected. Use connect() to connect to the target first.`);
     }
 
-    this.debug(`readUploadInfo(): Reading upload info`);
+    this.debug(`readPlcUploadInfo(): Reading upload info`);
 
     //Allocating bytes for request
     const data = Buffer.alloc(12);
@@ -4407,24 +4592,38 @@ export class Client extends EventEmitter<ClientEvents> {
 
       if (!targetOpts.adsPort && !targetOpts.amsNetId) {
         //Target is not overridden -> save to metadata
-        this.metaData.uploadInfo = uploadInfo;
+        this.metaData.plcUploadInfo = uploadInfo;
       }
 
-      this.debug(`readUploadInfo(): Upload info read and parsed for ${ADS.amsAddressToString(res.ams.sourceAmsAddress)}`);
+      this.debug(`readPlcUploadInfo(): Upload info read and parsed for ${ADS.amsAddressToString(res.ams.sourceAmsAddress)}`);
       return uploadInfo;
 
     } catch (err) {
-      this.debug(`readUploadInfo(): Reading upload info failed: %o`, err);
-      throw new ClientError(`readUploadInfo(): Reading upload info failed`, err);
+      this.debug(`readPlcUploadInfo(): Reading upload info failed: %o`, err);
+      throw new ClientError(`readPlcUploadInfo(): Reading upload info failed`, err);
     }
   }
 
   /**
-   * Reads and parses ALL target PLC symbol information data.
+   * Returns symbol information for all available symbols/variables in the target PLC runtime.
    * 
-   * If target is not overridden, also caches the result.
+   * **NOTE:** This requires that the target is a PLC runtime.
    * 
-   * **WARNING: The returned object might be VERY large**
+   * **WARNING:** The returned object might be very large!
+   * 
+   * If `targetOpts` is not used to override target, the upload info is also
+   * saved to the `metaData.symbols`.
+   * 
+   * @example
+   * ```js
+   * try {
+   *  const symbolInfos = await client.getSymbolInfos();
+   * } catch (err) {
+   *  console.log("Error:", err);
+   * }
+   * ```
+   * 
+   * @throws Throws an error if sending the command fails or if the target responds with an error.
    * 
    * @param targetOpts Optional target settings that override values in `settings`
    */
@@ -4438,7 +4637,7 @@ export class Client extends EventEmitter<ClientEvents> {
     try {
       this.debug(`getSymbolInfos(): Updating upload info (needed for symbol reading)`)
 
-      uploadInfo = await this.readUploadInfo(targetOpts);
+      uploadInfo = await this.readPlcUploadInfo(targetOpts);
 
     } catch (err) {
       this.debug(`getSymbolInfos(): Reading upload info failed`)
@@ -4490,8 +4689,8 @@ export class Client extends EventEmitter<ClientEvents> {
 
       if (!targetOpts.adsPort && !targetOpts.amsNetId) {
         //Target is not overridden -> save to metadata
-        this.metaData.symbols = symbols;
-        this.metaData.allSymbolsCached = true;
+        this.metaData.plcSymbols = symbols;
+        this.metaData.allPlcSymbolsCached = true;
         this.debug(`getSymbolInfos(): All symbols read and cached (symbol count ${count})`);
 
       } else {
@@ -4550,7 +4749,7 @@ export class Client extends EventEmitter<ClientEvents> {
     try {
       this.debug(`getDataTypes(): Updating upload info (needed for data type reading)`)
 
-      uploadInfo = await this.readUploadInfo(targetOpts);
+      uploadInfo = await this.readPlcUploadInfo(targetOpts);
 
     } catch (err) {
       this.debug(`getDataTypes(): Reading upload info failed`)
@@ -4601,8 +4800,8 @@ export class Client extends EventEmitter<ClientEvents> {
 
       if (!targetOpts.adsPort && !targetOpts.amsNetId) {
         //Target is not overridden -> save to metadata
-        this.metaData.dataTypes = dataTypes;
-        this.metaData.allDataTypesCached = true;
+        this.metaData.plcDataTypes = dataTypes;
+        this.metaData.allPlcDataTypesCached = true;
         this.debug(`getDataTypes(): All data types read and cached (data type count ${count})`);
 
       } else {
@@ -5215,60 +5414,60 @@ export class Client extends EventEmitter<ClientEvents> {
    * @param path Variable path in the PLC to read (such as `GVL_Test.ExampleStruct`)
    * @param targetOpts Optional target settings that override values in `settings`
    * 
-   * @template T Typescript data type of the PLC data, for example `readSymbol<number>(...)` or `readSymbol<ST_TypedStruct>(...)`
+   * @template T Typescript data type of the PLC data, for example `readSymbol<number>(...)` or `readSymbolValue<ST_TypedStruct>(...)`
    */
-  public async readSymbol<T = any>(path: string, targetOpts: Partial<AmsAddress> = {}): Promise<ReadSymbolResult<T>> {
+  public async readSymbolValue<T = any>(path: string, targetOpts: Partial<AmsAddress> = {}): Promise<ReadSymbolValueResult<T>> {
     if (!this.connection.connected) {
-      throw new ClientError(`readSymbol(): Client is not connected. Use connect() to connect to the target first.`);
+      throw new ClientError(`readSymbolValue(): Client is not connected. Use connect() to connect to the target first.`);
     }
 
-    this.debug(`readSymbol(): Reading symbol for ${path}`);
+    this.debug(`readSymbolValue(): Reading symbol value for ${path}`);
 
     //Getting the symbol information
     let symbolInfo: AdsSymbolInfo;
     try {
-      this.debugD(`readSymbol(): Getting symbol information for ${path}`);
+      this.debugD(`readSymbolValue(): Getting symbol information for ${path}`);
       symbolInfo = await this.getSymbolInfo(path, targetOpts);
 
     } catch (err) {
-      this.debug(`readSymbol(): Getting symbol information for ${path} failed: %o`, err);
-      throw new ClientError(`readSymbol(): Getting symbol information for ${path} failed`, err);
+      this.debug(`readSymbolValue(): Getting symbol information for ${path} failed: %o`, err);
+      throw new ClientError(`readSymbolValue(): Getting symbol information for ${path} failed`, err);
     }
 
     //Getting the symbol data type
     let dataType: AdsDataType;
     try {
-      this.debugD(`readSymbol(): Getting data type for ${path}`);
+      this.debugD(`readSymbolValue(): Getting data type for ${path}`);
       dataType = await this.buildDataType(symbolInfo.type, targetOpts);
 
     } catch (err) {
-      this.debug(`readSymbol(): Getting symbol information for ${path} failed: %o`, err);
-      throw new ClientError(`readSymbol(): Getting symbol information for ${path} failed`, err);
+      this.debug(`readSymbolValue(): Getting symbol information for ${path} failed: %o`, err);
+      throw new ClientError(`readSymbolValue(): Getting symbol information for ${path} failed`, err);
     }
 
     //Reading value by the symbol address
     let rawValue: Buffer;
     try {
-      this.debugD(`readSymbol(): Reading raw value for ${path}`);
+      this.debugD(`readSymbolValue(): Reading raw value for ${path}`);
       rawValue = await this.readRaw(symbolInfo.indexGroup, symbolInfo.indexOffset, symbolInfo.size, targetOpts);
 
     } catch (err) {
-      this.debug(`readSymbol(): Reading raw value for ${path} failed: %o`, err);
-      throw new ClientError(`readSymbol(): Reading raw value for ${path} failed`, err);
+      this.debug(`readSymbolValue(): Reading raw value for ${path} failed: %o`, err);
+      throw new ClientError(`readSymbolValue(): Reading raw value for ${path} failed`, err);
     }
 
     //Converting byte data to javascript object
     let value: T;
     try {
-      this.debugD(`readSymbol(): Converting raw value to object for ${path}`);
+      this.debugD(`readSymbolValue(): Converting raw value to object for ${path}`);
       value = await this.convertBufferToObject<T>(rawValue, dataType);
 
     } catch (err) {
-      this.debug(`readSymbol(): Converting raw value to object for ${path} failed: %o`, err);
-      throw new ClientError(`readSymbol(): Converting raw value to object for ${path} failed`, err);
+      this.debug(`readSymbolValue(): Converting raw value to object for ${path} failed: %o`, err);
+      throw new ClientError(`readSymbolValue(): Converting raw value to object for ${path} failed`, err);
     }
 
-    this.debug(`readSymbol(): Reading symbol for ${path} done`);
+    this.debug(`readSymbolValue(): Reading symbol for ${path} done`);
 
     return {
       value,
@@ -5291,33 +5490,33 @@ export class Client extends EventEmitter<ClientEvents> {
    * 
    * @template T Typescript data type of the PLC data, for example `writeSymbol<number>(...)` or `writeSymbol<ST_TypedStruct>(...)`
    */
-  public async writeSymbol<T = any>(path: string, value: T, autoFill: boolean = false, targetOpts: Partial<AmsAddress> = {}): Promise<WriteSymbolResult<T>> {
+  public async writeSymbolValue<T = any>(path: string, value: T, autoFill: boolean = false, targetOpts: Partial<AmsAddress> = {}): Promise<WriteSymbolValueResult<T>> {
     if (!this.connection.connected) {
-      throw new ClientError(`writeSymbol(): Client is not connected. Use connect() to connect to the target first.`);
+      throw new ClientError(`writeSymbolValue(): Client is not connected. Use connect() to connect to the target first.`);
     }
 
-    this.debug(`writeSymbol(): Writing symbol for ${path}`);
+    this.debug(`writeSymbolValue(): Writing symbol value for ${path}`);
 
     //Getting the symbol information
     let symbolInfo: AdsSymbolInfo;
     try {
-      this.debugD(`writeSymbol(): Getting symbol information for ${path}`);
+      this.debugD(`writeSymbolValue(): Getting symbol information for ${path}`);
       symbolInfo = await this.getSymbolInfo(path, targetOpts);
 
     } catch (err) {
-      this.debug(`writeSymbol(): Getting symbol information for ${path} failed: %o`, err);
-      throw new ClientError(`writeSymbol(): Getting symbol information for ${path} failed`, err);
+      this.debug(`writeSymbolValue(): Getting symbol information for ${path} failed: %o`, err);
+      throw new ClientError(`writeSymbolValue(): Getting symbol information for ${path} failed`, err);
     }
 
     //Getting the symbol data type
     let dataType: AdsDataType;
     try {
-      this.debugD(`writeSymbol(): Getting data type for ${path}`);
+      this.debugD(`writeSymbolValue(): Getting data type for ${path}`);
       dataType = await this.buildDataType(symbolInfo.type, targetOpts);
 
     } catch (err) {
-      this.debug(`writeSymbol(): Getting symbol information for ${path} failed: %o`, err);
-      throw new ClientError(`writeSymbol(): Getting symbol information for ${path} failed`, err);
+      this.debug(`writeSymbolValue(): Getting symbol information for ${path} failed: %o`, err);
+      throw new ClientError(`writeSymbolValue(): Getting symbol information for ${path} failed`, err);
     }
 
     //Creating raw data from object
@@ -5327,12 +5526,12 @@ export class Client extends EventEmitter<ClientEvents> {
 
       if (res.missingProperty && autoFill) {
         //Some fields are missing and autoFill is used -> try to auto fill missing values
-        this.debug(`writeSymbol(): Autofilling missing fields with active values`);
+        this.debug(`writeSymbolValue(): Autofilling missing fields with active values`);
 
-        this.debugD(`writeSymbol(): Reading active value`);
-        const valueNow = await this.readSymbol(path, targetOpts);
+        this.debugD(`writeSymbolValue(): Reading active value`);
+        const valueNow = await this.readSymbolValue(path, targetOpts);
 
-        this.debugD(`writeSymbol(): Merging objects (adding missing fields)`);
+        this.debugD(`writeSymbolValue(): Merging objects (adding missing fields)`);
         value = this.deepMergeObjects(false, valueNow.value, value);
 
         //Try conversion again - should work now
@@ -5341,12 +5540,12 @@ export class Client extends EventEmitter<ClientEvents> {
         if (res.missingProperty) {
           //This shouldn't really happen
           //However, if it happened, the merge isn't working as it should
-          throw new ClientError(`writeSymbol(): Converting object to raw value for ${path} failed. The object is missing key/value for "${res.missingProperty}". NOTE: autoFill failed - please report an issue at GitHub`);
+          throw new ClientError(`writeSymbolValue(): Converting object to raw value for ${path} failed. The object is missing key/value for "${res.missingProperty}". NOTE: autoFill failed - please report an issue at GitHub`);
         }
 
       } else if (res.missingProperty) {
         //Some fields are missing and no autoFill -> failed
-        throw new ClientError(`writeSymbol(): Converting object to raw value for ${path} failed. The object is missing key/value for "${res.missingProperty}". Hint: Use autoFill parameter to add missing fields automatically`);
+        throw new ClientError(`writeSymbolValue(): Converting object to raw value for ${path} failed. The object is missing key/value for "${res.missingProperty}". Hint: Use autoFill parameter to add missing fields automatically`);
       }
 
       //We are here -> success!
@@ -5358,21 +5557,21 @@ export class Client extends EventEmitter<ClientEvents> {
         throw err;
       }
 
-      this.debug(`writeSymbol(): Converting object to raw value for ${path} failed: %o`, err);
-      throw new ClientError(`writeSymbol(): Converting object to raw value for ${path} failed`, err);
+      this.debug(`writeSymbolValue(): Converting object to raw value for ${path} failed: %o`, err);
+      throw new ClientError(`writeSymbolValue(): Converting object to raw value for ${path} failed`, err);
     }
 
     //Writing value by the symbol address
     try {
-      this.debugD(`writeSymbol(): Writing raw value for ${path}`);
+      this.debugD(`writeSymbolValue(): Writing raw value for ${path}`);
       await this.writeRaw(symbolInfo.indexGroup, symbolInfo.indexOffset, rawValue, targetOpts);
 
     } catch (err) {
-      this.debug(`writeSymbol(): Writing raw value for ${path} failed: %o`, err);
-      throw new ClientError(`writeSymbol(): Writing raw value for ${path} failed`, err);
+      this.debug(`writeSymbolValue(): Writing raw value for ${path} failed: %o`, err);
+      throw new ClientError(`writeSymbolValue(): Writing raw value for ${path} failed`, err);
     }
 
-    this.debug(`writeSymbol(): Writing symbol for ${path} done`);
+    this.debug(`writeSymbolValue(): Writing symbol for ${path} done`);
 
     return {
       value,
@@ -5388,7 +5587,7 @@ export class Client extends EventEmitter<ClientEvents> {
    * @param dataType Data type name in the PLC as string (such as `ST_Struct`) or `AdsDataType` object 
    * @param targetOpts Optional target settings that override values in `settings` 
    * 
-   * @template T Typescript data type of the PLC data, for example `readSymbol<number>(...)` or `readSymbol<ST_TypedStruct>(...)`
+   * @template T Typescript data type of the PLC data, for example `readSymbolValue<number>(...)` or `readSymbolValue<ST_TypedStruct>(...)`
    */
   public async getDefaultPlcObject<T = any>(dataType: string | AdsDataType, targetOpts: Partial<AmsAddress> = {}): Promise<T> {
     if (!this.connection.connected) {

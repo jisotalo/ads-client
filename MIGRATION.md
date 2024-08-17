@@ -49,6 +49,11 @@ This document contains breaking changes between ads-client major versions.
         <ul>
           <li><code>systemManagerState</code> renamed to <code>tcSystemState</code></li>
           <li><code>symbolVersion</code> renamed to <code>plcSymbolVersion</code></li>
+          <li><code>uploadInfo</code> renamed to <code>plcUploadInfo</code></li>
+          <li><code>allSymbolsCached</code> renamed to <code>allPlcSymbolsCached</code></li>
+          <li><code>symbols</code> renamed to <code>plcSymbols</code></li>
+          <li><code>allDataTypesCached</code> renamed to <code>allPlcDataTypesCached</code></li>
+          <li><code>dataTypes</code> renamed to <code>plcDataTypes</code></li>
         </ul>
       </td>
       <td valign="top">
@@ -269,11 +274,13 @@ This document contains breaking changes between ads-client major versions.
       </td>
       <td valign="top">
         <ul>
+          <li>Renamed to <code>readSymbolValue()</code></li>
           <li>Return value property <code>symbol</code> renamed to <code>symbolInfo</code></li>
         </ul>
       </td>
       <td valign="top">
         <ul>
+          <li>Rename all <code>readSymbol()</code> calls to <code>readSymbolValue()</code></li>
           <li>If return value <code>symbol</code> was used -> rename to <code>symbolInfo</code></li>
         </ul>
       </td>
@@ -294,6 +301,23 @@ This document contains breaking changes between ads-client major versions.
           <ul>
             <li><code>readRaw(*, *, *, 852)</code> <br> -> <br> <code>readRaw(*, *, *, { adsPort: 852 })</code></li>
           </ul>
+        </ul>
+      </td>
+    </tr>
+    <tr>
+      <td valign="top">
+        <code>writeSymbol()</code>
+      </td>
+      <td valign="top">
+        <ul>
+          <li>Renamed to <code>writeSymbolValue()</code></li>
+          <li>Return value property <code>symbol</code> renamed to <code>symbolInfo</code></li>
+        </ul>
+      </td>
+      <td valign="top">
+        <ul>
+          <li>Rename all <code>writeSymbol()</code> calls to <code>writeSymbolValue()</code></li>
+          <li>If return value <code>symbol</code> was used -> rename to <code>symbolInfo</code></li>
         </ul>
       </td>
     </tr>
@@ -511,6 +535,21 @@ This document contains breaking changes between ads-client major versions.
       <td valign="top">
         <ul>
           <li>Rename all <code>readSymbolVersion()</code> calls to <code>readPlcSymbolVersion()</code></li>
+        </ul>
+      </td>
+    </tr>
+    <tr>
+      <td valign="top">
+        <code>readUploadInfo()</code>
+      </td>
+      <td valign="top">
+        <ul>
+          <li>Renamed to <code>readPlcUploadInfo()</code></li>
+        </ul>
+      </td>
+      <td valign="top">
+        <ul>
+          <li>Rename all <code>readUploadInfo()</code> calls to <code>readPlcUploadInfo()</code></li>
         </ul>
       </td>
     </tr>

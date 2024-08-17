@@ -3252,6 +3252,14 @@ describe('subscriptions (ADS notifications)', () => {
       let startTime = Date.now();
 
       await client.subscribeSymbol(
+        'GVL_Test.ExampleStruct.',
+        (data, subscription) => {
+          console.log(`Value of ${subscription.symbolInfo.name} changed: ${data.value}`);
+        },
+        1000
+      );
+
+      await client.subscribeSymbol(
         'GVL_Subscription.Numericvalue_Constant',
         async (data, subscription) => {
           await subscription.unsubscribe();

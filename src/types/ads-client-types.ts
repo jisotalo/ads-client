@@ -409,26 +409,26 @@ export interface ActiveAdsRequest {
  * Client connection metadata
  */
 export interface ConnectionMetaData {
-  /** Target device information (if available) */
-  deviceInfo?: AdsDeviceInfo,
+  /** Local AMS router state (if available) */
+  routerState?: AmsRouterState,
   /** Target TwinCAT system state (if available) */
   tcSystemState?: AdsState,
+  /** Target PLC device information (if available) */
+  plcDeviceInfo?: AdsDeviceInfo,
   /** Target PLC runtime state (if available) */
   plcRuntimeState?: AdsState,
   /** Target PLC runtime symbol and datatype count/size information (if available) */
-  uploadInfo?: AdsUploadInfo,
+  plcUploadInfo?: AdsUploadInfo,
   /** Target PLC runtime symbol version (if available) */
   plcSymbolVersion?: number,
   /** Set to `true` if client has cached all symbols */
-  allSymbolsCached: boolean,
+  allPlcSymbolsCached: boolean,
   /** Cached target PLC runtime symbols (if available) */
-  symbols: AdsSymbolInfoContainer,
+  plcSymbols: AdsSymbolInfoContainer,
   /** Set to `true` if client has cached all data types */
-  allDataTypesCached: boolean,
+  allPlcDataTypesCached: boolean,
   /** Cached target PLC runtime data types without subitems (if available) */
-  dataTypes: AdsDataTypeContainer,
-  /** Local AMS router state (if available) */
-  routerState?: AmsRouterState
+  plcDataTypes: AdsDataTypeContainer,
 };
 
 /**
@@ -542,11 +542,11 @@ export interface SubscriptionSettings<T = any> {
 export type PlcPrimitiveType = string | boolean | number | Buffer | Date | BigInt;
 
 /**
- * Return value of `readSymbol()`
+ * Return value of `readSymbolValue()`
  * 
  * @template T - Type of the value
  */
-export interface ReadSymbolResult<T = any> {
+export interface ReadSymbolValueResult<T = any> {
   /** Value of the symbol as converted Javascript object */
   value: T,
   /** Raw value as Buffer */
@@ -558,9 +558,9 @@ export interface ReadSymbolResult<T = any> {
 }
 
 /**
- * Return value of `writeSymbol()`
+ * Return value of `writeSymbolValue()`
  */
-export interface WriteSymbolResult<T = any> {
+export interface WriteSymbolValueResult<T = any> {
   /** Value of the symbol as converted Javascript object */
   value: T,
   /** Raw value as Buffer */
