@@ -28,15 +28,24 @@ README is under construction.
 ### Install
 `npm install ads-client@beta`
 
-### Create a client
-
+### Import the client
 ```js
+//Javascript:
 const { Client } = require('ads-client');
 
+//Typescript:
+import { Client } from 'ads-client';
+```
+
+### Create a client and connect
+
+```js
 const client = new Client({
   targetAmsNetId: "localhost",
   targetAdsPort: 851
 });
+
+await client.connect();
 ```
 
 ### Read a value
@@ -44,6 +53,11 @@ const client = new Client({
 ```js
 const res = await client.readValue('GVL_Example.StringValue');
 console.log(res.value);
+
+//Typescript:
+const res = await client.readValue<string>('GVL_Example.StringValue');
+console.log(res.value); //res.value is typed as string (instead of any)
+
 ```
 
 ### Write a value
@@ -58,6 +72,16 @@ await client.subscribe({
   target: 'GVL_Example.ChangingValue',
   cycleTime: 100,
   callback: (data, subscription) => console.log(`${data.timestamp}: Value changed to ${data.value}`)
+});
+
+//Typescript:
+await client.subscribe<number>({
+  target: 'GVL_Example.ChangingValue',
+  cycleTime: 100,
+  callback: (data, subscription) => {
+    //data.value is typed as string (instead of any)
+    console.log(`${data.timestamp}: Value changed to ${data.value}`);
+  }
 });
 ```
 
