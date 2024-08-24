@@ -826,6 +826,9 @@ export class Client extends EventEmitter<ClientEvents> {
     //Reading target runtime upload info
     await this.readPlcUploadInfo();
 
+    //Reading initial PLC runtime symbol version
+    await this.readPlcSymbolVersion();
+
     //Subscribe to PLC symbol version changes (detect PLC software updates etc.)
     await this.addSubscription<Buffer>({
       target: {
@@ -3461,7 +3464,7 @@ export class Client extends EventEmitter<ClientEvents> {
    * 
    * @example
    * ```js
-   * (TODO)
+   * TODO - DOCUMENTATION ONGOING
    * ```
    */
   public async sendAdsCommand<T = AdsResponse>(command: AdsCommandToSend) {
@@ -5000,6 +5003,8 @@ export class Client extends EventEmitter<ClientEvents> {
   }
 
   /**
+   * **TODO - DOCUMENTATION ONGOING**
+   * 
    * Reads raw byte data from the target system by provided index group, index offset and data length (bytes)
    * 
    * This is the `ADS read` command in ADS protocol.
@@ -5049,6 +5054,8 @@ export class Client extends EventEmitter<ClientEvents> {
   }
 
   /**
+   * **TODO - DOCUMENTATION ONGOING**
+   * 
    * Writes raw byte data to the target system by provided index group and index offset.
    * 
    * This is the `ADS write` command in ADS protocol.
@@ -5100,6 +5107,8 @@ export class Client extends EventEmitter<ClientEvents> {
   }
 
   /**
+   * **TODO - DOCUMENTATION ONGOING**
+   * 
    * Sends multiple readRaw() commands in one ADS packet
    * 
    * Reads raw byte data from the target system by provided index group, index offset and data length (bytes)
@@ -5200,6 +5209,8 @@ export class Client extends EventEmitter<ClientEvents> {
   }
 
   /**
+   * **TODO - DOCUMENTATION ONGOING**
+   * 
    * Sends multiple writeRaw() commands in one ADS packet
    * 
    * Writes raw byte data to the target system by provided index group and index offset.
@@ -5295,6 +5306,8 @@ export class Client extends EventEmitter<ClientEvents> {
   }
 
   /**
+   * **TODO - DOCUMENTATION ONGOING**
+   * 
    * Reads raw byte data from the target system by symbol path.
    * 
    * Supports also reading POINTER and REFERENCE values by using deference operator in path (`^`)
@@ -5353,6 +5366,8 @@ export class Client extends EventEmitter<ClientEvents> {
   }
 
   /**
+   * **TODO - DOCUMENTATION ONGOING**
+   * 
    * Writes raw byte data to the target system by symbol path.
    * 
    * Supports also reading POINTER and REFERENCE values by using deference operator in path (`^`)
@@ -5392,6 +5407,8 @@ export class Client extends EventEmitter<ClientEvents> {
   }
 
   /**
+   * **TODO - DOCUMENTATION ONGOING**
+   * 
    * Writes raw data to the target and reads the result as raw data
    * 
    * Uses `ADS ReadWrite` command
@@ -5451,6 +5468,8 @@ export class Client extends EventEmitter<ClientEvents> {
   }
 
   /**
+   * **TODO - DOCUMENTATION ONGOING**
+   * 
    * Sends multiple readWriteRaw() commands in one ADS packet
    * 
    * Uses ADS sum command under the hood (better performance)
@@ -5568,6 +5587,8 @@ export class Client extends EventEmitter<ClientEvents> {
   }
 
   /**
+   * **TODO - DOCUMENTATION ONGOING**
+   * 
    * Reads a value by a variable path (such as `GVL_Test.ExampleStruct`) and converts the value to a Javascript object.
    * 
    * Returns the converted value, the raw value, the data type and the symbol.
@@ -5639,6 +5660,8 @@ export class Client extends EventEmitter<ClientEvents> {
   }
 
   /**
+   * **TODO - DOCUMENTATION ONGOING**
+   * 
    * Reads a value by a symbol and converts the value to a Javascript object.
    * 
    * Returns the converted value, the raw value, the data type and the symbol.
@@ -5657,6 +5680,8 @@ export class Client extends EventEmitter<ClientEvents> {
   }
 
   /**
+   * **TODO - DOCUMENTATION ONGOING**
+   * 
    * Writes a value by a variable path (such as `GVL_Test.ExampleStruct`). Converts the value from a Javascript object to a raw value.
    * 
    * Returns the converted value, the raw value, the data type and the symbol.
@@ -5762,6 +5787,8 @@ export class Client extends EventEmitter<ClientEvents> {
   }
 
   /**
+   * **TODO - DOCUMENTATION ONGOING**
+   * 
    * Writes a value by symbol. Converts the value from a Javascript object to a raw value.
    * 
    * Returns the converted value, the raw value, the data type and the symbol.
@@ -5784,6 +5811,8 @@ export class Client extends EventEmitter<ClientEvents> {
   }
 
   /**
+   * **TODO - DOCUMENTATION ONGOING**
+   * 
    * Returns a default (empty) Javascript object representing provided PLC data type.
    * 
    * @param dataType Data type name in the PLC as string (such as `ST_Struct`) or `AdsDataType` object 
@@ -5818,6 +5847,8 @@ export class Client extends EventEmitter<ClientEvents> {
   }
 
   /**
+   * **TODO - DOCUMENTATION ONGOING**
+   * 
    * Converts a raw byte value to a Javascript object.
    * 
    * @param data Raw PLC data as Buffer (read for example with `readRaw()`)
@@ -5861,6 +5892,8 @@ export class Client extends EventEmitter<ClientEvents> {
   }
 
   /**
+   * **TODO - DOCUMENTATION ONGOING**
+   * 
    * Converts a Javascript object to raw byte data.
    * 
    * **NOTE:** Do not use `autoFill` for `UNION` types, it works without errors but the result isn't probably the desired one
@@ -5938,6 +5971,8 @@ export class Client extends EventEmitter<ClientEvents> {
   }
 
   /**
+   * **TODO - DOCUMENTATION ONGOING**
+   * 
    * Creates a variable handle for a PLC symbol by given variable path
    * 
    * Variable value can be accessed by using the handle with `readRawByHandle()` and `writeRawByHandle()`
@@ -6018,6 +6053,7 @@ export class Client extends EventEmitter<ClientEvents> {
   }
 
   /**
+   * **TODO - DOCUMENTATION ONGOING**
    * 
    * Sends multiple createVariableHandle() commands in one ADS packet
    * 
@@ -6161,6 +6197,8 @@ export class Client extends EventEmitter<ClientEvents> {
   }
 
   /**
+   * **TODO - DOCUMENTATION ONGOING**
+   * 
    * Deletes a variable handle that was previously created using `createVariableHandle()`
    * 
    * @param handle Variable handle to delete
@@ -6213,6 +6251,8 @@ export class Client extends EventEmitter<ClientEvents> {
 
 
   /**
+   * **TODO - DOCUMENTATION ONGOING**
+   * 
    * Sends multiple deleteVariableHandle() commands in one ADS packet
    * 
    * Deletes a variable handle that was previously created using `createVariableHandle()`
@@ -6309,6 +6349,8 @@ export class Client extends EventEmitter<ClientEvents> {
   }
 
   /**
+   * **TODO - DOCUMENTATION ONGOING**
+   * 
    * Reads raw byte data from the target system by previously created variable handle
    * 
    * @param handle Variable handle
@@ -6342,6 +6384,8 @@ export class Client extends EventEmitter<ClientEvents> {
   }
 
   /**
+   * **TODO - DOCUMENTATION ONGOING**
+   * 
    * Writes raw byte data to the target system by previously created variable handle
    * 
    * @param handle Variable handle
@@ -6368,6 +6412,8 @@ export class Client extends EventEmitter<ClientEvents> {
   }
 
   /**
+   * **TODO - DOCUMENTATION ONGOING**
+   * 
    * Reads raw data by symbol
    * 
    * @param symbol Symbol (acquired using `getSymbol()`)
@@ -6393,6 +6439,8 @@ export class Client extends EventEmitter<ClientEvents> {
   }
 
   /**
+   * **TODO - DOCUMENTATION ONGOING**
+   * 
    * Writes raw data by symbol
    * 
    * @param symbol Symbol (acquired using `getSymbol()`)
@@ -6418,6 +6466,8 @@ export class Client extends EventEmitter<ClientEvents> {
   }
 
   /**
+   * **TODO - DOCUMENTATION ONGOING**
+   * 
    * Invokes/calls a function block RPC method from PLC
    * 
    * Returns method return value and/or outputs (if any)
