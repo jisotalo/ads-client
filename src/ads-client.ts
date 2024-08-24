@@ -3634,7 +3634,7 @@ export class Client extends EventEmitter<ClientEvents> {
   /**
    * Starts the target PLC runtime. Same as pressing the green play button in TwinCAT XAE.
    * 
-   * **NOTE:** This requires that the target is a PLC runtime.
+   * **NOTE:** This requires that the target is a PLC runtime or has equivalent ADS protocol support.
    * 
    * @param targetOpts Optional target settings that override values in `settings`
    * 
@@ -3744,9 +3744,7 @@ export class Client extends EventEmitter<ClientEvents> {
   /**
    * Restarts the PLC runtime. Same as calling first {@link resetPlc}() and then {@link startPlc}()`
    * 
-   * @param targetOpts Optional target settings that override values in `settings`
-   *  
-   * @throws Throws an error if sending the command fails or if the target responds with an error.
+   * **NOTE:** This requires that the target is a PLC runtime or has equivalent ADS protocol support.
    * 
    * @example
    * ```js
@@ -3756,6 +3754,11 @@ export class Client extends EventEmitter<ClientEvents> {
    *  console.log("Error:", err);
    * }
    * ```
+   * 
+   * @param targetOpts Optional target settings that override values in `settings`
+   *  
+   * @throws Throws an error if sending the command fails or if the target responds with an error.
+   * 
    */
   public async restartPlc(targetOpts: Partial<AmsAddress> = {}): Promise<void> {
     if (!this.connection.connected) {
@@ -3780,11 +3783,6 @@ export class Client extends EventEmitter<ClientEvents> {
    * 
    * **NOTE:** As default, also reconnects the client afterwards to restore subscriptions.
    * 
-   * @param reconnect If `true`, connection is reconnected afterwards to restore subscriptions etc. (default: `true`)
-   * @param targetOpts Optional target settings that override values in `settings`
-   * 
-   * @throws Throws an error if sending the command fails or if the target responds with an error.
-   * 
    * @example
    * ```js
    * try {
@@ -3797,6 +3795,12 @@ export class Client extends EventEmitter<ClientEvents> {
    *  console.log("Error:", err);
    * }
    * ```
+   * 
+   * @param reconnect If `true`, connection is reconnected afterwards to restore subscriptions etc. (default: `true`)
+   * @param targetOpts Optional target settings that override values in `settings`
+   * 
+   * @throws Throws an error if sending the command fails or if the target responds with an error.
+   * 
    */
   public async setTcSystemToRun(reconnect: boolean = true, targetOpts: Partial<AmsAddress> = {}): Promise<void> {
     if (!this.connection.connected) {
@@ -3830,10 +3834,6 @@ export class Client extends EventEmitter<ClientEvents> {
    * 
    * **NOTE:** If the target is a PLC runtime, the connection might be lost.
    * 
-   * @param targetOpts Optional target settings that override values in `settings`
-   * 
-   * @throws Throws an error if sending the command fails or if the target responds with an error.
-   * 
    * @example
    * ```js
    * try {
@@ -3842,6 +3842,11 @@ export class Client extends EventEmitter<ClientEvents> {
    *  console.log("Error:", err);
    * }
    * ```
+   * 
+   * @param targetOpts Optional target settings that override values in `settings`
+   * 
+   * @throws Throws an error if sending the command fails or if the target responds with an error.
+   * 
    */
   public async setTcSystemToConfig(targetOpts: Partial<AmsAddress> = {}): Promise<void> {
     if (!this.connection.connected) {
@@ -3871,11 +3876,6 @@ export class Client extends EventEmitter<ClientEvents> {
    * 
    * **NOTE:** As default, also reconnects the client afterwards to restore subscriptions.
    * 
-   * @param reconnect If `true`, connection is reconnected afterwards to restore subscriptions etc. (default: `true`)
-   * @param targetOpts Optional target settings that override values in `settings`
-   * 
-   * @throws Throws an error if sending the command fails or if the target responds with an error.
-   * 
    * @example
    * ```js
    * try {
@@ -3888,6 +3888,12 @@ export class Client extends EventEmitter<ClientEvents> {
    *  console.log("Error:", err);
    * }
    * ```
+   * 
+   * @param reconnect If `true`, connection is reconnected afterwards to restore subscriptions etc. (default: `true`)
+   * @param targetOpts Optional target settings that override values in `settings`
+   * 
+   * @throws Throws an error if sending the command fails or if the target responds with an error.
+   * 
    */
   public async restartTcSystem(reconnect: boolean = true, targetOpts: Partial<AmsAddress> = {}): Promise<void> {
     if (!this.connection.connected) {
@@ -3909,7 +3915,16 @@ export class Client extends EventEmitter<ClientEvents> {
    * 
    * If `targetOpts` is used to override target, caching is always disabled.
    * 
-   * **NOTE:** This requires that the target is a PLC runtime.
+   * **NOTE:** This requires that the target is a PLC runtime or has equivalent ADS protocol support.
+   * 
+   * @example
+   * ```js
+   * try {
+   *  const symbol = await client.getSymbol('GVL_Test.ExampleStruct');
+   * } catch (err) {
+   *  console.log("Error:", err);
+   * }
+   * ```
    * 
    * @param path Symbol variable path at the target (such as `GVL_Test.ExampleStruct`)
    * @param targetOpts Optional target settings that override values in `settings`. If used, caching is disabled -> possible performance impact.
@@ -3996,6 +4011,17 @@ export class Client extends EventEmitter<ClientEvents> {
    * 
    * If `targetOpts` is used to override target, caching is always disabled.
    * 
+   * **NOTE:** This requires that the target is a PLC runtime or has equivalent ADS protocol support.
+   * 
+   * @example
+   * ```js
+   * try {
+   *  const dataType = await client.getDataType('ST_Struct');
+   * } catch (err) {
+   *  console.log("Error:", err);
+   * }
+   * ```
+   * 
    * @param name Data type name at the target (such as `ST_Struct`)
    * @param targetOpts Optional target settings that override values in `settings`. If used, caching is disabled -> possible performance impact.
    * 
@@ -4021,6 +4047,15 @@ export class Client extends EventEmitter<ClientEvents> {
    * This is the ADS protocol `ReadState` command.
    * 
    * See also {@link readPlcRuntimeState}() and {@link readTcSystemState}().
+   * 
+   * @example
+   * ```js
+   * try {
+   *  const state = await client.readState();
+   * } catch (err) {
+   *  console.log("Error:", err);
+   * }
+   * ```
    * 
    * @param targetOpts Optional target settings that override values in `settings`
    * 
@@ -4059,6 +4094,17 @@ export class Client extends EventEmitter<ClientEvents> {
    * This is the same as {@link readState}(), except that the result is saved to
    * the `metaData.plcRuntimeState`.
    *
+   * **NOTE:** This requires that the target is a PLC runtime or has equivalent ADS protocol support.
+   * 
+   * @example
+   * ```js
+   * try {
+   *  const plcState = await client.readPlcRuntimeState();
+   * } catch (err) {
+   *  console.log("Error:", err);
+   * }
+   * ```
+   * 
    * @param targetOpts Optional target settings that override values in `settings`
    * 
    * @throws Throws an error if sending the command fails or if the target responds with an error.
@@ -4101,6 +4147,15 @@ export class Client extends EventEmitter<ClientEvents> {
    * This is the same as {@link readState}(), except that the result is saved to
    * the `metaData.tcSystemState`.
    *
+   * @example
+   * ```js
+   * try {
+   *  const tcSystemState = await client.readTcSystemState();
+   * } catch (err) {
+   *  console.log("Error:", err);
+   * }
+   * ```
+   * 
    * @param targetOpts Optional target settings that override values in `settings`
    * 
    * @throws Throws an error if sending the command fails or if the target responds with an error.
@@ -4139,7 +4194,7 @@ export class Client extends EventEmitter<ClientEvents> {
    * 
    * Symbol version usually changes when the PLC software is updated with download.
    *
-   * **NOTE:** This requires that the target is a PLC runtime.
+   * **NOTE:** This requires that the target is a PLC runtime or has equivalent ADS protocol support.
    * 
    * Note that if `settings.rawClient` is not used, the symbol version should 
    * already be up-to-date in `metaData.plcSymbolVersion`, as the client
@@ -4148,6 +4203,15 @@ export class Client extends EventEmitter<ClientEvents> {
    * If `targetOpts` is not used to override target, the state is also
    * saved to the `metaData.plcSymbolVersion`.
    *
+   * @example
+   * ```js
+   * try {
+   *  const symbolVersion = await client.readPlcSymbolVersion();
+   * } catch (err) {
+   *  console.log("Error:", err);
+   * }
+   * ```
+   * 
    * @param targetOpts Optional target settings that override values in `settings`
    * 
    * @throws Throws an error if sending the command fails or if the target responds with an error.
@@ -4186,6 +4250,8 @@ export class Client extends EventEmitter<ClientEvents> {
    * enough time has passed (depending on settings).
    * 
    * **NOTE**: Consider using `subscribe()` instead, this is just a wrapper for it.
+   * 
+   * **NOTE:** This requires that the target is a PLC runtime or has equivalent ADS protocol support.
    * 
    * @example
    * ```js
@@ -4262,6 +4328,8 @@ export class Client extends EventEmitter<ClientEvents> {
    * enough time has passed (depending on settings).
    *
    * **NOTE**: Consider using `subscribe()` instead, this is just a wrapper for it.
+   * 
+   * **NOTE:** This requires that the target is a PLC runtime or has equivalent ADS protocol support.
    *
    * @example
    * ```js
@@ -4336,6 +4404,38 @@ export class Client extends EventEmitter<ClientEvents> {
    * 
    * Provided callback is called with the latest value when the value changes or when
    * enough time has passed (depending on settings).
+   * 
+   * **NOTE:** This requires that the target is a PLC runtime or has equivalent ADS protocol support.
+   * 
+   * @example
+   * ```js
+   * //Checks if value has changed every 100ms
+   * //Callback is called only when the value has changed
+   * await client.subscribe({
+   *  target: 'GVL_Test.ExampleStruct',
+   *  callback: (data, subscription) => {
+   *    console.log(`Value of ${subscription.symbol.name} has changed: ${data.value}`);
+   *  },
+   *  cycleTime: 100
+   * });
+   * ```
+   * 
+   * @example
+   * ```js
+   * //Checks if value has changed every 100ms
+   * //Callback is called only when the value has changed
+   * await client.subscribe({
+   *  target: {
+   *    indexGroup: 16448,
+   *    indexOffset: 414816,
+   *    size: 2
+   *  },
+   *  callback: (data, subscription) => {
+   *    console.log(`Value has changed: ${data.value}`);
+   *  },
+   *  cycleTime: 100
+   * });
+   * ```
    * 
    * @param options Subscription options
    * @param targetOpts Optional target settings that override values in `settings`. If used, caching
@@ -4512,7 +4612,7 @@ export class Client extends EventEmitter<ClientEvents> {
    * 
    * Upload information includes information about target PLC runtime data types and symbols (count and total data length).
    * 
-   * **NOTE:** This requires that the target is a PLC runtime.
+   * **NOTE:** This requires that the target is a PLC runtime or has equivalent ADS protocol support.
    * 
    * If `targetOpts` is not used to override target, the upload info is also
    * saved to the `metaData.plcUploadInfo`.
@@ -4605,11 +4705,11 @@ export class Client extends EventEmitter<ClientEvents> {
   }
 
   /**
-   * Returns all symbols in the target PLC runtime.
+   * Returns all symbols from the target PLC runtime.
    * 
-   * **NOTE:** This requires that the target is a PLC runtime.
+   * **NOTE:** This requires that the target is a PLC runtime or has equivalent ADS protocol support.
    * 
-   * **WARNING:** The returned object might be very large!
+   * **WARNING:** The returned object might be VERY large!
    * 
    * If `targetOpts` is not used to override target, the upload info is also
    * saved to the `metaData.symbols`.
@@ -4706,14 +4806,35 @@ export class Client extends EventEmitter<ClientEvents> {
   }
 
   /**
-   * Caches all symbols from target PLC runtime
+   * Caches all symbols from the target PLC runtime.
    * 
-   * Can be used to pre-cache all symbols to speed up communication. 
-   * Caching is only available for the original target configured in settings. 
+   * Can be used to pre-cache all symbols to speed up communication.
+   * Caching is only available for the original target configured in the settings. 
    * 
-   * Wrapper for `getSymbols()` (calling it without overridden target has the same effect)
+   * If caching is disabled using `settings.disableCaching` nothing is done.
+   * 
+   * Calling `getSymbols()` without `targetOpts` has the same effect.
+   * 
+   * **NOTE:** This requires that the target is a PLC runtime or has equivalent ADS protocol support.
+   * 
+   * @example
+   * ```js
+   * try {
+   *  await client.cacheSymbols();
+   *  //client.metaData.plcSymbols now has all PLC runtime symbols
+   * } catch (err) {
+   *  console.log("Error:", err);
+   * }
+   * ```
+   * 
+   * @throws Throws an error if sending the command fails or if the target responds with an error.
    */
   public async cacheSymbols() {
+    if (this.settings.disableCaching) {
+      this.debug(`cacheSymbols(): Caching is disabled, doing nothing`);
+      return;
+    }
+
     this.debug(`cacheSymbols(): Caching all symbols`);
 
     try {
@@ -4728,18 +4849,34 @@ export class Client extends EventEmitter<ClientEvents> {
   }
 
   /**
-   * Reads and parses ALL target PLC data type data.
+   * Returns all target PLC runtime data types.
    * 
-   * If target is not overridden, also caches the result.
+   * If `targetOpts` is not used to override target and `settings.disableCaching` is not set, 
+   * the results are cached.
    * 
-   * **IMPORTANT:** These data types do not have full construction with deep-level subitems.
-   * To get full data type declaration for specific data type, use `getDataType()`.
+   * **WARNING: The returned object might be VERY large!**
    * 
-   * **WARNING: The returned object might be VERY large**
+   * As default, the results do not have subitems constructred, unlike when calling `getDataType()`.
+   * To get all data types with full constructions (children and their children and so on), set parameter
+   * `fullTypes` to `true`. **WARNING: This heavily increases the result size and CPU usage.**
    * 
+   * @example
+   * ```js
+   * try {
+   *  const dataTypes = await client.getDataTypes();
+   *  //with built data types
+   *  const fullDataTypes = await client.getDataTypes(true);
+   * } catch (err) {
+   *  console.log("Error:", err);
+   * }
+   * ```
+   * 
+   * @param buildFullTypes If `true`, all data types are built to include all subitems (and their subitems and so on)
    * @param targetOpts Optional target settings that override values in `settings`
+   * 
+   * @throws Throws an error if sending the command fails or if the target responds with an error.
    */
-  public async getDataTypes(targetOpts: Partial<AmsAddress> = {}): Promise<AdsDataTypeContainer> {
+  public async getDataTypes(buildFullTypes?: boolean, targetOpts: Partial<AmsAddress> = {}): Promise<AdsDataTypeContainer> {
     if (!this.connection.connected) {
       throw new ClientError(`getDataTypes(): Client is not connected. Use connect() to connect to the target first.`);
     }
@@ -4800,12 +4937,20 @@ export class Client extends EventEmitter<ClientEvents> {
 
       if (!targetOpts.adsPort && !targetOpts.amsNetId) {
         //Target is not overridden -> save to metadata
-        this.metaData.plcDataTypes = dataTypes;
+        this.metaData.plcDataTypes = { ...dataTypes };
         this.metaData.allPlcDataTypesCached = true;
         this.debug(`getDataTypes(): All data types read and cached (data type count ${count})`);
 
       } else {
         this.debug(`getDataTypes(): All symbols read (data type count ${count})`);
+      }
+
+      if (buildFullTypes) {
+        this.debug(`getDataTypes(): Building all data types (buildFullTypes set)`);
+
+        for (let dataType in dataTypes) {
+          dataTypes[dataType] = await this.getDataType(dataType);
+        }
       }
 
       return dataTypes;
@@ -4817,12 +4962,28 @@ export class Client extends EventEmitter<ClientEvents> {
   }
 
   /**
-   * Caches all data types from target PLC runtime
+   * Caches all data types from the target PLC runtime.
    * 
-   * Can be used to pre-cache all data types to speed up communication. 
-   * Caching is only available for the original target configured in settings. 
+   * Can be used to pre-cache all data types to speed up communication.
+   * Caching is only available for the original target configured in the settings.  
    * 
-   * Wrapper for `getDataTypes()` (calling it without overridden target has the same effect)
+   * If caching is disabled using `settings.disableCaching` nothing is done.
+   * 
+   * Calling `getDataTypes()` without `targetOpts` has the same effect.
+   * 
+   * **NOTE:** This requires that the target is a PLC runtime or has equivalent ADS protocol support.
+   * 
+   * @example
+   * ```js
+   * try {
+   *  await client.cacheDataTypes();
+   *  //client.metaData.plcDataTypes now has all PLC runtime data types
+   * } catch (err) {
+   *  console.log("Error:", err);
+   * }
+   * ```
+   * 
+   * @throws Throws an error if sending the command fails or if the target responds with an error.
    */
   public async cacheDataTypes() {
     this.debug(`cacheDataTypes(): Caching all data types`);
@@ -5503,6 +5664,7 @@ export class Client extends EventEmitter<ClientEvents> {
    * **NOTE:** Do not use `autoFill` for `UNION` types, it works without errors but the result isn't probably the desired one
    * 
    * @param path Variable path in the PLC to read (such as `GVL_Test.ExampleStruct`)
+   * @param value Value to write
    * @param targetOpts Optional target settings that override values in `settings`
    * @param autoFill If true and data type is a container (`STRUCT`, `FUNCTION_BLOCK` etc.), missing properties are automatically **set to default values** (usually `0` or `''`) 
    * 
@@ -5606,7 +5768,8 @@ export class Client extends EventEmitter<ClientEvents> {
    * 
    * **NOTE:** Do not use `autoFill` for `UNION` types, it works without errors but the result isn't probably the desired one
    * 
-   * @param path Variable path in the PLC to read (such as `GVL_Test.ExampleStruct`)
+   * @param symbol Symbol (acquired using `getSymbol()`)
+   * @param value Value to write
    * @param targetOpts Optional target settings that override values in `settings`
    * @param autoFill If true and data type is a container (`STRUCT`, `FUNCTION_BLOCK` etc.), missing properties are automatically **set to default values** (usually `0` or `''`) 
    * 
