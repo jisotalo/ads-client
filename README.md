@@ -12,7 +12,7 @@ Connect to a Beckhoff TwinCAT automation system using the ADS protocol from a No
 
 ## v2 project status
 
-**24.08.2024:** Beta 1 released! 
+**26.08.2024:** Beta 2 released! 
 
 All breaking changes are (hopefully) now done.
 
