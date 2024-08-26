@@ -26,7 +26,7 @@ This document contains breaking changes between ads-client major versions.
       <td valign="top">
         <ul>
           <li><code>checkStateInterval</code> renamed to <code>connectionCheckInterval</code></li>
-          <li><code>disableSymbolVersionMonitoring</code> renamed to <code>monitorPlcSymbolVersion</code></li>
+          <li><code>disableSymbolVersionMonitoring</code> renamed to <code>monitorPlcSymbolVersion</code> (and operation inverted)</li>
           <li><code>bareClient</code> renamed to <code>rawClient</code></li>
           <li><code>disableBigInt</code> removed</li>
         </ul>
@@ -218,13 +218,13 @@ This document contains breaking changes between ads-client major versions.
       </td>
       <td valign="top">
         <ul>
-          <li>Renamed to <code>subscribeSymbol()</code></li>
+          <li>Renamed to <code>subscribeValue()</code></li>
           <li>Default cycle time changed 10ms -> 200ms (as in <a href="https://www.nuget.org/packages/Beckhoff.TwinCAT.Ads">Beckhoff.TwinCAT.Ads</a>)</li>
         </ul>
       </td>
       <td valign="top">
         <ul>
-          <li>Rename all <code>subscribe()</code> calls to <code>subscribeSymbol()</code></li>
+          <li>Rename all <code>subscribe()</code> calls to <code>subscribeValue()</code></li>
           <li>Check if default cycle time was used and set <code>cycleTime</code> it if needed</li>
         </ul>
         NOTE: Consider using the new <code>subscribe()</code> instead

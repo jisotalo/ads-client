@@ -1718,7 +1718,7 @@ export class Client extends EventEmitter<ClientEvents> {
           for (let sample of stamp.samples) {
             //Try to find the subscription
             const key = ADS.amsAddressToString(packet.ams.sourceAmsAddress);
-            const subscription = this.activeSubscriptions[key][sample.notificationHandle];
+            const subscription = this.activeSubscriptions[key]?.[sample.notificationHandle];
 
             if (subscription) {
               this.debug(`onAdsCommandReceived(): Notification received from ${key} for handle ${sample.notificationHandle} (%o)`, subscription.settings.target)
@@ -1734,12 +1734,13 @@ export class Client extends EventEmitter<ClientEvents> {
                   }
                 })
                 .catch(err => {
-                  this.debug(`onAdsCommandReceived(): Ads notification received but parsing Javascript object failed: %o`, err);
-                  this.emit('client-error', new ClientError(`onAdsCommandReceived(): Ads notification received but parsing data to Javascript object failed. Subscription: ${JSON.stringify(subscription)}`, err));
+                  this.debug(`onAdsCommandReceived(): Notification received but parsing Javascript object failed: %o`, err);
+                  this.emit('client-error', new ClientError(`onAdsCommandReceived(): Ntification received but parsing data to Javascript object failed. Subscription: ${JSON.stringify(subscription)}`, err));
                 });
+              
             } else {
-              this.debugD(`onAdsCommandReceived(): Ads notification received with unknown notificationHandle "${sample.notificationHandle}". Use unsubscribe() to save resources`);
-              this.emit('client-error', new ClientError(`onAdsCommandReceived(): Ads notification received with unknown notificationHandle (${sample.notificationHandle}). Use unsubscribe() to save resources.`));
+              this.debugD(`onAdsCommandReceived(): Notification received with unknown handle ${sample.notificationHandle} (${key}). Use unsubscribe() to save resources`);
+              this.emit('client-error', new ClientError(`onAdsCommandReceived(): Notification received with unknown handle ${sample.notificationHandle} (${key}). Use unsubscribe() to save resources.`));
             }
           }
         }
@@ -4271,13 +4272,13 @@ export class Client extends EventEmitter<ClientEvents> {
   }
 
   /**
-   * Subscribes to symbol value change notifications (ADS notifications) by variable path,
+   * Subscribes to value change notifications (ADS notifications) by a variable path,
    * such as `GVL_Test.ExampleStruct`.
    * 
    * Provided callback is called with the latest value of the symbol when the value changes or when
    * enough time has passed (depending on settings).
    * 
-   * **NOTE**: Consider using `subscribe()` instead, this is just a wrapper for it.
+   * Check also `subscribe()` instead, this is just a wrapper for it.
    * 
    * **NOTE:** This requires that the target is a PLC runtime or has equivalent ADS protocol support.
    * 
@@ -4285,7 +4286,7 @@ export class Client extends EventEmitter<ClientEvents> {
    * ```js
    * //Checks if value has changed every 100ms
    * //Callback is called only when the value has changed
-   * await client.subscribeSymbol(
+   * await client.subscribeValue(
    *  'GVL_Test.ExampleStruct.',
    *  (data, subscription) => {
    *   console.log(`Value of ${subscription.symbol.name} has changed: ${data.value}`);
@@ -4324,16 +4325,16 @@ export class Client extends EventEmitter<ClientEvents> {
    * 
    * @throws Throws an error if sending the command fails or if the target responds with an error.
    * 
-   * @template T In Typescript, the data type of the value, for example `subscribeSymbol<number>(...)` or `subscribeSymbol<ST_TypedStruct>(...)`. (default: `any`)
+   * @template T In Typescript, the data type of the value, for example `subscribeValue<number>(...)` or `subscribeValue<ST_TypedStruct>(...)`. (default: `any`)
    * 
    */
-  public subscribeSymbol<T = any>(path: string, callback: SubscriptionCallback<T>, cycleTime?: number, sendOnChange?: boolean, maxDelay?: number, targetOpts: Partial<AmsAddress> = {}): Promise<ActiveSubscription<T>> {
+  public subscribeValue<T = any>(path: string, callback: SubscriptionCallback<T>, cycleTime?: number, sendOnChange?: boolean, maxDelay?: number, targetOpts: Partial<AmsAddress> = {}): Promise<ActiveSubscription<T>> {
     if (!this.connection.connected) {
-      throw new ClientError(`subscribeSymbol(): Client is not connected. Use connect() to connect to the target first.`);
+      throw new ClientError(`subscribeValue(): Client is not connected. Use connect() to connect to the target first.`);
     }
 
     try {
-      this.debug(`subscribeSymbol(): Subscribing to ${path}`);
+      this.debug(`subscribeValue(): Subscribing to ${path}`);
 
       return this.subscribe<T>({
         target: path,
@@ -4344,8 +4345,8 @@ export class Client extends EventEmitter<ClientEvents> {
       }, targetOpts);
 
     } catch (err) {
-      this.debug(`subscribeSymbol(): Subscribing to ${path} failed: %o`, err);
-      throw new ClientError(`subscribeSymbol(): Subscribing to ${path} failed`, err);
+      this.debug(`subscribeValue(): Subscribing to ${path} failed: %o`, err);
+      throw new ClientError(`subscribeValue(): Subscribing to ${path} failed`, err);
     }
   }
 
@@ -4355,7 +4356,7 @@ export class Client extends EventEmitter<ClientEvents> {
    * Provided callback is called with the latest value when the value changes or when
    * enough time has passed (depending on settings).
    *
-   * **NOTE**: Consider using `subscribe()` instead, this is just a wrapper for it.
+   * Check also `subscribe()` instead, this is just a wrapper for it.
    * 
    * **NOTE:** This requires that the target is a PLC runtime or has equivalent ADS protocol support.
    *

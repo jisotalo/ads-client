@@ -3342,11 +3342,11 @@ describe('subscriptions (ADS notifications)', () => {
     await subscription.unsubscribe();
   });
 
-  test('subscribing using subscribeSymbol()', async () => {
+  test('subscribing using subscribeValue()', async () => {
     await new Promise(async (resolve, reject) => {
       let startTime = Date.now();
 
-      await client.subscribeSymbol(
+      await client.subscribeValue(
         'GVL_Subscription.Numericvalue_Constant',
         async (data, subscription) => {
           await subscription.unsubscribe();
