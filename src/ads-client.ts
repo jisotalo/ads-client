@@ -1737,7 +1737,7 @@ export class Client extends EventEmitter<ClientEvents> {
                   this.debug(`onAdsCommandReceived(): Notification received but parsing Javascript object failed: %o`, err);
                   this.emit('client-error', new ClientError(`onAdsCommandReceived(): Ntification received but parsing data to Javascript object failed. Subscription: ${JSON.stringify(subscription)}`, err));
                 });
-              
+
             } else {
               this.debugD(`onAdsCommandReceived(): Notification received with unknown handle ${sample.notificationHandle} (${key}). Use unsubscribe() to save resources`);
               this.emit('client-error', new ClientError(`onAdsCommandReceived(): Notification received with unknown handle ${sample.notificationHandle} (${key}). Use unsubscribe() to save resources.`));
@@ -4351,7 +4351,7 @@ export class Client extends EventEmitter<ClientEvents> {
   }
 
   /**
-   * Subscribes to raw value change notifications (ADS notifications) by raw ADS address (index group, index offset and data length).
+   * Subscribes to raw value change notifications (ADS notifications) by a raw ADS address (index group, index offset and data length).
    * 
    * Provided callback is called with the latest value when the value changes or when
    * enough time has passed (depending on settings).
@@ -5029,16 +5029,30 @@ export class Client extends EventEmitter<ClientEvents> {
   }
 
   /**
-   * **TODO - DOCUMENTATION ONGOING**
+   * Reads raw data from the target system by a raw ADS address (index group, index offset and data length).
    * 
-   * Reads raw byte data from the target system by provided index group, index offset and data length (bytes)
-   * 
-   * This is the `ADS read` command in ADS protocol.
+   * This is the ADS protocol `Read` command.
    *  
+   * @example
+   * ```js
+   * try {
+   *  const data = await client.readRaw(16448, 414816, 2);
+   *  console.log(data); //<Buffer ff 7f>
+   * 
+   *  const converted = await client.convertFromRaw(data, 'INT');
+   *  console.log(converted); //32767
+   * 
+   * } catch (err) {
+   *  console.log("Error:", err);
+   * }
+   * ```
+   * 
    * @param indexGroup Index group (address) of the data to read
    * @param indexOffset Index offset (address) of the data to read
    * @param size Data length to read (bytes)
    * @param targetOpts Optional target settings that override values in `settings`
+   * 
+   * @throws Throws an error if sending the command fails or if the target responds with an error.
    */
   public async readRaw(indexGroup: number, indexOffset: number, size: number, targetOpts: Partial<AmsAddress> = {}): Promise<Buffer> {
     if (!this.connection.connected) {
@@ -5080,16 +5094,28 @@ export class Client extends EventEmitter<ClientEvents> {
   }
 
   /**
-   * **TODO - DOCUMENTATION ONGOING**
+   * Writes raw data to the target system by a raw ADS address (index group, index offset and data length).
    * 
-   * Writes raw byte data to the target system by provided index group and index offset.
+   * This is the ADS protocol `Write` command.
    * 
-   * This is the `ADS write` command in ADS protocol.
+   * @example
+   * ```js
+   * try {
+   *  const data = await client.convertToRaw(32767, 'INT');
+   *  console.log(data); //<Buffer ff 7f>
+   * 
+   *  await client.writeRaw(16448, 414816, data);
+   * } catch (err) {
+   *  console.log("Error:", err);
+   * }
+   * ```
    *  
    * @param indexGroup Index group (address) of the data to write to
    * @param indexOffset Index offset (address) of the data to write to
    * @param value Data to write
    * @param targetOpts Optional target settings that override values in `settings`
+   * 
+   * @throws Throws an error if sending the command fails or if the target responds with an error.
    */
   public async writeRaw(indexGroup: number, indexOffset: number, value: Buffer, targetOpts: Partial<AmsAddress> = {}): Promise<void> {
     if (!this.connection.connected) {
@@ -5133,16 +5159,45 @@ export class Client extends EventEmitter<ClientEvents> {
   }
 
   /**
-   * **TODO - DOCUMENTATION ONGOING**
+   * Sends multiple `readRaw()` commands in one ADS packet.
    * 
-   * Sends multiple readRaw() commands in one ADS packet
+   * Reads raw data from the target system by a raw ADS addresses (index group, index offset and data length).
+   * Results are returned for each command separately - see {@link ReadRawMultiResult} for details. 
    * 
-   * Reads raw byte data from the target system by provided index group, index offset and data length (bytes)
+   * Uses ADS sum command under the hood (better and faster performance). 
+   * See [Beckhoff Information System](https://infosys.beckhoff.com/english.php?content=../content/1033/tc3_adsdll2/9007199379576075.html&id=9180083787138954512) for more info.
    * 
-   * Uses ADS sum command under the hood (better performance)
+   * @example
+   * ```js
+   * try {
+   *  const results = await client.readRawMulti([
+   *    {
+   *      indexGroup: 16448,
+   *      indexOffset: 414816,
+   *      size: 2
+   *    },
+   *    {
+   *      indexGroup: 16448,
+   *      indexOffset: 414900,
+   *      size: 128
+   *    }
+   *  ]);
+   *  
+   *  if(results[0].success) {
+   *    console.log(`First result: ${results[0].value}`); //First result: <Buffer ff 7f>
+   *  } else {
+   *    console.log(`First read command failed: ${results[0].errorStr}`);
+   *  }
+   * 
+   * } catch (err) {
+   *  console.log("Error:", err);
+   * }
+   * ```
    * 
    * @param commands Array of read commands
    * @param targetOpts Optional target settings that override values in `settings`
+   * 
+   * @throws Throws an error if sending the command fails or if the target responds with an error.
    */
   public async readRawMulti(commands: ReadRawMultiCommand[], targetOpts: Partial<AmsAddress> = {}): Promise<ReadRawMultiResult[]> {
     if (!this.connection.connected) {
@@ -5235,16 +5290,50 @@ export class Client extends EventEmitter<ClientEvents> {
   }
 
   /**
-   * **TODO - DOCUMENTATION ONGOING**
+   * Sends multiple `writeRaw()` commands in one ADS packet.
    * 
-   * Sends multiple writeRaw() commands in one ADS packet
+   * Writes raw data to the target system by a raw ADS addresses (index group and index offset).
+   * Results are returned for each command separately - see {@link WriteRawMultiResult} for details.
    * 
-   * Writes raw byte data to the target system by provided index group and index offset.
+   * Uses ADS sum command under the hood (better and faster performance). 
+   * See [Beckhoff Information System](https://infosys.beckhoff.com/english.php?content=../content/1033/tc3_adsdll2/9007199379576075.html&id=9180083787138954512) for more info.
+   *  
+   * @example
+   * ```js
+   * try {
+   *  const data1 = await client.convertToRaw(32767, 'INT');
+   *  console.log(data1); //<Buffer ff 7f>
    * 
-   * Uses ADS sum command under the hood (better performance)
+   *  const data2 = Buffer.alloc(128); //example
+   * 
+   *  const results = await client.writeRawMulti([
+   *    {
+   *      indexGroup: 16448,
+   *      indexOffset: 414816,
+   *      value: data1
+   *    },
+   *    {
+   *      indexGroup: 16448,
+   *      indexOffset: 414900,
+   *      value: data2
+   *    }
+   *  ]);
+   *  
+   *  if(results[0].success) {
+   *    console.log(`First write command successful`); 
+   *  } else {
+   *    console.log(`First write command failed: ${results[0].errorStr}`);
+   *  }
+   * 
+   * } catch (err) {
+   *  console.log("Error:", err);
+   * }
+   * ```
    * 
    * @param commands Array of write commands
    * @param targetOpts Optional target settings that override values in `settings`
+   * 
+   * @throws Throws an error if sending the command fails or if the target responds with an error.
    */
   public async writeRawMulti(commands: WriteRawMultiCommand[], targetOpts: Partial<AmsAddress> = {}): Promise<WriteRawMultiResult[]> {
     if (!this.connection.connected) {
