@@ -5421,16 +5421,37 @@ export class Client extends EventEmitter<ClientEvents> {
   }
 
   /**
-   * **TODO - DOCUMENTATION ONGOING**
+   * Reads raw data from the target system by variable path (such as `GVL_Test.ExampleStruct`).
    * 
-   * Reads raw byte data from the target system by symbol path.
+   * Supports also reading `POINTER` and `REFERENCE` values (see example).
    * 
-   * Supports also reading POINTER and REFERENCE values by using deference operator in path (`^`)
-   * 
-   * This uses the ADS command `READ_SYMVAL_BYNAME` under the hood
+   * This uses the ADS `READ_SYMVAL_BYNAME` under the hood, so only one
+   * round-trip is needed.
    *  
+   * @example
+   * ```js
+   * try {
+   *  const data = await client.readRawByPath('GVL_Read.StandardTypes.INT_');
+   *  console.log(data); //<Buffer ff 7f>
+   * 
+   *  const converted = await client.convertFromRaw(data, 'INT');
+   *  console.log(converted); //32767
+   * 
+   * //Reading a POINTER value (Note the dereference operator ^)
+   * const ptrValue = await client.readRawByPath('GVL_Read.ComplexTypes.POINTER_^');
+   * 
+   * //Reading a REFERENCE value
+   * const refValue = await client.readRawByPath('GVL_Read.ComplexTypes.REFERENCE_');
+   * 
+   * } catch (err) {
+   *  console.log("Error:", err);
+   * }
+   * ```
+   * 
    * @param path Variable path in the PLC to read (such as `GVL_Test.ExampleStruct`)
    * @param targetOpts Optional target settings that override values in `settings`
+   * 
+   * @throws Throws an error if sending the command fails or if the target responds with an error.
    */
   public async readRawByPath(path: string, targetOpts: Partial<AmsAddress> = {}): Promise<Buffer> {
     if (!this.connection.connected) {
@@ -5481,17 +5502,18 @@ export class Client extends EventEmitter<ClientEvents> {
   }
 
   /**
-   * **TODO - DOCUMENTATION ONGOING**
+   * Writes raw data to the target system by variable path (such as `GVL_Test.ExampleStruct`).
    * 
-   * Writes raw byte data to the target system by symbol path.
+   * Supports also writing POINTER and REFERENCE values (see example).
    * 
-   * Supports also reading POINTER and REFERENCE values by using deference operator in path (`^`)
-   * 
-   * Unlike `readRawByPath()`, this uses variable handles under the hood, the as there is no direct ADS command available for this.
+   * NOTE: Unlike with `{@link readRawByPath}()`, there is no direct ADS command available. 
+   * This uses variable handles under the hood, so multiple ADS commands are used.
    *  
-   * @param path Variable path in the PLC to read (such as `GVL_Test.ExampleStruct`)
+   * @param path Variable path in the PLC to write (such as `GVL_Test.ExampleStruct`)
    * @param value Data to write
    * @param targetOpts Optional target settings that override values in `settings`
+   * 
+   * @throws Throws an error if sending the command fails or if the target responds with an error.
    */
   public async writeRawByPath(path: string, value: Buffer, targetOpts: Partial<AmsAddress> = {}): Promise<void> {
     if (!this.connection.connected) {
@@ -5504,12 +5526,12 @@ export class Client extends EventEmitter<ClientEvents> {
       let handle = null;
 
       try {
-        handle = await this.createVariableHandle(path);
-        await this.writeRawByHandle(handle, value);
+        handle = await this.createVariableHandle(path, targetOpts);
+        await this.writeRawByHandle(handle, value, targetOpts);
 
       } finally {
         if (handle) {
-          await this.deleteVariableHandle(handle);
+          await this.deleteVariableHandle(handle, targetOpts);
         }
       }
 
