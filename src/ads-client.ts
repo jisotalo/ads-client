@@ -1735,7 +1735,7 @@ export class Client extends EventEmitter<ClientEvents> {
                 })
                 .catch(err => {
                   this.debug(`onAdsCommandReceived(): Notification received but parsing Javascript object failed: %o`, err);
-                  this.emit('client-error', new ClientError(`onAdsCommandReceived(): Ntification received but parsing data to Javascript object failed. Subscription: ${JSON.stringify(subscription)}`, err));
+                  this.emit('client-error', new ClientError(`onAdsCommandReceived(): Notification received but parsing data to Javascript object failed. Subscription: ${JSON.stringify(subscription)}`, err));
                 });
 
             } else {
