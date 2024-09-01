@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added `warning` event to listen for console warnings
 - Bugfix: `writeRawByPath()` didn't use the `targetOpts` parameter
 - Renamed `ReadWriteRawMultiCommand` property `writeData` to `value`
+- Type `ClientEvents` renamed to `AdsClientEvents`
 
 ## [2.0.0-beta.2] - 26.08.2024
 - Changed `subscribeSymbol()` -> `subscribeValue()`

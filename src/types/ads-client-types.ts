@@ -13,85 +13,171 @@ export type DebugLevel = 0 | 1 | 2 | 3;
  * 
  * @category Types
  */
-export interface ClientEvents {
+export interface AdsClientEvents {
   /**
-   * Emitted when client has connected to the target
+   * Emitted when the client has connected to the target.
    * 
+   * **Parameters:**
    * - `connection`: Active connection information
+   * 
+   * @example
+   * ```js
+   * client.on('connect', (connection) => {
+   *  console.log('Connected:', connection);
+   * });
+   * ``` 
    */
   'connect': [connection: AdsClientConnection],
 
   /**
-   * Emitted when client has disconnected from the target
+   * Emitted when the client has disconnected from the target.
    * 
+   * **Parameters:**
    * - `isReconnecting`: True if disconnect happened during reconnecting
+   * 
+   * @example
+   * ```js
+   * client.on('disconnect', (isReconnecting) => {
+   *  console.log('Disconnected - is reconnecting:', isReconnecting);
+   * });
+   * ``` 
    */
   'disconnect': [isReconnecting: boolean],
 
   /**
-   * Emitted when client has reconnected to the target after a disconnection
+   * Emitted when the client has reconnected to the target after a disconnection.
    * 
+   * **Parameters:**
    * - `allSubscriptionsRestored`: True if all subscriptions were restored successfully
    * - `unrestoredSubscriptions`: Array of subscription paths that failed to be restored
+   * 
+   * @example
+   * ```js
+   * client.on('reconnect', (allSubscriptionsRestored, unrestoredSubscriptions) => {
+   *  if(allSubscriptionsRestored) {
+   *    console.log('Reconnected and all subscriptions restored');
+   *  } else {
+   *    console.log('Reconnected but following subscriptions were not restored:', unrestoredSubscriptions);
+   *  }
+   * });
+   * ``` 
    */
   'reconnect': [allSubscriptionsRestored: boolean, unrestoredSubscriptions: string[]],
 
   /**
-   * Emitted when client has lost the connection to the target
+   * Emitted when the client has lost the connection to the target.
    * 
+   * **Parameters:**
    * - `socketFailure`: True if connection was lost due to a socket/tcp problem
+   * 
+   * @example
+   * ```js
+   * client.on('connectionLost', (socketFailure) => {
+   *  console.log('Connection to the target was lost. TCP socket failure:', socketFailure);
+   * });
+   * ``` 
    */
   'connectionLost': [socketFailure: boolean],
 
   /**
-   * Emitted when PLC runtime symbol version has changed
+   * Emitted when the target PLC runtime symbol version has changed.
    * 
+   * **Parameters:**
    * - `version`: New PLC runtime symbol version
    * - `previousVersion`: Previous PLC runtime symbol version (if known)
+   * 
+   * @example
+   * ```js
+   * client.on('plcSymbolVersionChange', (version, previousVersion) => {
+   *  console.log(`Target PLC runtime symbol version changed from ${previousVersion} to ${version}`);
+   * });
+   * ``` 
    */
   'plcSymbolVersionChange': [version: number, previousVersion?: number],
 
   /**
-   * Emitted when PLC runtime state has changed
+   * Emitted when the target PLC runtime state has changed
    * 
+   * **Parameters:**
    * - `state`: New PLC runtime state
    * - `previousState`: Previous PLC runtime state (if known)
+   * 
+   * @example
+   * ```js
+   * client.on('plcRuntimeStateChange', (state, previousState) => {
+   *  console.log(`Target PLC state has changed from ${previousState} to ${state}`);
+   * });
+   * ``` 
    */
   'plcRuntimeStateChange': [state: AdsState, previousState?: AdsState],
 
   /**
-   * Emitted when TwinCAT system state has changed
+   * Emitted when the target TwinCAT system state has changed.
    * 
+   * **Parameters:**
    * - `state`: New TwinCAT system state
    * - `previousState`: Previous TwinCAT system state (if known)
+   * 
+   * @example
+   * ```js
+   * client.on('tcSystemStateChange', (state, previousState) => {
+   *  console.log(`Target TwinCAT system state has changed from ${previousState} to ${state}`);
+   * });
+   * ``` 
    */
   'tcSystemStateChange': [state: AdsState, previousState?: AdsState],
 
   /**
-   * Emitted when AMS router state has changed
+   * Emitted when the AMS router state has changed.
    * 
+   * **Parameters:**
    * - `state`: New AMS router state
    * - `previousState`: Previous AMS router state (if known)
+   * 
+   * @example
+   * ```js
+   * client.on('routerStateChange', (state, previousState) => {
+   *  console.log(`TwinCAT AMS router state has changed from ${previousState} to ${state}`);
+   * });
+   * ``` 
    */
   'routerStateChange': [state: AmsRouterState, previousState?: AmsRouterState],
 
   /**
-   * Emitted when the client has had an error, such as
-   *  - unknown ADS notification received
-   *  - handling ADS notification failed
-   *  - unknown ADS command received
+   * Emitted when the client has had an error, such as:
    * 
+   * - handling received ADS notification failed
+   * - unknown ADS command received
+   * 
+   * **Parameters:**
    * - `error`: Error that was thrown
+   * 
+   * @example
+   * ```js
+   * client.on('client-error'', (error) => {
+   *  console.log('Error occured:', error);
+   * });
+   * ``` 
    */
   'client-error': [error: ClientError]
 
   /**
-   * Emitted when the client encounters non-critical abnormal events, such as
-   *  - connected to a non-running TwinCAT system
-   *  - re-connection attempted after connection loss
-   *  - lost connection re-established
+   * Emitted when the client encounters a non-critical abnormal event, such as:
+   * 
+   * - connected to a non-running TwinCAT system
+   * - re-connection attempted after connection loss
+   * - lost connection re-established
+   * - unknown ADS notification received
    *
+   * **Parameters:**
    * - `message`: Warning message
+   * 
+   * @example
+   * ```js
+   * client.on('warning', (message) => {
+   *  console.log('WARNING:', message);
+   * });
+   * ``` 
    */
   'warning': [message: string]
 }

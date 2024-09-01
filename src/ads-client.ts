@@ -61,9 +61,9 @@ import type {
   ReadWriteRawMultiResult,
   ReadWriteRawMultiCommand,
   WriteRawMultiCommand,
-  ClientEvents,
   SubscriptionCallback,
-  DebugLevel
+  DebugLevel,
+  AdsClientEvents
 } from "./types/ads-client-types";
 
 import {
@@ -123,8 +123,10 @@ export * as ADS from './ads-commons';
  * However, a single client instance can also be used to communicate with 
  * multiple endpoints using the `targetOpts` parameter available in all methods.
  * 
- * @example
+ * Client also emits different events, such as `client.on('connect', ...)`. 
+ * See {@link AdsClientEvents} for all available events.
  * 
+ * @example
  * ```js
  * const client = new Client({
  *  targetAmsNetId: "192.168.4.1.1.1",
@@ -134,7 +136,7 @@ export * as ADS from './ads-commons';
  * 
  * @category Client
  */
-export class Client extends EventEmitter<ClientEvents> {
+export class Client extends EventEmitter<AdsClientEvents> {
   /**
    * Debug instance for debug level 1.
    */
