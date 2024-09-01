@@ -3462,19 +3462,19 @@ describe('miscellaneous', () => {
           indexGroup: ADS.ADS_RESERVED_INDEX_GROUPS.SymbolValueByName,
           indexOffset: 0,
           size: 0xFFFF,
-          writeData: path
+          value: path
         },
         {
           indexGroup: ADS.ADS_RESERVED_INDEX_GROUPS.SymbolValueByName,
           indexOffset: 0,
           size: 0xFFFF,
-          writeData: path2
+          value: path2
         },
         {
           indexGroup: ADS.ADS_RESERVED_INDEX_GROUPS.SymbolValueByName,
           indexOffset: 0,
           size: 0xFFFF,
-          writeData: path3
+          value: path3
         }
       ])
 

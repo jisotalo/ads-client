@@ -5570,8 +5570,8 @@ export class Client extends EventEmitter<ClientEvents> {
     let pos = 0;
 
     //0..3 IndexGroup 
-    data.writeUInt32LE(ADS.ADS_RESERVED_INDEX_GROUPS.SymbolValueByName, pos);
     pos += 4;
+    data.writeUInt32LE(ADS.ADS_RESERVED_INDEX_GROUPS.SymbolValueByName, pos);
 
     //4..7 IndexOffset
     data.writeUInt32LE(0, pos);
@@ -5670,26 +5670,42 @@ export class Client extends EventEmitter<ClientEvents> {
   }
 
   /**
-   * **TODO - DOCUMENTATION ONGOING**
+   * Writes raw data to the target system by a raw ADS address (index group, index offset) 
+   * and reads the result as raw data.
    * 
-   * Writes raw data to the target and reads the result as raw data
+   * This is the ADS protocol `ReadWrite` command.
    * 
-   * Uses `ADS ReadWrite` command
+   * @example
+   * ```js
+   * const { ADS } = require('../dist/ads-client');
+   * 
+   * try {
+   *  //Reading raw value by symbol path (= same as readRawByPath())
+   *  const path = ADS.encodeStringToPlcStringBuffer('GVL_Read.StandardTypes.INT_');
+   *  const data = await client.readWriteRaw(ADS.ADS_RESERVED_INDEX_GROUPS.SymbolValueByName, 0, 0xFFFFFFFF, path);
+   *  console.log(data); //<Buffer ff 7f>
+   * 
+   * } catch (err) {
+   *  console.log("Error:", err);
+   * }
+   * ```
    * 
    * @param indexGroup Address index group
    * @param indexOffset Address index offset
-   * @param size How many bytes to read
-   * @param writeData Data to write
+   * @param size Data length to read (bytes)
+   * @param value Value to write
    * @param targetOpts Optional target settings that override values in `settings`
+   * 
+   * @throws Throws an error if sending the command fails or if the target responds with an error.
    */
-  public async readWriteRaw(indexGroup: number, indexOffset: number, size: number, writeData: Buffer, targetOpts: Partial<AmsAddress> = {}): Promise<Buffer> {
+  public async readWriteRaw(indexGroup: number, indexOffset: number, size: number, value: Buffer, targetOpts: Partial<AmsAddress> = {}): Promise<Buffer> {
     if (!this.connection.connected) {
       throw new ClientError(`readWriteRaw(): Client is not connected. Use connect() to connect to the target first.`);
     }
-    this.debug(`readWriteRaw(): Sending ReadWrite command (${JSON.stringify({ indexGroup, indexOffset, size })} with ${writeData.byteLength} bytes of data`);
+    this.debug(`readWriteRaw(): Sending ReadWrite command (${JSON.stringify({ indexGroup, indexOffset, size })} with ${value.byteLength} bytes of data`);
 
     //Allocating bytes for request
-    const data = Buffer.alloc(16 + writeData.byteLength);
+    const data = Buffer.alloc(16 + value.byteLength);
     let pos = 0;
 
     //0..3 IndexGroup 
@@ -5705,12 +5721,12 @@ export class Client extends EventEmitter<ClientEvents> {
     pos += 4;
 
     //12..15 Write data length
-    data.writeUInt32LE(writeData.byteLength, pos);
+    data.writeUInt32LE(value.byteLength, pos);
     pos += 4;
 
     //16..n Write data
-    writeData.copy(data, pos);
-    pos += writeData.byteLength;
+    value.copy(data, pos);
+    pos += value.byteLength;
 
     try {
       const res = await this.sendAdsCommand<AdsReadWriteResponse>({
@@ -5731,14 +5747,52 @@ export class Client extends EventEmitter<ClientEvents> {
   }
 
   /**
-   * **TODO - DOCUMENTATION ONGOING**
+   * Sends multiple `readWriteRaw()` commands in one ADS packet.
    * 
-   * Sends multiple readWriteRaw() commands in one ADS packet
+   * Writes raw data to the target system by a raw ADS address (index group, index offset) 
+   * and reads the result as raw data.
    * 
-   * Uses ADS sum command under the hood (better performance)
+   * Uses ADS sum command under the hood (better and faster performance). 
+   * See [Beckhoff Information System](https://infosys.beckhoff.com/english.php?content=../content/1033/tc3_adsdll2/9007199379576075.html&id=9180083787138954512) for more info.
    * 
-   * @param commands Array of read write commands
+   * @example
+   * ```js
+   * try {
+   *  //Reading raw values by symbol paths (= same as readRawByPath())
+   *  const path = ADS.encodeStringToPlcStringBuffer('GVL_Read.StandardTypes.INT_');
+   *  const path2 = ADS.encodeStringToPlcStringBuffer('GVL_Read.StandardTypes.REAL_');
+   * 
+   *  const results = await client.readWriteRawMulti([
+   *    {
+   *      indexGroup: ADS.ADS_RESERVED_INDEX_GROUPS.SymbolValueByName,
+   *      indexOffset: 0,
+   *      size: 0xFFFF,
+   *      value: path
+   *    },
+   *    {
+   *      indexGroup: ADS.ADS_RESERVED_INDEX_GROUPS.SymbolValueByName,
+   *      indexOffset: 0,
+   *      size: 0xFFFF,
+   *      value: path2
+   *    }
+   *  ]);
+   *  
+   *  if(results[0].success) {
+   *    console.log(`First result: ${results[0].value}`); //First result: <Buffer ff 7f>
+   *  } else {
+   *    console.log(`First read/write command failed: ${results[0].errorStr}`);
+   *  }
+   * 
+   * } catch (err) {
+   *  console.log("Error:", err);
+   * }
+   * 
+   * ```
+   * 
+   * @param commands Array of read/write commands
    * @param targetOpts Optional target settings that override values in `settings`
+   * 
+   * @throws Throws an error if sending the command fails or if the target responds with an error.
    */
   public async readWriteRawMulti(commands: ReadWriteRawMultiCommand[], targetOpts: Partial<AmsAddress> = {}): Promise<ReadWriteRawMultiResult[]> {
     if (!this.connection.connected) {
@@ -5746,7 +5800,7 @@ export class Client extends EventEmitter<ClientEvents> {
     }
     this.debug(`readWriteRawMulti(): Sending ${commands.length} ReadWrite commands`);
     const totalSize = commands.reduce((total, command) => total + command.size, 0);
-    const totalWriteSize = commands.reduce((total, command) => total + command.writeData.byteLength, 0);
+    const totalWriteSize = commands.reduce((total, command) => total + command.value.byteLength, 0);
 
     //Allocating bytes for request
     const data = Buffer.alloc(16 + commands.length * 16 + totalWriteSize);
@@ -5783,14 +5837,14 @@ export class Client extends EventEmitter<ClientEvents> {
       pos += 4;
 
       //12..15 Write data length
-      data.writeUInt32LE(command.writeData.byteLength, pos);
+      data.writeUInt32LE(command.value.byteLength, pos);
       pos += 4
     });
 
     //data
     commands.forEach(command => {
-      command.writeData.copy(data, pos);
-      pos += command.writeData.byteLength;
+      command.value.copy(data, pos);
+      pos += command.value.byteLength;
     });
 
     try {
