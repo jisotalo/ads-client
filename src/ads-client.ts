@@ -3576,14 +3576,44 @@ export class Client extends EventEmitter<AdsClientEvents> {
    * - {@link Client.unsubscribe}() - `DeleteNotification` command
    * - {@link Client.readWriteRaw}() - `ReadWrite` command
    * 
-   * @template T ADS response type. If omitted, generic {@link AdsResponse} type is used
+   * @example
+   * ```js
+   * try {
+   *  //Creating readRaw(16448, 414816, 2) command manually and sending it using sendAdsCommand()
+   * 
+   *  const data = Buffer.alloc(12);
+   *  let pos = 0;
+   * 
+   *  //0..3 IndexGroup 
+   *  data.writeUInt32LE(16448, pos);
+   *  pos += 4;
+   * 
+   *  //4..7 IndexOffset
+   *  data.writeUInt32LE(414816, pos);
+   *  pos += 4;
+   * 
+   *  //8..11 Read data length
+   *  data.writeUInt32LE(2, pos);
+   *  pos += 4;
+   * 
+   *  const res = await this.sendAdsCommand<AdsReadResponse>({
+   *    adsCommand: ADS.ADS_COMMAND.Read,
+   *    targetAmsNetId: targetOpts.amsNetId,
+   *    targetAdsPort: targetOpts.adsPort,
+   *    payload: data
+   *  });
+   * 
+   *  console.log(res.ads.payload); //<Buffer ff 7f>
+   * 
+   * } catch (err) {
+   *  console.log("Error:", err);
+   * }
+   * ```
+   * 
+   * @template T In Typescript, the type of the ADS response. If omitted, generic {@link AdsResponse} type is used.
    * 
    * @throws Throws an error if sending the command fails or if target responds with an error
    * 
-   * @example
-   * ```js
-   * TODO - DOCUMENTATION ONGOING
-   * ```
    */
   public async sendAdsCommand<T = AdsResponse>(command: AdsCommandToSend) {
     return new Promise<AmsTcpPacket<T>>(async (resolve, reject) => {
@@ -4027,7 +4057,7 @@ export class Client extends EventEmitter<AdsClientEvents> {
   }
 
   /**
-   * Returns symbol for given variable path, such as `GVL_Test.ExampleStruct`.
+   * Returns a symbol object for given variable path, such as `GVL_Test.ExampleStruct`.
    * 
    * Returns previously cached value if available, otherwise reads it from the target
    * and caches it. 
@@ -5891,13 +5921,28 @@ export class Client extends EventEmitter<AdsClientEvents> {
   }
 
   /**
-   * **TODO - DOCUMENTATION ONGOING**
+   * Reads variable's value from the target system by a variable path (such as `GVL_Test.ExampleStruct`) 
+   * and returns the value as a Javascript object.
    * 
-   * Reads a value by a variable path (such as `GVL_Test.ExampleStruct`) and converts the value to a Javascript object.
+   * Returns variable's
+   * - converted value
+   * - raw value
+   * - data type
+   * - symbol
+   *  
+   * **NOTE:** This requires that the target is a PLC runtime or has equivalent ADS protocol support.
    * 
-   * Returns the converted value, the raw value, the data type and the symbol.
+   * @example
+   * ```js
+   * try {
+   *  const res = await client.readValue('GVL_Test.ExampleStruct');
+   *  console.log(res.value);
+   * } catch (err) {
+   *  console.log("Error:", err);
+   * }
+   * ```
    * 
-   * @param path Variable path in the PLC to read (such as `GVL_Test.ExampleStruct`)
+   * @param path Variable path in the PLC (such as `GVL_Test.ExampleStruct`)
    * @param targetOpts Optional target settings that override values in `settings`
    * 
    * @template T In Typescript, the data type of the value, for example `readValue<number>(...)` or `readValue<ST_TypedStruct>(...)` (default: `any`)
@@ -5964,13 +6009,30 @@ export class Client extends EventEmitter<AdsClientEvents> {
   }
 
   /**
-   * **TODO - DOCUMENTATION ONGOING**
+   * Reads variable's value from the target system by a symbol object
+   * and returns the value as a Javascript object.
    * 
-   * Reads a value by a symbol and converts the value to a Javascript object.
+   * Returns variable's
+   * - converted value
+   * - raw value
+   * - data type
+   * - symbol
    * 
-   * Returns the converted value, the raw value, the data type and the symbol.
+   * **NOTE:** This requires that the target is a PLC runtime or has equivalent ADS protocol support.
    * 
-   * @param symbol Symbol (acquired using `getSymbol()`)
+   * @example
+   * ```js
+   * try {
+   *  const symbol = await client.getSymbol('GVL_Test.ExampleStruct');
+   * 
+   *  const res = await client.readValueBySymbol(symbol);
+   *  console.log(res.value);
+   * } catch (err) {
+   *  console.log("Error:", err);
+   * }
+   * ```
+   * 
+   * @param symbol Symbol object (acquired using {@link getSymbol}())
    * @param targetOpts Optional target settings that override values in `settings`
    * 
    * @template T In Typescript, the data type of the value, for example `readValueBySymbol<number>(...)` or `readValueBySymbol<ST_TypedStruct>(...)` (default: `any`)
@@ -5984,18 +6046,36 @@ export class Client extends EventEmitter<AdsClientEvents> {
   }
 
   /**
-   * **TODO - DOCUMENTATION ONGOING**
+   * Writes variable's value to the target system by a variable path (such as `GVL_Test.ExampleStruct`). 
+   * Converts the value from a Javascript object to a raw value.
    * 
-   * Writes a value by a variable path (such as `GVL_Test.ExampleStruct`). Converts the value from a Javascript object to a raw value.
+   * Returns variable's
+   * - converted value
+   * - raw value
+   * - data type
+   * - symbol
    * 
-   * Returns the converted value, the raw value, the data type and the symbol.
+   * **NOTE:** Do not use `autoFill` for `UNION` types, it doesn't work correctly.
    * 
-   * **NOTE:** Do not use `autoFill` for `UNION` types, it works without errors but the result isn't probably the desired one
+   * **NOTE:** This requires that the target is a PLC runtime or has equivalent ADS protocol support.
    * 
-   * @param path Variable path in the PLC to read (such as `GVL_Test.ExampleStruct`)
+   * @example
+   * ```js
+   * try {
+   *  const value = {
+   *    example: true
+   *  };
+   * 
+   *  const res = await client.writeValue('GVL_Test.ExampleStruct', value);
+   * } catch (err) {
+   *  console.log("Error:", err);
+   * }
+   * ```
+   * 
+   * @param path Variable path in the PLC (such as `GVL_Test.ExampleStruct`)
    * @param value Value to write
    * @param targetOpts Optional target settings that override values in `settings`
-   * @param autoFill If true and data type is a container (`STRUCT`, `FUNCTION_BLOCK` etc.), missing properties are automatically **set to default values** (usually `0` or `''`) 
+   * @param autoFill If set and the data type is a container (`STRUCT`, `FUNCTION_BLOCK` etc.), missing properties are automatically set to default values (usually `0` or `''`).
    * 
    * @template T In Typescript, the data type of the value, for example `writeValue<number>(...)` or `writeValue<ST_TypedStruct>(...)`
    */
