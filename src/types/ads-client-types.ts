@@ -169,6 +169,9 @@ export interface AdsClientEvents {
    * - lost connection re-established
    * - unknown ADS notification received
    *
+   * As default, the client writes these warnings to the console unless `settings.hideConsoleWarnings` is set.
+   * The setting does not disable the `warning` event.
+   * 
    * **Parameters:**
    * - `message`: Warning message
    * 
@@ -358,9 +361,15 @@ export interface AdsClientSettings {
   /** 
    * **Optional**: If set, no warnings are written to console using `console.log()` (default: `false`)
    * 
-   * As default, the client writes some warnings to console, such as connection loss and reconnection information.
+   * As default, the client writes warnings to the console, such as 
+   * - connected to a non-running TwinCAT system
+   * - re-connection attempted after connection loss
+   * - lost connection re-established
+   * - unknown ADS notification received
    * 
-   * If set, the client **never** writes anything to console.
+   * The exact same warnings are emitted using the `warning` event. See {@link AdsClientEvents}.
+   * 
+   * If this setting is set, the client never writes anything to the console.
    */
   hideConsoleWarnings?: boolean,
 

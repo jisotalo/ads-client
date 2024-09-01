@@ -47,8 +47,15 @@ See setting <code>connectionCheckInterval</code>.</p>
 This slows the communication but guarantees up-to-date data in all cases.</p>
 <p>As default, the client caches the results after reading them from the target.</p>
 </div><div class="tsd-comment tsd-typography"></div></section><section class="tsd-panel tsd-member"><a id="hideConsoleWarnings" class="tsd-anchor"></a><h3 class="tsd-anchor-link"><code class="tsd-tag">Optional</code><span>hide<wbr/>Console<wbr/>Warnings</span><a href="#hideConsoleWarnings" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3><div class="tsd-signature"><span class="tsd-kind-property">hide<wbr/>Console<wbr/>Warnings</span><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-type">boolean</span></div><div class="tsd-comment tsd-typography"><p><strong>Optional</strong>: If set, no warnings are written to console using <code>console.log()</code> (default: <code>false</code>)</p>
-<p>As default, the client writes some warnings to console, such as connection loss and reconnection information.</p>
-<p>If set, the client <strong>never</strong> writes anything to console.</p>
+<p>As default, the client writes warnings to the console, such as</p>
+<ul>
+<li>connected to a non-running TwinCAT system</li>
+<li>re-connection attempted after connection loss</li>
+<li>lost connection re-established</li>
+<li>unknown ADS notification received</li>
+</ul>
+<p>The exact same warnings are emitted using the <code>warning</code> event. See <a href="AdsClientEvents.html" class="tsd-kind-interface">AdsClientEvents</a>.</p>
+<p>If this setting is set, the client never writes anything to the console.</p>
 </div><div class="tsd-comment tsd-typography"></div></section><section class="tsd-panel tsd-member"><a id="localAddress" class="tsd-anchor"></a><h3 class="tsd-anchor-link"><code class="tsd-tag">Optional</code><span>local<wbr/>Address</span><a href="#localAddress" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3><div class="tsd-signature"><span class="tsd-kind-property">local<wbr/>Address</span><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-type">string</span></div><div class="tsd-comment tsd-typography"><p><strong>Optional</strong>: Local IP address to use (default: <code>(empty string)</code> -&gt; automatic)</p>
 <p>Can be used to force using another network interface</p>
 <p>See <a href="https://nodejs.org/api/net.html#socketconnectoptions-connectlistener">https://nodejs.org/api/net.html#socketconnectoptions-connectlistener</a></p>
