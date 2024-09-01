@@ -5570,8 +5570,8 @@ export class Client extends EventEmitter<ClientEvents> {
     let pos = 0;
 
     //0..3 IndexGroup 
-    pos += 4;
     data.writeUInt32LE(ADS.ADS_RESERVED_INDEX_GROUPS.SymbolValueByName, pos);
+    pos += 4;
 
     //4..7 IndexOffset
     data.writeUInt32LE(0, pos);
