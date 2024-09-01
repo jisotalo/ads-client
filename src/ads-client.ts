@@ -348,6 +348,16 @@ export class Client extends EventEmitter<ClientEvents> {
   };
 
   /**
+   * Emits a warning, which results in a `warning` event, and a console message if `hideConsoleWarnings` is not set.
+   *
+   * @param message Warning message
+   */
+  private warn(message: string) {
+    if (!this.settings.hideConsoleWarnings) console.log(`WARNING: ${message}`)
+    this.emit('warning', message)
+  }
+
+  /**
    * Clears given timer if it's available and increases the ID.
    * 
    * @param timerObject Timer object
@@ -546,13 +556,13 @@ export class Client extends EventEmitter<ClientEvents> {
 
             //allowHalfOpen allows this, but show some warnings..
             if (!this.metaData.tcSystemState) {
-              !this.settings.hideConsoleWarnings && console.log(`WARNING: "allowHalfOpen" setting is active. Target is connected but no connection to TwinCAT system. If target is not PLC runtime, use setting "rawClient" instead of "allowHalfOpen".`);
+              this.warn(`"allowHalfOpen" setting is active. Target is connected but no connection to TwinCAT system. If target is not PLC runtime, use setting "rawClient" instead of "allowHalfOpen".`);
 
             } else if (this.metaData.tcSystemState.adsState !== ADS.ADS_STATE.Run) {
-              !this.settings.hideConsoleWarnings && console.log(`WARNING: "allowHalfOpen" setting is active. Target is connected but TwinCAT system is in ${this.metaData.tcSystemState.adsStateStr} instead of run mode. No connection to PLC runtime.`);
+              this.warn(`"allowHalfOpen" setting is active. Target is connected but TwinCAT system is in ${this.metaData.tcSystemState.adsStateStr} instead of run mode. No connection to PLC runtime.`);
 
             } else {
-              !this.settings.hideConsoleWarnings && console.log(`WARNING: "allowHalfOpen" setting is active. No connection to PLC runtime. Check "targetAdsPort" setting and PLC status`);
+              this.warn(`"allowHalfOpen" setting is active. No connection to PLC runtime. Check "targetAdsPort" setting and PLC status`);
             }
           }
         }
@@ -721,11 +731,11 @@ export class Client extends EventEmitter<ClientEvents> {
           const failures = await this.restoreSubscriptions();
 
           if (!failures.length) {
-            isReconnecting && !this.settings.hideConsoleWarnings && console.log(`Reconnected and all subscriptions were restored!`);
+            isReconnecting && this.warn(`Reconnected and all subscriptions were restored!`);
             this.debug(`reconnectToTarget(): Reconnected and all subscriptions were restored!`);
 
           } else {
-            !this.settings.hideConsoleWarnings && console.log(`WARNING: Reconnected but failed to restore following subscriptions:\n - ${failures.join('\n - ')}`);
+            this.warn(`Reconnected but failed to restore following subscriptions:\n - ${failures.join('\n - ')}`);
             this.debug(`reconnectToTarget(): Reconnected but failed to restore following subscriptions: ${failures.join(', ')}`);
           }
 
@@ -1152,7 +1162,7 @@ export class Client extends EventEmitter<ClientEvents> {
         await this.restoreSubscriptions();
 
       } catch (err) {
-        !this.settings.hideConsoleWarnings && console.log(`WARNING: Target PLC symbol version changed and all subscriptions were not restored (data might be lost from now on). Error info: ${JSON.stringify(err)}`);
+        this.warn(`Target PLC symbol version changed and all subscriptions were not restored (data might be lost from now on). Error info: ${JSON.stringify(err)}`);
         this.debug(`onPlcSymbolVersionChanged(): Failed to restore all subscriptions. Error: %o`, err);
       }
     }
@@ -1169,7 +1179,7 @@ export class Client extends EventEmitter<ClientEvents> {
    * See also {@link Client.socketErrorHandler} which is `onSocketError.bind(this)`
    */
   private onSocketError(err: Error) {
-    !this.settings.hideConsoleWarnings && console.log(`WARNING: Socket connection to target closed to an an error, disconnecting: ${JSON.stringify(err)}`);
+    this.warn(`Socket connection to target closed to an an error, disconnecting: ${JSON.stringify(err)}`);
     this.onConnectionLost(true);
   }
 
@@ -1188,13 +1198,13 @@ export class Client extends EventEmitter<ClientEvents> {
     this.emit('connectionLost', socketFailure);
 
     if (this.settings.autoReconnect !== true) {
-      !this.settings.hideConsoleWarnings && console.log("WARNING: Connection to target was lost and setting autoReconnect was false -> disconnecting");
+      this.warn("Connection to target was lost and setting autoReconnect was false -> disconnecting");
       await this.disconnectFromTarget(true).catch();
       return;
     }
 
     this.socketConnectionLostHandler && this.socket?.off('close', this.socketConnectionLostHandler);
-    !this.settings.hideConsoleWarnings && console.log("WARNING: Connection to target was lost. Trying to reconnect automatically...");
+    this.warn("Connection to target was lost. Trying to reconnect automatically...");
 
     const tryToReconnect = async (firstRetryAttempt: boolean, timerId: number) => {
       //If the timer has changed, quit here (to prevent multiple timers)
@@ -1215,7 +1225,7 @@ export class Client extends EventEmitter<ClientEvents> {
           //Reconnecting failed
           if (firstRetryAttempt) {
             this.debug(`onConnectionLost()/tryToReconnect(): Reconnecting failed, keeping trying in the background (${(err as Error).message}`);
-            !this.settings.hideConsoleWarnings && console.log(`WARNING: Reconnecting failed. Keeping trying in the background every ${this.settings.reconnectInterval} ms...`);
+            this.warn(`Reconnecting failed. Keeping trying in the background every ${this.settings.reconnectInterval} ms...`);
           }
 
           //If this is still a valid timer, start over again
@@ -1872,7 +1882,7 @@ export class Client extends EventEmitter<ClientEvents> {
       this.debug("onRouterStateChanged(): Local loopback connection active, monitoring router state. Reconnecting when router is back running.");
 
       if (this.metaData.routerState.state === ADS.AMS_ROUTER_STATE.START) {
-        !this.settings.hideConsoleWarnings && console.log(`WARNING: Local AMS router state has changed to ${this.metaData.routerState.stateStr}. Reconnecting...`);
+        this.warn(`Local AMS router state has changed to ${this.metaData.routerState.stateStr}. Reconnecting...`);
         this.onConnectionLost();
 
       } else {
@@ -2331,7 +2341,7 @@ export class Client extends EventEmitter<ClientEvents> {
 
     //If extended flag RefactorInfo is set
     if ((symbol.extendedFlags & ADS.ADS_SYMBOL_FLAGS_2.RefactorInfo) === ADS.ADS_SYMBOL_FLAGS_2.RefactorInfo) {
-      !this.settings.hideConsoleWarnings && console.log(`WARNING: Symbol ${symbol.name} (${symbol.type}) has extended flag "RefactorInfo" which is not supported. Things might not work now. Please open an issue at Github`);
+      this.warn(`Symbol ${symbol.name} (${symbol.type}) has extended flag "RefactorInfo" which is not supported. Things might not work now. Please open an issue at Github`);
     }
 
     //Reserved, if any
@@ -2733,7 +2743,7 @@ export class Client extends EventEmitter<ClientEvents> {
     if ((dataType.flags & ADS.ADS_DATA_TYPE_FLAGS.RefactorInfo) === ADS.ADS_DATA_TYPE_FLAGS.RefactorInfo) {
       //TODO: this is not working now
       //Things probably break now
-      !this.settings.hideConsoleWarnings && console.log(`WARNING: Data type ${dataType.name} (${dataType.type}) has flag "RefactorInfo" which is not supported. Things might not work now. Please open an issue at Github`);
+      this.warn(`Data type ${dataType.name} (${dataType.type}) has flag "RefactorInfo" which is not supported. Things might not work now. Please open an issue at Github`);
     }
 
     //If flag ExtendedFlags set
@@ -2753,14 +2763,14 @@ export class Client extends EventEmitter<ClientEvents> {
     if ((dataType.flags & ADS.ADS_DATA_TYPE_FLAGS.ExtendedEnumInfos) === ADS.ADS_DATA_TYPE_FLAGS.ExtendedEnumInfos) {
       //TODO: this is not working now
       //Things probably break now
-      !this.settings.hideConsoleWarnings && console.log(`WARNING: Data type ${dataType.name} (${dataType.type}) has flag "ExtendedEnumInfos" which is not supported. Things might not work now. Please open an issue at Github`);
+      this.warn(`Data type ${dataType.name} (${dataType.type}) has flag "ExtendedEnumInfos" which is not supported. Things might not work now. Please open an issue at Github`);
     }
 
     //If flag SoftwareProtectionLevels set
     if ((dataType.flags & ADS.ADS_DATA_TYPE_FLAGS.SoftwareProtectionLevels) === ADS.ADS_DATA_TYPE_FLAGS.SoftwareProtectionLevels) {
       //TODO: this is not working now
       //Things probably break now
-      !this.settings.hideConsoleWarnings && console.log(`WARNING: Data type ${dataType.name} (${dataType.type}) has flag "SoftwareProtectionLevels" which is not supported. Things might not work now. Please open an issue at Github`);
+      this.warn(`Data type ${dataType.name} (${dataType.type}) has flag "SoftwareProtectionLevels" which is not supported. Things might not work now. Please open an issue at Github`);
     }
 
     //Reserved, if any
@@ -3925,7 +3935,7 @@ export class Client extends EventEmitter<ClientEvents> {
 
       if (reconnect) {
         this.debug(`setTcSystemToRun(): Reconnecting after TwinCAT system restart`);
-        !this.settings.hideConsoleWarnings && console.log("WARNING: Reconnecting after TwinCAT system restart");
+        this.warn("Reconnecting after TwinCAT system restart");
         this.onConnectionLost();
       }
 

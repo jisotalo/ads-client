@@ -84,6 +84,16 @@ export interface ClientEvents {
    * - `error`: Error that was thrown
    */
   'client-error': [error: ClientError]
+
+  /**
+   * Emitted when the client encounters non-critical abnormal events, such as
+   *  - connected to a non-running TwinCAT system
+   *  - re-connection attempted after connection loss
+   *  - lost connection re-established
+   *
+   * - `message`: Warning message
+   */
+  'warning': [message: string]
 }
 
 /**
