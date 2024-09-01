@@ -421,6 +421,18 @@ export interface AdsClientSettings {
    * As default, the client caches the results after reading them from the target.
    */
   disableCaching?: boolean
+
+  /**
+   * **Optional**: If set, the client automatically deletes ADS notifications for unknown subscriptions (default: `true`)
+   *
+   * Otherwise, when a notification for an unknown subscription is received, the client will emit a warning.
+   *
+   * Stale subscriptions can occur if previous subscriptions were not unsubscribed (using the `unsubscribe()` method).
+   *
+   * As default, the client automatically deletes stale subscriptions on the PLC to conserve resources.
+   * A warning will be emitted when a stale subscription is handled.
+   */
+  deleteUnknownSubscriptions?: boolean
 }
 
 /**

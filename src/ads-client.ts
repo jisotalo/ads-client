@@ -304,7 +304,8 @@ export class Client extends EventEmitter<AdsClientEvents> {
     connectionDownDelay: 5000,
     allowHalfOpen: false,
     rawClient: false,
-    disableCaching: false
+    disableCaching: false,
+    deleteUnknownSubscriptions: true
   } as Required<AdsClientSettings>;
 
   /**
@@ -1830,8 +1831,13 @@ export class Client extends EventEmitter<AdsClientEvents> {
                   this.emit('client-error', new ClientError(`onAdsCommandReceived(): Notification received but parsing data to Javascript object failed. Subscription: ${JSON.stringify(subscription)}`, err));
                 });
 
+            } else if (this.settings.deleteUnknownSubscriptions) {
+              this.debugD(`onAdsCommandReceived(): Notification received with unknown handle ${sample.notificationHandle} (${key})`);
+              this.deleteNotificationHandle(sample.notificationHandle, packet.ams.sourceAmsAddress)
+                  .then(() => this.warn(`onAdsCommandReceived(): Notification received with unknown handle ${sample.notificationHandle} (${key}) was automatically deleted.`))
+                  .catch((err) => this.emit('client-error', new ClientError(`onAdsCommandReceived(): Failed to delete stale notification handle ${sample.notificationHandle} (${key})`, err)));
             } else {
-              this.debugD(`onAdsCommandReceived(): Notification received with unknown handle ${sample.notificationHandle} (${key}). Use unsubscribe() to save resources`);
+              this.debugD(`onAdsCommandReceived(): Notification received with unknown handle ${sample.notificationHandle} (${key})`);
               this.warn(`onAdsCommandReceived(): Notification received with unknown handle ${sample.notificationHandle} (${key}). Use unsubscribe() to save resources.`);
             }
           }
@@ -4610,21 +4616,8 @@ export class Client extends EventEmitter<AdsClientEvents> {
 
     this.debug(`unsubscribe(): Unsubscribing %o`, subscription);
 
-    //Allocating bytes for request
-    const data = Buffer.alloc(4);
-    let pos = 0;
-
-    //0..3 Notification handle
-    data.writeUInt32LE(subscription.notificationHandle, pos);
-    pos += 4;
-
     try {
-      const res = await this.sendAdsCommand<AdsDeleteNotificationResponse>({
-        adsCommand: ADS.ADS_COMMAND.DeleteNotification,
-        targetAmsNetId: subscription.remoteAddress.amsNetId,
-        targetAdsPort: subscription.remoteAddress.adsPort,
-        payload: data
-      });
+      await this.deleteNotificationHandle(subscription.notificationHandle, subscription.remoteAddress)
 
       const address = ADS.amsAddressToString(subscription.remoteAddress);
 
@@ -4638,6 +4631,28 @@ export class Client extends EventEmitter<AdsClientEvents> {
       this.debug(`unsubscribe(): Unsubscribing failed: %o`, err);
       throw new ClientError(`unsubscribe(): Unsubscribing failed`, err);
     }
+  }
+
+  /**
+   * Delete ADS notification on PLC.
+   */
+   private async deleteNotificationHandle(notificationHandle: number, targetAmsAddress: AmsAddress): Promise<AdsDeleteNotificationResponse> {
+    //Allocating bytes for request
+    const data = Buffer.alloc(4);
+    let pos = 0;
+
+    //0..3 Notification handle
+    data.writeUInt32LE(notificationHandle, pos);
+    pos += 4;
+
+    const res = await this.sendAdsCommand<AdsDeleteNotificationResponse>({
+      adsCommand: ADS.ADS_COMMAND.DeleteNotification,
+      targetAmsNetId: targetAmsAddress.amsNetId,
+      targetAdsPort: targetAmsAddress.adsPort,
+      payload: data
+    });
+
+    return res.ads;
   }
 
   /**
