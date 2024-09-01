@@ -746,8 +746,8 @@ export interface DeleteVariableHandleMultiResult extends BaseAdsResponse {
  * @category Types
  */
 export interface ReadWriteRawMultiCommand extends Required<AdsRawAddress> {
-  /** Data to write */
-  writeData: Buffer,
+  /** Value to write */
+  value: Buffer,
   /** How many bytes to read */
   size: number
 }
