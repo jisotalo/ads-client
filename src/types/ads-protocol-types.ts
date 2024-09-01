@@ -26,6 +26,8 @@ import { PlcPrimitiveType } from "./ads-client-types";
  * AMS address
  * 
  * Combination of AmsNetId and ADS port
+ * 
+ * @category Types
  */
 export interface AmsAddress {
   /** AmsNetId, such as `192.168.1.2.1.1`*/
@@ -36,6 +38,8 @@ export interface AmsAddress {
 
 /** 
  * AMS packet for communication
+ * 
+ * @category Types
  */
 export interface AmsTcpPacket<T = AdsData> {
   /** AMS TCP header */
@@ -48,6 +52,8 @@ export interface AmsTcpPacket<T = AdsData> {
 
 /** 
  * AMS TCP header 
+ * 
+ * @category Types
  */
 export interface AmsTcpHeader {
   /** AMS command as number */
@@ -62,6 +68,8 @@ export interface AmsTcpHeader {
 
 /** 
  * AMS header
+ * 
+ * @category Types
  */
 export interface AmsHeader {
   /** Target AmsNetId and port (receiver) */
@@ -90,11 +98,15 @@ export interface AmsHeader {
 
 /** 
  * ADS data 
+ * 
+ * @category Types
  */
 export type AdsData = AdsResponse | AdsRequest;
 
 /** 
  * AmsTcpHeader data that is received when AMS router state changes 
+ * 
+ * @category Types
  */
 export interface AmsRouterStateData {
   /** New router state as number */
@@ -103,11 +115,15 @@ export interface AmsRouterStateData {
 
 /** 
  * AmsTcpHeader data that is received when AMS port is registered from the router 
+ * 
+ * @category Types
  */
 export type AmsPortRegisteredData = AmsAddress;
 
 /** 
  * AMS router state 
+ * 
+ * @category Types
  */
 export interface AmsRouterState {
   /** Router state */
@@ -118,6 +134,8 @@ export interface AmsRouterState {
 
 /** 
  * ADS response
+ * 
+ * @category Types
  */
 export type AdsResponse =
   EmptyAdsResponse
@@ -133,6 +151,8 @@ export type AdsResponse =
 
 /**
  * ADS request
+ * 
+ * @category Types
  */
 export interface AdsRequest {
   /** Payload of the ADS request (if any) */
@@ -141,6 +161,8 @@ export interface AdsRequest {
 
 /**
  * ADS error
+ * 
+ * @category Types
  */
 export interface AdsError {
   /** ADS error code (0 = no error, -1 = other than ADS error) */
@@ -151,6 +173,8 @@ export interface AdsError {
 
 /**
  * Base ADS reponse (that is received in all responses)
+ * 
+ * @category Types
  */
 export interface BaseAdsResponse {
   /** True if response has error (ADS or our own customer error) */
@@ -163,6 +187,8 @@ export interface BaseAdsResponse {
 
 /**
  * Empty ADS response (no payload)
+ * 
+ * @category Types
  */
 export type EmptyAdsResponse = {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -171,6 +197,8 @@ export type EmptyAdsResponse = {
 
 /**
  * ADS response for `Read` command
+ * 
+ * @category Types
  */
 export interface AdsReadResponse extends BaseAdsResponse {
   /** Data length */
@@ -181,6 +209,8 @@ export interface AdsReadResponse extends BaseAdsResponse {
 
 /**
  * ADS response for `ReadWrite` command
+ * 
+ * @category Types
  */
 export interface AdsReadWriteResponse extends BaseAdsResponse {
   /** Data length */
@@ -191,12 +221,16 @@ export interface AdsReadWriteResponse extends BaseAdsResponse {
 
 /**
  * ADS response for `Write` command
+ * 
+ * @category Types
  */
 export interface AdsWriteResponse extends BaseAdsResponse {
 };
 
 /**
  * ADS response for `ReadDeviceInfo` command
+ * 
+ * @category Types
  */
 export interface AdsReadDeviceInfoResponse extends BaseAdsResponse {
   /** Device info */
@@ -205,6 +239,8 @@ export interface AdsReadDeviceInfoResponse extends BaseAdsResponse {
 
 /**
  * ADS response for `ReadState` command
+ * 
+ * @category Types
  */
 export interface AdsReadStateResponse extends BaseAdsResponse {
   /** ADS state */
@@ -213,6 +249,8 @@ export interface AdsReadStateResponse extends BaseAdsResponse {
 
 /**
  * ADS response for `AddNotification` command
+ * 
+ * @category Types
  */
 export interface AdsAddNotificationResponse extends BaseAdsResponse {
   /** Device notification handle */
@@ -221,16 +259,22 @@ export interface AdsAddNotificationResponse extends BaseAdsResponse {
 
 /**
  * ADS response for `DeleteNotification` command
+ * 
+ * @category Types
  */
 export interface AdsDeleteNotificationResponse extends BaseAdsResponse { };
 
 /**
  * ADS response for `WriteControl` command
+ * 
+ * @category Types
  */
 export interface AdsWriteControlResponse extends BaseAdsResponse { };
 
 /**
  * ADS response for `Notification` command
+ * 
+ * @category Types
  */
 export interface AdsNotificationResponse extends BaseAdsResponse {
   /** Notification data */
@@ -239,11 +283,15 @@ export interface AdsNotificationResponse extends BaseAdsResponse {
 
 /**
  * ADS response for unknown command
+ * 
+ * @category Types
  */
 export interface UnknownAdsResponse extends BaseAdsResponse { };
 
 /**
  * ADS device info
+ * 
+ * @category Types
  */
 export interface AdsDeviceInfo {
   /** Major version number */
@@ -258,6 +306,8 @@ export interface AdsDeviceInfo {
 
 /**
  * ADS state
+ * 
+ * @category Types
  */
 export interface AdsState {
   /** ADS state */
@@ -269,7 +319,9 @@ export interface AdsState {
 }
 
 /**
- * ADS `AddNotification` reponse payload
+ * ADS `AddNotification` response payload
+ * 
+ * @category Types
  */
 export interface AdsAddNotificationResponseData {
   /** Notification handle */
@@ -278,6 +330,8 @@ export interface AdsAddNotificationResponseData {
 
 /**
  * ADS notification with number of stamps
+ * 
+ * @category Types
  */
 export interface AdsNotification {
   /** Total data length (bytes) */
@@ -290,6 +344,8 @@ export interface AdsNotification {
 
 /**
  * Single ADS notification stamp with multiple samples
+ * 
+ * @category Types
  */
 export interface AdsNotificationStamp {
   /** Timestamp of the included data*/
@@ -302,6 +358,8 @@ export interface AdsNotificationStamp {
 
 /**
  * Single ADS notification sample
+ * 
+ * @category Types
  */
 export interface AdsNotificationSample {
   /** Notification handle this data belongs to */
@@ -314,6 +372,8 @@ export interface AdsNotificationSample {
 
 /**
  * ADS raw address
+ * 
+ * @category Types
  */
 export interface AdsRawAddress{
   /** Address indexGroup */
@@ -326,6 +386,8 @@ export interface AdsRawAddress{
 
 /**
  * ADS symbol object
+ * 
+ * @category Types
  */
 export interface AdsSymbol {
   /** Symbol address indexGroup */
@@ -364,6 +426,8 @@ export interface AdsSymbol {
 
 /**
  * Array information entry for symbol or data type
+ * 
+ * @category Types
  */
 export interface AdsArrayInfoEntry {
   /** Array start/first index */
@@ -374,6 +438,8 @@ export interface AdsArrayInfoEntry {
 
 /**
  * Attribute entry for symbol, data type, RPC method etc.
+ * 
+ * @category Types
  */
 export interface AdsAttributeEntry {
   /** Attribute name */
@@ -384,6 +450,8 @@ export interface AdsAttributeEntry {
 
 /**
  * ADS data type object
+ * 
+ * @category Types
  */
 export interface AdsDataType {
   /** Structure version */
@@ -448,6 +516,8 @@ export interface AdsDataType {
 
 /**
  * RPC method entry for a data type
+ * 
+ * @category Types
  */
 export interface AdsRpcMethodEntry {
   /** Structure version */
@@ -484,6 +554,8 @@ export interface AdsRpcMethodEntry {
 
 /**
  * RPC method parameter entry for a RPC method
+ * 
+ * @category Types
  */
 export interface AdsRpcMethodParameterEntry {
   /** Size (bytes) */
@@ -518,6 +590,8 @@ export interface AdsRpcMethodParameterEntry {
 
 /**
  * ADS enumeration entry
+ * 
+ * @category Types
  */
 export interface AdsEnumInfoEntry {
   /** Enumeration name*/

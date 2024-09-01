@@ -1,10 +1,17 @@
 import ClientError from "../client-error";
 import { AdsDataType, AdsDeviceInfo, AdsRawAddress, AdsResponse, AdsState, AdsSymbol, AmsAddress, AmsRouterState, AmsTcpPacket, BaseAdsResponse } from "./ads-protocol-types";
 
+/**
+ * Possible debug levels
+ * 
+ * @category Types
+ */
 export type DebugLevel = 0 | 1 | 2 | 3;
 
 /**
  * Events for the client, for example `client.on('connect', ...)`
+ * 
+ * @category Types
  */
 export interface ClientEvents {
   /**
@@ -81,6 +88,8 @@ export interface ClientEvents {
 
 /**
  * Client settings
+ * 
+ * @category Types
  */
 export interface AdsClientSettings {
   /** 
@@ -311,6 +320,8 @@ export interface AdsClientSettings {
 
 /**
  * Internal timer object to keep the timer state saved
+ * 
+ * @category Types
  */
 export interface TimerObject {
   /** Timer ID */
@@ -321,6 +332,8 @@ export interface TimerObject {
 
 /**
  * Active client connection
+ * 
+ * @category Types
  */
 export interface AdsClientConnection {
   /** Connection status of the client, true if connected */
@@ -341,6 +354,8 @@ export interface AdsClientConnection {
  * Object containing all active subscriptions for each target address
  * 
  * Target address (`amsNetId:port`) is used as a key
+ * 
+ * @category Types
  */
 export interface ActiveSubscriptionContainer {
   [K: string]: TargetActiveSubscriptionContainer
@@ -350,6 +365,8 @@ export interface ActiveSubscriptionContainer {
  * Object containing all active subscriptions for each notification handle (for one target)
  * 
  * Notification handle is used as a key
+ * 
+ * @category Types
  */
 export interface TargetActiveSubscriptionContainer {
   [K: number]: ActiveSubscription
@@ -357,6 +374,8 @@ export interface TargetActiveSubscriptionContainer {
 
 /** 
  * Object containing information for a single active subscription 
+ * 
+ * @category Types
  */
 export interface ActiveSubscription<T = any> {
   /** Settings for this subscription */
@@ -381,6 +400,8 @@ export interface ActiveSubscription<T = any> {
 
 /**
  * Subscription data (value and timestamp)
+ * 
+ * @category Types
  */
 export interface SubscriptionData<T = any> {
   timestamp: Date,
@@ -391,6 +412,8 @@ export interface SubscriptionData<T = any> {
  * Object containing all active ADS requests that are waiting for responses 
  * 
  * Invoke ID is used as a key
+ * 
+ * @category Types
  */
 export interface ActiveAdsRequestContainer {
   [K: number]: ActiveAdsRequest
@@ -399,6 +422,8 @@ export interface ActiveAdsRequestContainer {
 /**
  * Active ADS command that is waiting for answer
  * Callback is called when response is received
+ * 
+ * @category Types
  */
 export interface ActiveAdsRequest {
   timeoutTimerHandle?: NodeJS.Timeout,
@@ -407,6 +432,8 @@ export interface ActiveAdsRequest {
 
 /**
  * Client connection metadata
+ * 
+ * @category Types
  */
 export interface ConnectionMetaData {
   /** Local AMS router state (if available) */
@@ -435,6 +462,8 @@ export interface ConnectionMetaData {
  * PLC runtime upload info
  * 
  * Contains information about symbols and data types
+ * 
+ * @category Types
  */
 export interface AdsUploadInfo {
   /** Number of symbols in the target runtime */
@@ -453,6 +482,8 @@ export interface AdsUploadInfo {
 
 /**
  * Object containing PLC runtime symbol information objects
+ * 
+ * @category Types
  */
 export interface AdsSymbolContainer {
   [K: string]: AdsSymbol
@@ -460,6 +491,8 @@ export interface AdsSymbolContainer {
 
 /**
  * Object containing PLC runtime data type objects
+ * 
+ * @category Types
  */
 export interface AdsDataTypeContainer {
   [K: string]: AdsDataType
@@ -467,6 +500,8 @@ export interface AdsDataTypeContainer {
 
 /**
  * ADS command  
+ * 
+ * @category Types
  */
 export interface AdsCommandToSend {
   /** Ads command (see `ADS.ADS_COMMAND`)*/
@@ -486,11 +521,15 @@ export interface AdsCommandToSend {
  * 
  * @param data - The data received
  * @param subscription - The active subscription object
+ * 
+ * @category Types
  */
 export type SubscriptionCallback<T = any> = (data: SubscriptionData<T>, subscription: ActiveSubscription<T>) => void;
 
 /**
  * Settings for a subscription
+ * 
+ * @category Types
  */
 export interface SubscriptionSettings<T = any> {
   /** 
@@ -538,6 +577,8 @@ export interface SubscriptionSettings<T = any> {
 
 /**
  * PLC primitive types (not structs, function blocks etc.)
+ * 
+ * @category Types
  */
 export type PlcPrimitiveType = string | boolean | number | Buffer | Date | BigInt;
 
@@ -545,6 +586,8 @@ export type PlcPrimitiveType = string | boolean | number | Buffer | Date | BigIn
  * Return value of `readValue()` and `readValueBySymbol()`
  * 
  * @template T - Type of the value
+ * 
+ * @category Types
  */
 export interface ReadValueResult<T = any> {
   /** Value of the symbol as converted Javascript object */
@@ -559,6 +602,8 @@ export interface ReadValueResult<T = any> {
 
 /**
  * Return value of `writeValue()` and `writeValueBySymbol()`
+ * 
+ * @category Types
  */
 export interface WriteValueResult<T = any> {
   /** Value of the symbol as converted Javascript object */
@@ -573,6 +618,8 @@ export interface WriteValueResult<T = any> {
 
 /** 
  * Return value of `convertObjectToBuffer()` 
+ * 
+ * @category Types
  */
 export interface ObjectToBufferConversionResult {
   /** Converted raw value */
@@ -583,6 +630,8 @@ export interface ObjectToBufferConversionResult {
 
 /**
  * Variable handle object created using `createVariableHandle()` or `createVariableHandleMulti()`
+ * 
+ * @category Types
  */
 export interface VariableHandle {
   /** Handle number */
@@ -600,6 +649,8 @@ export interface VariableHandle {
  * 
  * @template T The type of method return value
  * @template U The type of method outputs
+ * 
+ * @category Types
  */
 export interface RpcMethodCallResult<T = any, U = Record<string, any>> {
   /** Method return value (if any - `undefined` if none) */
@@ -610,11 +661,15 @@ export interface RpcMethodCallResult<T = any, U = Record<string, any>> {
 
 /**
  * Parameter containing all read commands for `readRawMulti()`
+ * 
+ * @category Types
  */
 export interface ReadRawMultiCommand extends Required<AdsRawAddress> { }
 
 /**
  * Return value of `readRawMulti()`
+ * 
+ * @category Types
  */
 export interface ReadRawMultiResult extends BaseAdsResponse {
   /** Command */
@@ -627,6 +682,8 @@ export interface ReadRawMultiResult extends BaseAdsResponse {
 
 /**
  * Parameter containing all write commands for `writeRawMulti()`
+ * 
+ * @category Types
  */
 export interface WriteRawMultiCommand extends AdsRawAddress {
   /** Value to write */
@@ -637,6 +694,8 @@ export interface WriteRawMultiCommand extends AdsRawAddress {
 
 /**
  * Return value of `writeRawMulti()`
+ * 
+ * @category Types
  */
 export interface WriteRawMultiResult extends BaseAdsResponse {
   /** Command */
@@ -647,6 +706,8 @@ export interface WriteRawMultiResult extends BaseAdsResponse {
 
 /**
  * Return value of `createVariableHandleMulti()`
+ * 
+ * @category Types
  */
 export interface CreateVariableHandleMultiResult extends BaseAdsResponse {
   /** Full variable path in the PLC (such as `GVL_Test.ExampleStruct`) */
@@ -659,6 +720,8 @@ export interface CreateVariableHandleMultiResult extends BaseAdsResponse {
 
 /**
  * Return value of `deleteVariableHandleMulti()`
+ * 
+ * @category Types
  */
 export interface DeleteVariableHandleMultiResult extends BaseAdsResponse {
   /** Variable handle */
@@ -669,6 +732,8 @@ export interface DeleteVariableHandleMultiResult extends BaseAdsResponse {
 
 /**
  * Parameter containing all read/write commands for `readWriteRawMulti()`
+ * 
+ * @category Types
  */
 export interface ReadWriteRawMultiCommand extends Required<AdsRawAddress> {
   /** Data to write */
@@ -679,6 +744,8 @@ export interface ReadWriteRawMultiCommand extends Required<AdsRawAddress> {
 
 /**
  * Return value of `readWriteRawMulti()`
+ * 
+ * @category Types
  */
 export interface ReadWriteRawMultiResult extends BaseAdsResponse {
   /** Command */

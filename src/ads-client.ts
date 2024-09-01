@@ -23,30 +23,105 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
 
-import EventEmitter from "events";
-import type { ActiveAdsRequestContainer, ActiveSubscription, ActiveSubscriptionContainer, AdsClientConnection, AdsClientSettings, AdsCommandToSend, AdsDataTypeContainer, AdsSymbolContainer, AdsUploadInfo, ConnectionMetaData, PlcPrimitiveType, SubscriptionData, SubscriptionSettings, ReadValueResult, TimerObject, ObjectToBufferConversionResult, WriteValueResult, VariableHandle, RpcMethodCallResult, CreateVariableHandleMultiResult, ReadRawMultiResult, ReadRawMultiCommand, WriteRawMultiResult, DeleteVariableHandleMultiResult, ReadWriteRawMultiResult, ReadWriteRawMultiCommand, WriteRawMultiCommand, ClientEvents, SubscriptionCallback, DebugLevel } from "./types/ads-client-types";
-import { AdsAddNotificationResponse, AdsAddNotificationResponseData, AdsArrayInfoEntry, AdsAttributeEntry, AdsDataType, AdsDeleteNotificationResponse, AdsDeviceInfo, AdsEnumInfoEntry, AdsNotification, AdsNotificationResponse, AdsNotificationSample, AdsNotificationStamp, AdsRawAddress, AdsReadDeviceInfoResponse, AdsReadResponse, AdsReadStateResponse, AdsReadWriteResponse, AdsRequest, AdsResponse, AdsRpcMethodEntry, AdsRpcMethodParameterEntry, AdsState, AdsSymbol, AdsWriteControlResponse, AdsWriteResponse, AmsAddress, AmsHeader, AmsPortRegisteredData, AmsRouterState, AmsRouterStateData, AmsTcpHeader, AmsTcpPacket, BaseAdsResponse, EmptyAdsResponse, UnknownAdsResponse } from "./types/ads-protocol-types";
 import {
   Socket,
   SocketConnectOpts
 } from "net";
+import EventEmitter from "events";
 import Debug from "debug";
 import Long from "long";
 import * as ADS from './ads-commons';
 import ClientError from "./client-error";
-export * as ADS from './ads-commons';
+
+import type {
+  ActiveAdsRequestContainer,
+  ActiveSubscription,
+  ActiveSubscriptionContainer,
+  AdsClientConnection,
+  AdsClientSettings,
+  AdsCommandToSend,
+  AdsDataTypeContainer,
+  AdsSymbolContainer,
+  AdsUploadInfo,
+  ConnectionMetaData,
+  PlcPrimitiveType,
+  SubscriptionData,
+  SubscriptionSettings,
+  ReadValueResult,
+  TimerObject,
+  ObjectToBufferConversionResult,
+  WriteValueResult,
+  VariableHandle,
+  RpcMethodCallResult,
+  CreateVariableHandleMultiResult,
+  ReadRawMultiResult,
+  ReadRawMultiCommand,
+  WriteRawMultiResult,
+  DeleteVariableHandleMultiResult,
+  ReadWriteRawMultiResult,
+  ReadWriteRawMultiCommand,
+  WriteRawMultiCommand,
+  ClientEvents,
+  SubscriptionCallback,
+  DebugLevel
+} from "./types/ads-client-types";
+
+import {
+  AdsAddNotificationResponse,
+  AdsAddNotificationResponseData,
+  AdsArrayInfoEntry,
+  AdsAttributeEntry,
+  AdsDataType,
+  AdsDeleteNotificationResponse,
+  AdsDeviceInfo,
+  AdsEnumInfoEntry,
+  AdsNotification,
+  AdsNotificationResponse,
+  AdsNotificationSample,
+  AdsNotificationStamp,
+  AdsRawAddress,
+  AdsReadDeviceInfoResponse,
+  AdsReadResponse,
+  AdsReadStateResponse,
+  AdsReadWriteResponse,
+  AdsRequest,
+  AdsResponse,
+  AdsRpcMethodEntry,
+  AdsRpcMethodParameterEntry,
+  AdsState,
+  AdsSymbol,
+  AdsWriteControlResponse,
+  AdsWriteResponse,
+  AmsAddress,
+  AmsHeader,
+  AmsPortRegisteredData,
+  AmsRouterStateData,
+  AmsTcpHeader,
+  AmsTcpPacket,
+  BaseAdsResponse,
+  EmptyAdsResponse,
+  UnknownAdsResponse
+} from "./types/ads-protocol-types";
+
 export type * from "./types/ads-client-types";
-//export type { AdsState, AmsRouterState, AdsResponse, EmptyAdsResponse, UnknownAdsResponse, AdsReadResponse, AdsReadWriteResponse, AdsWriteResponse, AdsReadDeviceInfoResponse, AdsNotificationResponse, AdsAddNotificationResponse, AdsDeleteNotificationResponse, AdsWriteControlResponse } from "./types/ads-protocol-types";
 export type * from './types/ads-protocol-types';
 export type * from './client-error';
+
+/**
+ * Common ADS constants and helper functions
+ * 
+ * @category Client
+ */
+export * as ADS from './ads-commons';
 
 /**
  * A class for handling TwinCAT ADS protocol communication.
  * 
  * Settings are provided in constructor - see {@link Client.constructor} and {@link AdsClientSettings}.
  * 
- * A client instance should be created for each target, however, a single client
- * can also be used to communicate with multiple endpoints.
+ * A client instance should be created for each target. 
+ * However, a single client instance can also be used to communicate with 
+ * multiple endpoints using the `targetOpts` parameter available in all methods.
  * 
  * @example
  * 
@@ -56,6 +131,8 @@ export type * from './client-error';
  *  targetAdsPort: 851
  * });
  * ```
+ * 
+ * @category Client
  */
 export class Client extends EventEmitter<ClientEvents> {
   /**
@@ -5504,11 +5581,32 @@ export class Client extends EventEmitter<ClientEvents> {
   /**
    * Writes raw data to the target system by variable path (such as `GVL_Test.ExampleStruct`).
    * 
-   * Supports also writing POINTER and REFERENCE values (see example).
+   * Supports also writing `POINTER` and `REFERENCE` values (see example).
    * 
-   * NOTE: Unlike with `{@link readRawByPath}()`, there is no direct ADS command available. 
-   * This uses variable handles under the hood, so multiple ADS commands are used.
+   * NOTE: Unlike with {@link readRawByPath}(), this command uses multiple ADS requests for the operation.
    *  
+   *  
+   * @example
+   * ```js
+   * try {
+   *  const data = await client.convertToRaw(32767, 'INT');
+   *  console.log(data); //<Buffer ff 7f>
+   * 
+   *  await client.writeRawByPath('GVL_Write.StandardTypes.INT_', data);
+   * 
+   * //Writing a POINTER value (Note the dereference operator ^)
+   * const ptrValue = ...
+   * await client.writeRawByPath('GVL_Read.ComplexTypes.POINTER_^', ptrValue);
+   * 
+   * //Writing a REFERENCE value
+   * const refValue = ...
+   * await client.readRawByPath('GVL_Read.ComplexTypes.REFERENCE_');
+   * 
+   * } catch (err) {
+   *  console.log("Error:", err);
+   * }
+   * ```
+   * 
    * @param path Variable path in the PLC to write (such as `GVL_Test.ExampleStruct`)
    * @param value Data to write
    * @param targetOpts Optional target settings that override values in `settings`
