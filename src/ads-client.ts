@@ -1827,7 +1827,7 @@ export class Client extends EventEmitter<ClientEvents> {
 
             } else {
               this.debugD(`onAdsCommandReceived(): Notification received with unknown handle ${sample.notificationHandle} (${key}). Use unsubscribe() to save resources`);
-              this.emit('client-error', new ClientError(`onAdsCommandReceived(): Notification received with unknown handle ${sample.notificationHandle} (${key}). Use unsubscribe() to save resources.`));
+              this.warn(`onAdsCommandReceived(): Notification received with unknown handle ${sample.notificationHandle} (${key}). Use unsubscribe() to save resources.`);
             }
           }
         }
