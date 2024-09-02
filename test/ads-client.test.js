@@ -3409,6 +3409,8 @@ test('cleanup of stale subscriptions', async () => {
 
   expect(ev).toHaveBeenCalledWith(`onAdsCommandReceived(): Notification received with unknown handle ${subscription.notificationHandle} (${client.connection.targetAmsNetId}:${client.connection.targetAdsPort}) was automatically deleted.`);
 
+  client.off('warning', ev);
+
   await subscription.unsubscribe();
 });
 
