@@ -3389,6 +3389,29 @@ describe('subscriptions (ADS notifications)', () => {
   });
 });
 
+test('cleanup of stale subscriptions', async () => {
+  let subscription = null;
+
+  const ev = jest.fn();
+  client.on('warning', ev);
+
+  subscription = await client.subscribe({
+    target: 'GVL_Subscription.NumericValue_10ms',
+    callback: async () => {}
+  });
+
+  // Forcefully disconnect, without unsubscribing
+  await client.disconnect(true);
+  await client.connect();
+
+  // Wait for a notification to arrive for the stale subscription
+  await delay(100);
+
+  expect(ev).toHaveBeenCalledWith(`onAdsCommandReceived(): Notification received with unknown handle ${subscription.notificationHandle} (${client.connection.targetAmsNetId}:${client.connection.targetAdsPort}) was automatically deleted.`);
+
+  await subscription.unsubscribe();
+});
+
 describe('remote procedure calls (RPC methods)', () => {
   test('calling a RPC method', async () => {
     const res = await client.invokeRpcMethod('GVL_RPC.RpcBlock', 'Calculator', {
