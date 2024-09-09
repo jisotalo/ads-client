@@ -3631,7 +3631,7 @@ describe('handling unknown/stale ADS notifications', () => {
     await subscription.unsubscribe();
   });
   
-  test('deleting an unknown noticication handle automatically', async () => {
+  test('deleting an unknown notification handle automatically', async () => {
     let subscription = null;
 
     client2.settings.deleteUnknownSubscriptions = true;
