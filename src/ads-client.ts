@@ -653,6 +653,7 @@ export class Client extends EventEmitter<AdsClientEvents> {
         };
 
         this.metaData = { ...this.defaultMetaData };
+        this.activeSubscriptions = {};
 
         this.socket?.removeAllListeners();
         this.socket?.destroy();
@@ -665,7 +666,7 @@ export class Client extends EventEmitter<AdsClientEvents> {
       let disconnectError = null;
 
       try {
-        await this.removeSubscriptions(true)
+        await this.removeSubscriptions(true);
       } catch (err) {
         disconnectError = err;
       }
@@ -679,6 +680,7 @@ export class Client extends EventEmitter<AdsClientEvents> {
         };
 
         this.metaData = { ...this.defaultMetaData };
+        this.activeSubscriptions = {};
 
         this.socket?.removeAllListeners();
         this.socket?.destroy();
@@ -701,6 +703,7 @@ export class Client extends EventEmitter<AdsClientEvents> {
         };
 
         this.metaData = { ...this.defaultMetaData };
+        this.activeSubscriptions = {};
 
         this.debug(`disconnectFromTarget(): Connection closing failed, connection was forced to close`);
         this.emit("disconnect", isReconnecting);
@@ -1828,17 +1831,25 @@ export class Client extends EventEmitter<AdsClientEvents> {
                 })
                 .catch(err => {
                   this.debug(`onAdsCommandReceived(): Notification received but parsing Javascript object failed: %o`, err);
-                  this.emit('client-error', new ClientError(`onAdsCommandReceived(): Notification received but parsing data to Javascript object failed. Subscription: ${JSON.stringify(subscription)}`, err));
+                  this.emit('client-error', new ClientError(`An ADS notification received but parsing data to a Javascript object failed. Subscription: ${JSON.stringify(subscription)}`, err));
                 });
 
             } else if (this.settings.deleteUnknownSubscriptions) {
-              this.debugD(`onAdsCommandReceived(): Notification received with unknown handle ${sample.notificationHandle} (${key})`);
+              this.debug(`onAdsCommandReceived(): An ADS notification with an unknown handle ${sample.notificationHandle} was received from ${key}. Trying to delete it to save resources (deleteUnknownSubscriptions is set).`);
+
               this.deleteNotificationHandle(sample.notificationHandle, packet.ams.sourceAmsAddress)
-                  .then(() => this.warn(`onAdsCommandReceived(): Notification received with unknown handle ${sample.notificationHandle} (${key}) was automatically deleted.`))
-                  .catch((err) => this.emit('client-error', new ClientError(`onAdsCommandReceived(): Failed to delete stale notification handle ${sample.notificationHandle} (${key})`, err)));
+                .then(() => {
+                  this.debug(`onAdsCommandReceived(): An ADS notification with an unknown handle ${sample.notificationHandle} was received from ${key} and automatically deleted`);
+                  this.warn(`An ADS notification with an unknown handle ${sample.notificationHandle} was received from ${key} and automatically deleted`);
+                })
+                .catch(err => {
+                  this.debug(`onAdsCommandReceived(): Failed to delete an unknown ADS notification handle ${sample.notificationHandle} (from ${key}): %o`, err);
+                  this.emit('client-error', new ClientError(`Failed to delete an unknown ADS notification handle ${sample.notificationHandle} (from ${key})`, err));
+                });
+
             } else {
-              this.debugD(`onAdsCommandReceived(): Notification received with unknown handle ${sample.notificationHandle} (${key})`);
-              this.warn(`onAdsCommandReceived(): Notification received with unknown handle ${sample.notificationHandle} (${key}). Use unsubscribe() to save resources.`);
+              this.debug(`onAdsCommandReceived(): Notification received with unknown handle ${sample.notificationHandle} (${key})`);
+              this.warn(`An ADS notification with an unknown handle ${sample.notificationHandle} was received from ${key}. Use unsubscribe() or deleteUnknownSubscriptions setting to save resources.`);
             }
           }
         }
@@ -1855,7 +1866,7 @@ export class Client extends EventEmitter<AdsClientEvents> {
 
         } else {
           this.debugD(`onAdsCommandReceived(): Ads command received with unknown invokeId "${packet.ams.invokeId}"`);
-          this.emit('client-error', new ClientError(`onAdsCommandReceived(): Ads command received with unknown invokeId "${packet.ams.invokeId}"`));
+          this.emit('client-error', new ClientError(`Ads command received with unknown invokeId "${packet.ams.invokeId}"`));
         }
         break;
     }
@@ -4664,9 +4675,18 @@ export class Client extends EventEmitter<AdsClientEvents> {
   }
 
   /**
-   * Delete ADS notification on PLC.
+   * Sends a delete ADS notification command to the target system.
+   * 
+   * Doesn't delete subscriptions, just sends the ADS command.
+   * 
+   * @param notificationHandle Notification handle to delete (number)
+   * @param targetAmsAddress Target system address
+   * 
+   * @throws NOTE: Throws error if failed
    */
-   private async deleteNotificationHandle(notificationHandle: number, targetAmsAddress: AmsAddress): Promise<AdsDeleteNotificationResponse> {
+  private async deleteNotificationHandle(notificationHandle: number, targetAmsAddress: AmsAddress): Promise<AdsDeleteNotificationResponse> {
+    this.debug(`deleteNotificationHandle(): Sending DeleteNotification command for handle ${notificationHandle} to ${ADS.amsAddressToString(targetAmsAddress)}`);
+
     //Allocating bytes for request
     const data = Buffer.alloc(4);
     let pos = 0;
@@ -4681,6 +4701,8 @@ export class Client extends EventEmitter<AdsClientEvents> {
       targetAdsPort: targetAmsAddress.adsPort,
       payload: data
     });
+
+    this.debug(`deleteNotificationHandle(): Notification for handle ${notificationHandle} (${ADS.amsAddressToString(targetAmsAddress)}) deleted!`);
 
     return res.ads;
   }

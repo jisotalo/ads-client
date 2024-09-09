@@ -131,7 +131,7 @@ describe('connection', () => {
         extraLength: 0
       }));
       expect(client.metaData.plcSymbolVersion).toBe(1);
-        
+
       expect(client.metaData.allPlcSymbolsCached).toBe(false);
       expect(client.metaData.plcSymbols).toStrictEqual({});
       expect(client.metaData.allPlcDataTypesCached).toBe(false);
@@ -144,7 +144,7 @@ describe('connection', () => {
   });
 
   test('checking that test PLC project is active', async () => {
-    try {  
+    try {
       const res = await client.readValue('GVL_AdsClientTests.IsTestProject');
       expect(res).toHaveProperty('value');
       expect(res.value).toBe(true);
@@ -3389,31 +3389,6 @@ describe('subscriptions (ADS notifications)', () => {
   });
 });
 
-test('cleanup of stale subscriptions', async () => {
-  let subscription = null;
-
-  const ev = jest.fn();
-  client.on('warning', ev);
-
-  subscription = await client.subscribe({
-    target: 'GVL_Subscription.NumericValue_10ms',
-    callback: async () => {}
-  });
-
-  // Forcefully disconnect, without unsubscribing
-  await client.disconnect(true);
-  await client.connect();
-
-  // Wait for a notification to arrive for the stale subscription
-  await delay(100);
-
-  expect(ev).toHaveBeenCalledWith(`onAdsCommandReceived(): Notification received with unknown handle ${subscription.notificationHandle} (${client.connection.targetAmsNetId}:${client.connection.targetAdsPort}) was automatically deleted.`);
-
-  client.off('warning', ev);
-
-  await subscription.unsubscribe();
-});
-
 describe('remote procedure calls (RPC methods)', () => {
   test('calling a RPC method', async () => {
     const res = await client.invokeRpcMethod('GVL_RPC.RpcBlock', 'Calculator', {
@@ -3569,49 +3544,123 @@ describe('disconnecting', () => {
   })
 });
 
-
 describe('controlling TwinCAT system service', () => {
-  const sysClient = new Client({
+  const client2 = new Client({
     targetAmsNetId: AMS_NET_ID,
     targetAdsPort: 10000,
     rawClient: true
   });
 
   test('connecting', async () => {
-    await sysClient.connect();
+    await client2.connect();
   });
 
   test('setting TwinCAT system to config', async () => {
-    let state = await sysClient.readTcSystemState();
+    let state = await client2.readTcSystemState();
     expect(state.adsState).toBe(ADS.ADS_STATE.Run);
 
-    await sysClient.setTcSystemToConfig();
+    await client2.setTcSystemToConfig();
 
     //Some delay as system was just started
     await delay(2000);
 
-    state = await sysClient.readTcSystemState();
+    state = await client2.readTcSystemState();
     expect(state.adsState).toBe(ADS.ADS_STATE.Config);
   });
 
   test('setting TwinCAT system to run', async () => {
-    let state = await sysClient.readTcSystemState();
+    let state = await client2.readTcSystemState();
     expect(state.adsState).toBe(ADS.ADS_STATE.Config);
 
-    await sysClient.setTcSystemToRun(false); //false -> we don't want to reconnect
+    await client2.setTcSystemToRun(false); //false -> we don't want to reconnect
 
     //Some delay as system was just started
     await delay(2000);
 
-    state = await sysClient.readTcSystemState();
+    state = await client2.readTcSystemState();
     expect(state.adsState).toBe(ADS.ADS_STATE.Run);
   });
 
   test('disconnecting', async () => {
-    if (sysClient?.connection.connected) {
-      const task = sysClient.disconnect()
+    if (client2?.connection.connected) {
+      const task = client2.disconnect()
       expect(task).resolves.toBeUndefined()
     }
-  })
+  });
+});
 
+
+describe('handling unknown/stale ADS notifications', () => {
+  //We need own client for this as the ADS port has to be static
+  //Otherwise we wouldn't get notifications after reconnect
+  const client2 = new Client({
+    targetAmsNetId: AMS_NET_ID,
+    targetAdsPort: 851,
+    localAdsPort: 32758,
+    hideConsoleWarnings: true
+  });
+
+  test('connecting', async () => {
+    await client2.connect();
+  });
+
+  test('creating an unknown noticication handle by forced disconnecting', async () => {
+    let subscription = null;
+
+    client2.settings.deleteUnknownSubscriptions = false;
+
+    const ev = jest.fn();
+    client2.on('warning', ev);
+
+    subscription = await client2.subscribe({
+      target: 'GVL_Subscription.NumericValue_100ms',
+      callback: async () => { }
+    });
+
+    // Forcefully disconnect, without unsubscribing
+    await client2.disconnect(true);
+    await client2.connect();
+
+    // Wait for a notification to arrive for an unknown notification handle
+    await delay(1000);
+
+    expect(ev).toHaveBeenCalledWith(`An ADS notification with an unknown handle ${subscription.notificationHandle} was received from ${client2.connection.targetAmsNetId}:${client2.connection.targetAdsPort}. Use unsubscribe() or deleteUnknownSubscriptions setting to save resources.`);
+  
+    client2.off('warning', ev);
+
+    await subscription.unsubscribe();
+  });
+  
+  test('deleting an unknown noticication handle automatically', async () => {
+    let subscription = null;
+
+    client2.settings.deleteUnknownSubscriptions = true;
+
+    const ev = jest.fn();
+    client2.on('warning', ev);
+
+    subscription = await client2.subscribe({
+      target: 'GVL_Subscription.NumericValue_100ms',
+      callback: async () => { }
+    });
+
+    // Forcefully disconnect, without unsubscribing
+    await client2.disconnect(true);
+    await client2.connect();
+
+    // Wait for a notification to arrive for the deletion of an unknown notification handle
+    await delay(1000);
+
+    expect(ev).toHaveBeenCalledWith(`An ADS notification with an unknown handle ${subscription.notificationHandle} was received from ${client2.connection.targetAmsNetId}:${client2.connection.targetAdsPort} and automatically deleted`);
+  
+    client2.off('warning', ev);
+  });
+
+  
+  test('disconnecting', async () => {
+    if (client2?.connection.connected) {
+      const task = client2.disconnect()
+      expect(task).resolves.toBeUndefined()
+    }
+  });
 });
