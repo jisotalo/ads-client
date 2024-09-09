@@ -3604,7 +3604,7 @@ describe('handling unknown/stale ADS notifications', () => {
     await client2.connect();
   });
 
-  test('creating an unknown noticication handle by forced disconnecting', async () => {
+  test('creating an unknown notification handle by forced disconnecting', async () => {
     let subscription = null;
 
     client2.settings.deleteUnknownSubscriptions = false;
@@ -3625,12 +3625,12 @@ describe('handling unknown/stale ADS notifications', () => {
     await delay(1000);
 
     expect(ev).toHaveBeenCalledWith(`An ADS notification with an unknown handle ${subscription.notificationHandle} was received from ${client2.connection.targetAmsNetId}:${client2.connection.targetAdsPort}. Use unsubscribe() or deleteUnknownSubscriptions setting to save resources.`);
-  
+
     client2.off('warning', ev);
 
     await subscription.unsubscribe();
   });
-  
+
   test('deleting an unknown notification handle automatically', async () => {
     let subscription = null;
 
@@ -3652,11 +3652,11 @@ describe('handling unknown/stale ADS notifications', () => {
     await delay(1000);
 
     expect(ev).toHaveBeenCalledWith(`An ADS notification with an unknown handle ${subscription.notificationHandle} was received from ${client2.connection.targetAmsNetId}:${client2.connection.targetAdsPort} and automatically deleted`);
-  
+
     client2.off('warning', ev);
   });
 
-  
+
   test('disconnecting', async () => {
     if (client2?.connection.connected) {
       const task = client2.disconnect()
