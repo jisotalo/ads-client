@@ -18,7 +18,6 @@ All breaking changes are (hopefully) done.
 
 * See [milestone #2](https://github.com/jisotalo/ads-client/milestone/2) for tasks to be done.
 * See [MIGRATION.md](https://github.com/jisotalo/ads-client/blob/v2-dev/MIGRATION.md) for guide of migrating v1->v2
-
 * Clone repository and open `docs/index.html` in browser for documentation
 
 ## Getting started
