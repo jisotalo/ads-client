@@ -4,11 +4,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [2.0.0-beta.3] - UNRELEASED
+## [2.0.0-beta.3] - 10.09.2024
+- **BREAKING:** Renamed `ReadWriteRawMultiCommand` property `writeData` to `value`
 - Added `warning` event to listen for console warnings
 - Bugfix: `writeRawByPath()` didn't use the `targetOpts` parameter
-- Renamed `ReadWriteRawMultiCommand` property `writeData` to `value`
 - Type `ClientEvents` renamed to `AdsClientEvents`
+- Added automatic deletion of stale subscriptions / unknown ADS notification handles
+  - New setting: `deleteUnknownSubscriptions` (default: `true`)
+
+Thank you [Christian Rishøj](https://github.com/crishoj) for contribution!
 
 ## [2.0.0-beta.2] - 26.08.2024
 - Changed `subscribeSymbol()` -> `subscribeValue()`
