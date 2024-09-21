@@ -2,7 +2,15 @@
 
 This document contains breaking changes between ads-client major versions.
 
-## 1.x.x --> 2.x.x
+## 1.x.x → 2.x.x
+
+### Typescript types
+
+ads-client is now natively Typescript. Please remove the type definition package, if installed:
+
+```
+npm remove @types/ads-client
+```
 
 ### Client general
 <table>
