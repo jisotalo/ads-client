@@ -1,4 +1,3 @@
-
 /**
  * Symbol information object to check keys & types
  */
@@ -258,12 +257,12 @@ const ST_STANDARD_ARRAY_TYPES_WRITE =
 }
 
 
-const BLOCK_4 = {
+const BLOCK_4 = (IS_64_BIT) => ({
   bRead: false,
   sNetId: '',
   nPort: 851,
   sVarName: '',
-  nDestAddr: 0n,
+  nDestAddr: IS_64_BIT ? 0n : 0,
   nLen: 0,
   tTimeout: 5000,
   eComMode: { name: 'eAdsComModeSecureCom', value: 0 },
@@ -281,8 +280,8 @@ const BLOCK_4 = {
     IDXOFFS: 0,
     WRITELEN: 0,
     READLEN: 0,
-    SRCADDR: 0n,
-    DESTADDR: 0n,
+    SRCADDR: IS_64_BIT ? 0n : 0,
+    DESTADDR: IS_64_BIT ? 0n : 0,
     WRTRD: false,
     TMOUT: 5000,
     BUSY: false,
@@ -295,7 +294,7 @@ const BLOCK_4 = {
     IDXGRP: 0,
     IDXOFFS: 0,
     LEN: 0,
-    SRCADDR: 0n,
+    SRCADDR: IS_64_BIT ? 0n : 0,
     WRITE: false,
     TMOUT: 5000,
     BUSY: false,
@@ -308,7 +307,7 @@ const BLOCK_4 = {
     IDXGRP: 0,
     IDXOFFS: 0,
     LEN: 0,
-    DESTADDR: 0n,
+    DESTADDR: IS_64_BIT ? 0n : 0,
     READ: false,
     TMOUT: 5000,
     BUSY: false,
@@ -319,7 +318,8 @@ const BLOCK_4 = {
   iStep: 0,
   iNextStep: 0,
   nSymbolHandle: 0
-}
+})
+
 
 
 module.exports = {

@@ -50,6 +50,7 @@ const delay = (ms) => new Promise((resolve, reject) => {
   setTimeout(() => resolve(), ms);
 });
 
+let IS_64_BIT = false;
 
 
 test('IMPORTANT NOTE: This test requires running a specific PLC project locally (https://github.com/jisotalo/ads-client-test-plc-project)', () => { });
@@ -68,79 +69,76 @@ describe('connection', () => {
   });
 
   test('connecting to the target', async () => {
-    try {
-      const ev = jest.fn();
-      client.on('connect', ev);
-      const res = await client.connect();
+    const ev = jest.fn();
+    client.on('connect', ev);
+    const res = await client.connect();
 
-      expect(res).toHaveProperty('connected');
-      expect(res.connected).toBe(true);
-      expect(ev).toHaveBeenCalled();
+    expect(res).toHaveProperty('connected');
+    expect(res.connected).toBe(true);
+    expect(ev).toHaveBeenCalled();
 
-      //Checking client.connection
-      //only keys
-      expect(Object.keys(client.connection)).toStrictEqual(Object.keys({
-        connected: true,
-        isLocal: false,
-        localAmsNetId: '192.168.68.101.1.1',
-        localAdsPort: 32891,
-        targetAmsNetId: client.settings.targetAmsNetId,
-        targetAdsPort: 851
-      }));
+    //Checking client.connection
+    //only keys
+    expect(Object.keys(client.connection)).toStrictEqual(Object.keys({
+      connected: true,
+      isLocal: false,
+      localAmsNetId: '192.168.68.101.1.1',
+      localAdsPort: 32891,
+      targetAmsNetId: client.settings.targetAmsNetId,
+      targetAdsPort: 851
+    }));
 
-      //Checking some values
-      expect(client.connection.connected).toBe(true);
-      expect(client.connection.isLocal).toBe(false);
-      expect(client.connection.targetAmsNetId).toBe(client.settings.targetAmsNetId);
-      expect(client.connection.targetAdsPort).toBe(client.settings.targetAdsPort);
+    //Checking some values
+    expect(client.connection.connected).toBe(true);
+    expect(client.connection.isLocal).toBe(false);
+    expect(client.connection.targetAmsNetId).toBe(client.settings.targetAmsNetId);
+    expect(client.connection.targetAdsPort).toBe(client.settings.targetAdsPort);
 
-      //Checking client.metaData
-      //only keys
-      expect(Object.keys(client.metaData)).toStrictEqual(Object.keys({
-        routerState: undefined,
-        tcSystemState: {},
-        plcDeviceInfo: {},
-        plcRuntimeState: {},
-        plcUploadInfo: {},
-        plcSymbolVersion: 1,
-        allPlcSymbolsCached: false,
-        plcSymbols: {},
-        allPlcDataTypesCached: false,
-        plcDataTypes: {}
-      }));
+    //Checking client.metaData
+    //only keys
+    expect(Object.keys(client.metaData)).toStrictEqual(Object.keys({
+      routerState: undefined,
+      tcSystemState: {},
+      plcDeviceInfo: {},
+      plcRuntimeState: {},
+      plcUploadInfo: {},
+      plcSymbolVersion: 1,
+      allPlcSymbolsCached: false,
+      plcSymbols: {},
+      allPlcDataTypesCached: false,
+      plcDataTypes: {}
+    }));
 
-      expect(client.metaData.tcSystemState).toStrictEqual({
-        adsState: 5,
-        adsStateStr: 'Run',
-        deviceState: 1
-      });
+    expect(client.metaData.tcSystemState).toStrictEqual({
+      adsState: 5,
+      adsStateStr: 'Run',
+      deviceState: 1
+    });
 
-      expect(client.metaData.plcRuntimeState).toStrictEqual({
-        adsState: 5,
-        adsStateStr: 'Run',
-        deviceState: 0
-      });
+    expect(client.metaData.plcRuntimeState).toStrictEqual({
+      adsState: 5,
+      adsStateStr: 'Run',
+      deviceState: 0
+    });
 
-      //Note: checking only keys
-      expect(Object.keys(client.metaData.plcUploadInfo)).toStrictEqual(Object.keys({
-        symbolCount: 0,
-        symbolLength: 0,
-        dataTypeCount: 0,
-        dataTypeLength: 0,
-        extraCount: 0,
-        extraLength: 0
-      }));
-      expect(client.metaData.plcSymbolVersion).toBe(1);
+    //Note: checking only keys
+    expect(Object.keys(client.metaData.plcUploadInfo)).toStrictEqual(Object.keys({
+      symbolCount: 0,
+      symbolLength: 0,
+      dataTypeCount: 0,
+      dataTypeLength: 0,
+      extraCount: 0,
+      extraLength: 0
+    }));
 
-      expect(client.metaData.allPlcSymbolsCached).toBe(false);
-      expect(client.metaData.plcSymbols).toStrictEqual({});
-      expect(client.metaData.allPlcDataTypesCached).toBe(false);
-      expect(client.metaData.plcDataTypes).toStrictEqual({});
+    //this didn't work in TC3 PLC 4022.x
+    //expect(client.metaData.plcSymbolVersion).toBe(1);
 
+    expect(client.metaData.allPlcSymbolsCached).toBe(false);
+    expect(client.metaData.plcSymbols).toStrictEqual({});
+    expect(client.metaData.allPlcDataTypesCached).toBe(false);
+    expect(client.metaData.plcDataTypes).toStrictEqual({});
 
-    } catch (err) {
-      throw new Error(`connecting failed (${err.message}`, err);
-    }
   });
 
   test('checking that test PLC project is active', async () => {
@@ -157,6 +155,13 @@ describe('connection', () => {
   test('checking that test PLC project version is correct', async () => {
     const res = await client.readValue('GVL_AdsClientTests.VERSION');
     expect(res.value).toBe(PLC_PROJECT_VERSION);
+  });
+
+  test('checking 32/64 bitness', async () => {
+    const symbol = await client.getSymbol('GVL_AdsClientTests.TestPointer');
+    IS_64_BIT = symbol.size === 8;
+
+    expect(true).toBe(true);
   });
 
   test('caching of symbols and data types', async () => {
@@ -430,8 +435,8 @@ describe('symbols and data types', () => {
       offset: 0,
       adsDataType: 65,
       adsDataTypeStr: 'ADST_BIGTYPE',
-      flags: 2101377,
-      flagsStr: ['DataType', 'TypeGuid', 'Attributes', 'PersistantDatatype'],
+      //flags: 2101377, 
+      //flagsStr: ['DataType', 'TypeGuid', 'Attributes', 'PersistantDatatype'],
       arrayDimension: 0,
       name: 'ST_TestDataType',
       type: '',
@@ -473,6 +478,11 @@ describe('symbols and data types', () => {
       enumInfos: [],
       //reserved: Buffer.alloc(0)
     });
+
+    //Flags might different based on system (e.g. TC3 4022 (32bit) had different flags)
+    expect(typeof testType.flags).toBe('number');
+    expect(testType.flags).toBeGreaterThanOrEqual(2101377);
+    expect(testType.flagsStr).toEqual(expect.arrayContaining(['DataType', 'TypeGuid', 'Attributes', 'PersistantDatatype']))
   });
 
   test('reading single data type information', async () => {
@@ -505,8 +515,8 @@ describe('symbols and data types', () => {
       offset: 0,
       adsDataType: 65,
       adsDataTypeStr: 'ADST_BIGTYPE',
-      flags: 2101377,
-      flagsStr: ['DataType', 'TypeGuid', 'Attributes', 'PersistantDatatype'],
+      //flags: 2101377,
+      //flagsStr: ['DataType', 'TypeGuid', 'Attributes', 'PersistantDatatype'],
       arrayDimension: 0,
       name: '',
       type: 'ST_TestDataType',
@@ -619,7 +629,12 @@ describe('symbols and data types', () => {
       //reserved: Buffer.alloc(0)
     });
 
+    //Flags might different based on system (e.g. TC3 4022 (32bit) had different flags)
+    expect(typeof res.flags).toBe('number');
+    expect(res.flags).toBeGreaterThanOrEqual(2101377);
+    expect(res.flagsStr).toEqual(expect.arrayContaining(['DataType', 'TypeGuid', 'Attributes', 'PersistantDatatype']))
   });
+
 });
 
 describe('data conversion', () => {
@@ -1151,7 +1166,7 @@ describe('reading values', () => {
       //Note: dereferenced pointer value is not possible to read using readValue() - we only get memory address
       const res = await client.readValue('GVL_Read.ComplexTypes.POINTER_');
 
-      expect(typeof res.value).toBe("bigint");
+      expect(typeof res.value).toBe(IS_64_BIT ? "bigint" : "number");
       expect(res.symbol.type).toBe("POINTER TO ST_StandardTypes");
     });
 
@@ -1215,7 +1230,7 @@ describe('reading values', () => {
       {
         const res = await client.readValue('GVL_Read.ComplexTypes.BLOCK_4');
         expect(res.value).toStrictEqual({
-          ...BLOCK_4,
+          ...BLOCK_4(IS_64_BIT),
           sVarName: 'GVL_Test.Variable',
         });
       }
@@ -1224,7 +1239,8 @@ describe('reading values', () => {
     test('reading INTERFACE', async () => {
       {
         const res = await client.readValue('GVL_Read.ComplexTypes.INTERFACE_');
-        expect(typeof res.value).toBe('bigint');
+
+        expect(typeof res.value).toBe(IS_64_BIT ? "bigint" : "number");
       }
     });
   });
@@ -1359,7 +1375,7 @@ describe('reading values', () => {
       //Note: dereferenced pointer value is not possible to read using readValue() - we only get memory address
       const res = await client.readValue('GVL_Read.ComplexArrayTypes.POINTER_');
 
-      expect(typeof res.value[0]).toBe("bigint");
+      expect(typeof res.value[0]).toBe(IS_64_BIT ? "bigint" : "number");
       expect(res.symbol.type).toBe("ARRAY [0..2] OF POINTER TO ST_StandardTypes"); //TODO: Is this valid really?
     });
 
@@ -1454,15 +1470,16 @@ describe('reading values', () => {
         const res = await client.readValue('GVL_Read.ComplexArrayTypes.BLOCK_4');
         expect(res.value).toStrictEqual([
           {
-            ...BLOCK_4,
+            ...BLOCK_4(IS_64_BIT),
             sVarName: 'GVL_Test.Variable',
           },
-          BLOCK_4,
+          BLOCK_4(IS_64_BIT),
           {
-            ...BLOCK_4,
+            ...BLOCK_4(IS_64_BIT),
             sVarName: 'GVL_Test.AnotherVariable',
           },
         ]);
+
       }
     });
 
@@ -1470,11 +1487,12 @@ describe('reading values', () => {
       {
         const res = await client.readValue('GVL_Read.ComplexArrayTypes.INTERFACE_');
         expect(typeof res.value).toBe('object');
-        expect(typeof res.value[0]).toBe('bigint');
-        expect(typeof res.value[1]).toBe('bigint');
-        expect(typeof res.value[2]).toBe('bigint');
 
-        expect(res.value[1]).toBe(0n);
+        expect(typeof res.value[0]).toBe(IS_64_BIT ? "bigint" : "number");
+        expect(typeof res.value[1]).toBe(IS_64_BIT ? "bigint" : "number");
+        expect(typeof res.value[2]).toBe(IS_64_BIT ? "bigint" : "number");
+
+        expect(res.value[1]).toBe(IS_64_BIT ? 0n : 0);
       }
     });
   });
@@ -1539,7 +1557,7 @@ describe('reading values', () => {
       {
         const res = await client.readValue('GVL_Read.SpecialTypes.EmptyBlock');
 
-        expect(typeof res.value).toBe("bigint");
+        expect(typeof res.value).toBe(IS_64_BIT ? "bigint" : "number");
       }
     });
 
@@ -2421,7 +2439,7 @@ describe('writing values', () => {
           sNetId: '',
           nPort: 851,
           sVarName: 'GVL_Test.Variable',
-          nDestAddr: 0n,
+          nDestAddr: IS_64_BIT ? 0n : 0,
           nLen: 0,
           tTimeout: 5000,
           eComMode: { name: 'eAdsComModeSecureCom', value: 0 },
@@ -2439,8 +2457,8 @@ describe('writing values', () => {
             IDXOFFS: 0,
             WRITELEN: 0,
             READLEN: 0,
-            SRCADDR: 0n,
-            DESTADDR: 0n,
+            SRCADDR: IS_64_BIT ? 0n : 0,
+            DESTADDR: IS_64_BIT ? 0n : 0,
             WRTRD: false,
             TMOUT: 5000,
             BUSY: false,
@@ -2453,7 +2471,7 @@ describe('writing values', () => {
             IDXGRP: 0,
             IDXOFFS: 0,
             LEN: 0,
-            SRCADDR: 0n,
+            SRCADDR: IS_64_BIT ? 0n : 0,
             WRITE: false,
             TMOUT: 5000,
             BUSY: false,
@@ -2466,7 +2484,7 @@ describe('writing values', () => {
             IDXGRP: 0,
             IDXOFFS: 0,
             LEN: 0,
-            DESTADDR: 0n,
+            DESTADDR: IS_64_BIT ? 0n : 0,
             READ: false,
             TMOUT: 5000,
             BUSY: false,
@@ -2654,7 +2672,7 @@ describe('writing values', () => {
 
       const arrayValue = [
         value,
-        0n,
+        IS_64_BIT ? 0n : 0,
         value
       ];
 
@@ -2781,12 +2799,12 @@ describe('writing values', () => {
       {
         const value = [
           {
-            ...BLOCK_4,
+            ...BLOCK_4(IS_64_BIT),
             sVarName: 'GVL_Test.Variable',
           },
-          BLOCK_4,
+          BLOCK_4(IS_64_BIT),
           {
-            ...BLOCK_4,
+            ...BLOCK_4(IS_64_BIT),
             sVarName: 'GVL_Test.AnotherVariable',
           },
         ];
@@ -2802,7 +2820,7 @@ describe('writing values', () => {
         const { value } = await client.readValue('GVL_Read.ComplexTypes.INTERFACE_');
         const arrayValue = [
           value,
-          0n,
+          IS_64_BIT ? 0n : 0,
           value
         ];
 
@@ -3562,7 +3580,7 @@ describe('controlling TwinCAT system service', () => {
     await client2.setTcSystemToConfig();
 
     //Some delay as system was just started
-    await delay(2000);
+    await delay(4000);
 
     state = await client2.readTcSystemState();
     expect(state.adsState).toBe(ADS.ADS_STATE.Config);
@@ -3575,7 +3593,7 @@ describe('controlling TwinCAT system service', () => {
     await client2.setTcSystemToRun(false); //false -> we don't want to reconnect
 
     //Some delay as system was just started
-    await delay(2000);
+    await delay(4000);
 
     state = await client2.readTcSystemState();
     expect(state.adsState).toBe(ADS.ADS_STATE.Run);
