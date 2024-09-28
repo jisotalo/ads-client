@@ -6,8 +6,6 @@
   "scripts": {
     "test-tc3": "jest --runInBand TC3/ads-client.test.js",
     "test-tc2": "jest --runInBand TC2/ads-client.test.js",
-    "test-dev": "jest --runInBand --bail=true --verbose=false --summaryThreshold=1",
-    "test-watch": "npm run test -- --watch --config test/jest.config.js",
     "build": "tsc",
     "watch": "tsc -w",
     "create-docs": "npx typedoc"
