@@ -4,6 +4,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.0-beta.4] - UNRELEASED
+- Improved TwinCAT 2 support
+  - Improved performance by caching base data types that aren't available in the PLC (for example, `INT16` in TC2)
+  - Bug fix: Building data types for TC2 system didn't always work (`DataType` flag is not set in base types)
+  - Bug fix: Building data types for TC2 system didn't always work (with arrays of base types)
+- Added test suites for TwinCAT 2
+  - Separate TwinCAT 2 test PLC project created (See [https://github.com/jisotalo/ads-client-test-plc-project/tree/v2-dev](https://github.com/jisotalo/ads-client-test-plc-project/tree/v2-dev))
+  - Updated tests to work with TC2 (and removed tests for TC2 unsupported features)
+
 ## [2.0.0-beta.3] - 10.09.2024
 - **BREAKING:** Renamed `ReadWriteRawMultiCommand` property `writeData` to `value`
 - Added `warning` event to listen for console warnings

@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2022 Jussi Isotalo <j.isotalo91@gmail.com>
+Copyright (c) Jussi Isotalo <j.isotalo91@gmail.com>
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -27,7 +27,7 @@ SOFTWARE.
 const PLC_PROJECT_VERSION = '2.0.0';
 const AMS_NET_ID = '192.168.4.1.1.1';
 
-const { Client, ADS } = require('../dist/ads-client');
+const { Client, ADS } = require('../../dist/ads-client');
 const util = require('util');
 const {
   ST_STANDARD_TYPES,
@@ -53,7 +53,7 @@ const delay = (ms) => new Promise((resolve, reject) => {
 let IS_64_BIT = false;
 
 
-test('IMPORTANT NOTE: This test requires running a specific PLC project locally (https://github.com/jisotalo/ads-client-test-plc-project)', () => { });
+test('IMPORTANT NOTE: This test requires running a specific TwinCAT 3 PLC project (https://github.com/jisotalo/ads-client-test-plc-project)', () => { });
 
 describe('connection', () => {
 

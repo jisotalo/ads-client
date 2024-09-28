@@ -2913,6 +2913,8 @@ export class Client extends EventEmitter<AdsClientEvents> {
         if ((err as ClientError).adsError && (err as ClientError).adsError?.errorCode === 1808) {
           //Type wasn't found.
           //Might be TwinCAT 2 system that doesn't provide pseudo or base data types by ADS --> check if we know the type ourselves
+          const originalName = name;
+
           if (ADS.BASE_DATA_TYPES.isPseudoType(name)) {
             //This converts e.g. PVOID to a primitive type
             if (knownSize === undefined) {
@@ -2948,6 +2950,13 @@ export class Client extends EventEmitter<AdsClientEvents> {
               extendedFlags: 0,
               reserved: Buffer.alloc(0)
             };
+
+            //Adding to cache, even though it's not read from the target
+            //With TwinCAT 2, this prevents trying to read base types again and again from the target (as there aren't any)
+            if (!this.settings.disableCaching && !targetOpts.adsPort && !targetOpts.amsNetId) {
+              this.metaData.plcDataTypes[originalName.toLowerCase()] = dataType;
+            }
+
           } else {
             //Type is unknown - we can't do anything
             throw new ClientError(`Data type ${name} is unknown (PLC doesn't provide it and it's not a base type)`);
@@ -2994,7 +3003,7 @@ export class Client extends EventEmitter<AdsClientEvents> {
         }
 
       } else if ((((dataType.type === '' && !ADS.BASE_DATA_TYPES.isPseudoType(dataType.name)) || ADS.BASE_DATA_TYPES.isKnownType(dataType.name))
-        && dataType.flagsStr.includes('DataType')
+        && (dataType.flagsStr.includes('DataType') || ADS.BASE_DATA_TYPES.isKnownType(dataType.name)) //isKnownType() call is for TwinCAT 2 support, as base types (like INT16) do not have DataType flag (but it's the final base type)
         && !dataType.flagsStr.includes('EnumInfos')
         && dataType.arrayDimension === 0)) {
 
@@ -3003,8 +3012,12 @@ export class Client extends EventEmitter<AdsClientEvents> {
 
       } else if (dataType.arrayDimension > 0) {
         //Data type is an array - get array subtype
+
+        //TwinCAT 2 support - calculate size if it's array of pointer etc.
+        const size = dataType.size / dataType.arrayInfos.reduce((total, dimension) => total * dimension.length, 1);
+
         builtType = {
-          ...(await this.buildDataType(dataType.type, targetOpts, false))
+          ...(await this.buildDataType(dataType.type, targetOpts, false, size))
         };
 
         builtType.arrayInfos = [...dataType.arrayInfos, ...builtType.arrayInfos];
@@ -6006,7 +6019,9 @@ export class Client extends EventEmitter<AdsClientEvents> {
     let dataType: AdsDataType;
     try {
       this.debugD(`readValue(): Getting data type for ${path}`);
-      dataType = await this.buildDataType(symbol.type, targetOpts);
+
+      //Also passing size for TC2 pointer/pseudo type support
+      dataType = await this.buildDataType(symbol.type, targetOpts, true, symbol.size);
 
     } catch (err) {
       this.debug(`readValue(): Getting data type for ${path} failed: %o`, err);
@@ -6138,7 +6153,9 @@ export class Client extends EventEmitter<AdsClientEvents> {
     let dataType: AdsDataType;
     try {
       this.debugD(`writeValue(): Getting data type for ${path}`);
-      dataType = await this.buildDataType(symbol.type, targetOpts);
+
+      //Also passing size for TC2 pointer/pseudo type support
+      dataType = await this.buildDataType(symbol.type, targetOpts, true, symbol.size);
 
     } catch (err) {
       this.debug(`writeValue(): Getting data type for ${path} failed: %o`, err);

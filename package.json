@@ -1,10 +1,11 @@
 {
   "name": "ads-client",
-  "version": "2.0.0-beta.3",
+  "version": "2.0.0-beta.4",
   "description": "Beckhoff TwinCAT ADS client library for Node.js (unofficial). Connect to a Beckhoff TwinCAT automation system using the ADS protocol from a Node.js app.",
   "main": "./dist/ads-client.js",
   "scripts": {
-    "test": "jest --runInBand",
+    "test-tc3": "jest --runInBand TC3/ads-client.test.js",
+    "test-tc2": "jest --runInBand TC2/ads-client.test.js",
     "test-dev": "jest --runInBand --bail=true --verbose=false --summaryThreshold=1",
     "test-watch": "npm run test -- --watch --config test/jest.config.js",
     "build": "tsc",
