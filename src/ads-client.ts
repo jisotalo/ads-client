@@ -837,7 +837,7 @@ export class Client extends EventEmitter<AdsClientEvents> {
       this.socket?.once('error', errorHandler);
 
       try {
-        await this.socketWrite(packet);
+        this.socketWrite(packet);
 
       } catch (err) {
         this.socket?.off('error', errorHandler);
@@ -910,7 +910,8 @@ export class Client extends EventEmitter<AdsClientEvents> {
       });
 
       try {
-        await this.socketWrite(buffer);
+        this.socketWrite(buffer);
+        resolve();
       } catch (err) {
         reject(err);
       }
