@@ -909,9 +909,16 @@ export class Client extends EventEmitter<AdsClientEvents> {
         resolve();
       });
 
+      this.amsTcpCallback = (res: AmsTcpPacket) => {
+        this.amsTcpCallback = undefined;
+        if (res.amsTcp.command === ADS.AMS_HEADER_FLAG.AMS_TCP_PORT_CLOSE) {
+          this.debug(`unregisterAdsPort(): ADS port unregistered`);
+          resolve();
+        }
+      }
+
       try {
         this.socketWrite(buffer);
-        resolve();
       } catch (err) {
         reject(err);
       }
@@ -1740,7 +1747,11 @@ export class Client extends EventEmitter<AdsClientEvents> {
       //AMS port unregister
       case ADS.AMS_HEADER_FLAG.AMS_TCP_PORT_CLOSE:
         packet.amsTcp.commandStr = 'Port unregister';
-        //No action at the moment
+        if (this.amsTcpCallback) {
+          this.amsTcpCallback(packet);
+        } else {
+          this.debug(`onAmsTcpPacketReceived(): Port unregister response received but no callback was assigned (${packet.amsTcp.commandStr})`);
+        }
         break;
 
       //AMS port register
