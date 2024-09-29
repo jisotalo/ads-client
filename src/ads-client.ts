@@ -913,6 +913,7 @@ export class Client extends EventEmitter<AdsClientEvents> {
         this.amsTcpCallback = undefined;
         if (res.amsTcp.command === ADS.AMS_HEADER_FLAG.AMS_TCP_PORT_CLOSE) {
           this.debug(`unregisterAdsPort(): ADS port unregistered`);
+          this.socket?.destroy();
           resolve();
         }
       }
