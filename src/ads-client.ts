@@ -918,10 +918,29 @@ export class Client extends EventEmitter<AdsClientEvents> {
         }
       }
 
+      //Timeout (if no answer from router)
+      this.portRegisterTimeoutTimer = setTimeout(() => {
+        //Callback is no longer needed, delete it
+        this.amsTcpCallback = undefined;
+
+        //Create a custom "ads error" so that the info is passed onwards
+        const adsError = {
+          ads: {
+            error: true,
+            errorCode: -1,
+            errorStr: `Timeout - no response in ${this.settings.timeoutDelay} ms`
+          }
+        };
+        this.debug(`unregisterAdsPort(): Failed to unregister ADS port: Timeout - no response in ${this.settings.timeoutDelay} ms`);
+        return reject(new ClientError(`unregisterAdsPort(): Timeout - no response in ${this.settings.timeoutDelay} ms`, adsError));
+      }, this.settings.timeoutDelay);
+
       try {
         this.socketWrite(buffer);
       } catch (err) {
         reject(err);
+      } finally {
+        this.portRegisterTimeoutTimer && clearTimeout(this.portRegisterTimeoutTimer);
       }
     })
   }
