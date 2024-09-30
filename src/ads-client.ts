@@ -4101,7 +4101,7 @@ export class Client extends EventEmitter<AdsClientEvents> {
    * @example
    * ```js
    * try {
-   *  const symbol = await client.getSymbol('GVL_Test.ExampleStruct');
+   *  const symbol = await client.getSymbol('GVL_Read.StandardTypes.INT_');
    * } catch (err) {
    *  console.log("Error:", err);
    * }
@@ -4439,7 +4439,7 @@ export class Client extends EventEmitter<AdsClientEvents> {
    * //Checks if value has changed every 100ms
    * //Callback is called only when the value has changed
    * await client.subscribeValue(
-   *  'GVL_Test.ExampleStruct.',
+   *  'GVL_Subscription.NumericValue_10ms',
    *  (data, subscription) => {
    *   console.log(`Value of ${subscription.symbol.name} has changed: ${data.value}`);
    *  },
@@ -4593,7 +4593,7 @@ export class Client extends EventEmitter<AdsClientEvents> {
    * //Checks if value has changed every 100ms
    * //Callback is called only when the value has changed
    * await client.subscribe({
-   *  target: 'GVL_Test.ExampleStruct',
+   *  target: 'GVL_Subscription.NumericValue_10ms',
    *  callback: (data, subscription) => {
    *    console.log(`Value of ${subscription.symbol.name} has changed: ${data.value}`);
    *  },
@@ -5680,7 +5680,6 @@ export class Client extends EventEmitter<AdsClientEvents> {
    * 
    * NOTE: Unlike with {@link readRawByPath}(), this command uses multiple ADS requests for the operation.
    *  
-   *  
    * @example
    * ```js
    * try {
@@ -5985,7 +5984,7 @@ export class Client extends EventEmitter<AdsClientEvents> {
    * @example
    * ```js
    * try {
-   *  const res = await client.readValue('GVL_Test.ExampleStruct');
+   *  const res = await client.readValue('GVL_Read.StandardTypes.INT_');
    *  console.log(res.value);
    * } catch (err) {
    *  console.log("Error:", err);
@@ -5996,6 +5995,7 @@ export class Client extends EventEmitter<AdsClientEvents> {
    * @param targetOpts Optional target settings that override values in `settings`
    * 
    * @template T In Typescript, the data type of the value, for example `readValue<number>(...)` or `readValue<ST_TypedStruct>(...)` (default: `any`)
+   * @throws Throws an error if sending the command fails or if the target responds with an error.
    */
   public async readValue<T = any>(path: string, targetOpts: Partial<AmsAddress> = {}): Promise<ReadValueResult<T>> {
     if (!this.connection.connected) {
@@ -6061,7 +6061,7 @@ export class Client extends EventEmitter<AdsClientEvents> {
   }
 
   /**
-   * Reads variable's value from the target system by a symbol object
+   * Reads variable's value from the target system by a symbol object (acquired using `getSymbol()`)
    * and returns the value as a Javascript object.
    * 
    * Returns variable's
@@ -6075,7 +6075,7 @@ export class Client extends EventEmitter<AdsClientEvents> {
    * @example
    * ```js
    * try {
-   *  const symbol = await client.getSymbol('GVL_Test.ExampleStruct');
+   *  const symbol = await client.getSymbol('GVL_Read.StandardTypes.INT_');
    * 
    *  const res = await client.readValueBySymbol(symbol);
    *  console.log(res.value);
@@ -6084,10 +6084,11 @@ export class Client extends EventEmitter<AdsClientEvents> {
    * }
    * ```
    * 
-   * @param symbol Symbol object (acquired using {@link getSymbol}())
+   * @param symbol Symbol object
    * @param targetOpts Optional target settings that override values in `settings`
    * 
    * @template T In Typescript, the data type of the value, for example `readValueBySymbol<number>(...)` or `readValueBySymbol<ST_TypedStruct>(...)` (default: `any`)
+   * @throws Throws an error if sending the command fails or if the target responds with an error.
    */
   public async readValueBySymbol<T = any>(symbol: AdsSymbol, targetOpts: Partial<AmsAddress> = {}): Promise<ReadValueResult<T>> {
     if (!this.connection.connected) {
@@ -6118,7 +6119,7 @@ export class Client extends EventEmitter<AdsClientEvents> {
    *    example: true
    *  };
    * 
-   *  const res = await client.writeValue('GVL_Test.ExampleStruct', value);
+   *  const res = await client.writeValue('GVL_Read.StandardTypes.INT_', value);
    * } catch (err) {
    *  console.log("Error:", err);
    * }
@@ -6127,9 +6128,10 @@ export class Client extends EventEmitter<AdsClientEvents> {
    * @param path Variable path in the PLC (such as `GVL_Test.ExampleStruct`)
    * @param value Value to write
    * @param targetOpts Optional target settings that override values in `settings`
-   * @param autoFill If set and the data type is a container (`STRUCT`, `FUNCTION_BLOCK` etc.), missing properties are automatically set to default values (usually `0` or `''`).
+   * @param autoFill If set and the data type is a container (`STRUCT`, `FUNCTION_BLOCK` etc.), missing properties are automatically set to active values read from target (kept as-is).
    * 
    * @template T In Typescript, the data type of the value, for example `writeValue<number>(...)` or `writeValue<ST_TypedStruct>(...)`
+   * @throws Throws an error if sending the command fails or if the target responds with an error.
    */
   public async writeValue<T = any>(path: string, value: T, autoFill: boolean = false, targetOpts: Partial<AmsAddress> = {}): Promise<WriteValueResult<T>> {
     if (!this.connection.connected) {
@@ -6225,20 +6227,37 @@ export class Client extends EventEmitter<AdsClientEvents> {
   }
 
   /**
-   * **TODO - DOCUMENTATION ONGOING**
+   * Writes variable's value to the target system by a symbol object (acquired using `getSymbol()`).
+   * Converts the value from a Javascript object to a raw value.
    * 
-   * Writes a value by symbol. Converts the value from a Javascript object to a raw value.
+   * Returns variable's
+   * - converted value
+   * - raw value
+   * - data type
+   * - symbol
    * 
-   * Returns the converted value, the raw value, the data type and the symbol.
+   * **NOTE:** Do not use `autoFill` for `UNION` types, it doesn't work correctly.
    * 
-   * **NOTE:** Do not use `autoFill` for `UNION` types, it works without errors but the result isn't probably the desired one
+   * **NOTE:** This requires that the target is a PLC runtime or has equivalent ADS protocol support.
    * 
-   * @param symbol Symbol (acquired using `getSymbol()`)
+   * @example
+   * ```js
+   * try {
+   *  const symbol = await client.getSymbol('GVL_Read.StandardTypes.INT_');
+   * 
+   *  const res = await client.writeValueBySymbol(symbol, 32767);
+   * } catch (err) {
+   *  console.log("Error:", err);
+   * }
+   * ```
+   * 
+   * @param symbol Symbol object
    * @param value Value to write
    * @param targetOpts Optional target settings that override values in `settings`
-   * @param autoFill If true and data type is a container (`STRUCT`, `FUNCTION_BLOCK` etc.), missing properties are automatically **set to default values** (usually `0` or `''`) 
+   * @param autoFill If set and the data type is a container (`STRUCT`, `FUNCTION_BLOCK` etc.), missing properties are automatically set to active values read from target (kept as-is).
    * 
    * @template T In Typescript, the data type of the value, for example `writeValue<number>(...)` or `writeValue<ST_TypedStruct>(...)`
+   * @throws Throws an error if sending the command fails or if the target responds with an error.
    */
   public async writeValueBySymbol<T = any>(symbol: AdsSymbol, value: T, autoFill: boolean = false, targetOpts: Partial<AmsAddress> = {}): Promise<WriteValueResult<T>> {
     if (!this.connection.connected) {
@@ -6249,14 +6268,27 @@ export class Client extends EventEmitter<AdsClientEvents> {
   }
 
   /**
-   * **TODO - DOCUMENTATION ONGOING**
-   * 
    * Returns a default (empty) Javascript object representing provided PLC data type.
+   *
+   * @example
+   * ```js
+   * try {
+   *  const res = await client.getDefaultPlcObject('INT');
+   *  console.log(res); //0
+
+   *  const res2 = await client.getDefaultPlcObject('Tc2_Standard.TON');
+   *  console.log(res2); //{ IN: false, PT: 0, Q: false, ET: 0, M: false, StartTime: 0 }
    * 
-   * @param dataType Data type name in the PLC as string (such as `ST_Struct`) or `AdsDataType` object 
+   * } catch (err) {
+   *  console.log("Error:", err);
+   * }
+   * ```
+   * 
+   * @param dataType Data type name in the PLC as string (such as `ST_Struct`) or data type object (acquired using {@link getDataType}())
    * @param targetOpts Optional target settings that override values in `settings` 
    * 
-   * @template T Typescript data type of the PLC data, for example `readValue<number>(...)` or `readValue<ST_TypedStruct>(...)`
+   * @template T Typescript data type of the PLC data, for example `getDefaultPlcObject<number>(...)` or `getDefaultPlcObject<ST_TypedStruct>(...)`
+   * @throws Throws an error if sending the command fails or if the target responds with an error.
    */
   public async getDefaultPlcObject<T = any>(dataType: string | AdsDataType, targetOpts: Partial<AmsAddress> = {}): Promise<T> {
     if (!this.connection.connected) {
@@ -6285,15 +6317,28 @@ export class Client extends EventEmitter<AdsClientEvents> {
   }
 
   /**
-   * **TODO - DOCUMENTATION ONGOING**
+   * Converts raw data to a Javascript object by using the provided data type.
    * 
-   * Converts a raw byte value to a Javascript object.
+   * @example
+   * ```js
+   * try {
+   *  const data = await client.readRaw(16448, 414816, 2);
+   *  console.log(data); //<Buffer ff 7f>
    * 
-   * @param data Raw PLC data as Buffer (read for example with `readRaw()`)
-   * @param dataType Data type name in the PLC as string (such as `ST_Struct`) or `AdsDataType` object
+   *  const converted = await client.convertFromRaw(data, 'INT');
+   *  console.log(converted); //32767
+   * 
+   * } catch (err) {
+   *  console.log("Error:", err);
+   * }
+   * ```
+   * 
+   * @param data Raw data (acquired for example using {@link readRaw}())
+   * @param dataType Data type name in the PLC as string (such as `ST_Struct`) or data type object (acquired using {@link getDataType}())
    * @param targetOpts Optional target settings that override values in `settings`
    * 
    * @template T Typescript data type of the PLC data, for example `convertFromRaw<number>(...)` or `convertFromRaw<ST_TypedStruct>(...)`
+   * @throws Throws an error if sending the command fails or if the target responds with an error.
    */
   public async convertFromRaw<T = any>(data: Buffer, dataType: string | AdsDataType, targetOpts: Partial<AmsAddress> = {}): Promise<T> {
     if (!this.connection.connected) {
@@ -6330,18 +6375,27 @@ export class Client extends EventEmitter<AdsClientEvents> {
   }
 
   /**
-   * **TODO - DOCUMENTATION ONGOING**
+   * Converts a Javascript object to raw data by using the provided data type.
    * 
-   * Converts a Javascript object to raw byte data.
+   * **NOTE:** Do not use `autoFill` for `UNION` types, it doesn't work correctly.
+   
+   * @example
+   * ```js
+   * try {
+   *  const data = await client.convertToRaw(32767, 'INT');
+   *  console.log(data); //<Buffer ff 7f>
    * 
-   * **NOTE:** Do not use `autoFill` for `UNION` types, it works without errors but the result isn't probably the desired one
+   * } catch (err) {
+   *  console.log("Error:", err);
+   * }
+   * ```
    * 
-   * @param value Javascript object that represents the `dataType` in target system
-   * @param dataType Data type name in the PLC as string (such as `ST_Struct`) or `AdsDataType` object
-   * @param autoFill If true and data type is a container (`STRUCT`, `FUNCTION_BLOCK` etc.), missing properties are automatically **set to default values** (usually `0` or `''`) 
+   * @param value Value to convert
+   * @param dataType Data type name in the PLC as string (such as `ST_Struct`) or data type object (acquired using {@link getDataType}())
+   * @param autoFill autoFill If set and the data type is a container (`STRUCT`, `FUNCTION_BLOCK` etc.), missing properties are automatically set to default values (`0` or empty string).
    * @param targetOpts Optional target settings that override values in `settings`
    * 
-   * @template T Typescript data type of the PLC data, for example `convertFromRaw<number>(...)` or `convertFromRaw<ST_TypedStruct>(...)`
+   * @throws Throws an error if sending the command fails or if the target responds with an error.
    */
   public async convertToRaw(value: any, dataType: string | AdsDataType, autoFill: boolean = false, targetOpts: Partial<AmsAddress> = {}): Promise<Buffer> {
     if (!this.connection.connected) {
@@ -6409,14 +6463,39 @@ export class Client extends EventEmitter<AdsClientEvents> {
   }
 
   /**
-   * **TODO - DOCUMENTATION ONGOING**
+   * Creates a handle to a variable at the target system by variable path (such as `GVL_Test.ExampleStruct`).
    * 
-   * Creates a variable handle for a PLC symbol by given variable path
+   * The handle can be then used for reading and writing the value.
    * 
-   * Variable value can be accessed by using the handle with `readRawByHandle()` and `writeRawByHandle()`
+   * Reading and writing dereferenced `POINTER` and `REFERENCE` values is also possible.
+   * See {@link readRawByHandle}() and {@link writeRawByHandle}().
    * 
-   * @param path Full variable path in the PLC (such as `GVL_Test.ExampleStruct`)
-   * @param targetOpts Optional target settings that override values in `settings` (**NOTE:** If used, no caching is available -> possible performance impact)
+   * NOTE: The handle should be deleted after it's no longer needed,
+   * as there is a limited amount of handles available. See {@link deleteVariableHandle}().
+   * 
+   * @example
+   * ```js
+   * try {
+   *  //POINTER value (Note the dereference operator ^)
+   *  const handle1 = await client.createVariableHandle('GVL_Read.ComplexTypes.POINTER_^');
+   *  const value = await client.readRawByHandle(handle1);
+   *  await client.deleteVariableHandle(handle1);
+   * 
+   *  const handle2 = await client.createVariableHandle('GVL_Read.StandardTypes.INT_');
+   *  const value2 = await client.readRawByHandle(handle2);
+   *  await client.deleteVariableHandle(handle2);
+   * 
+   *  //Now you use convertFromRaw() to get actual values
+   * 
+   * } catch (err) {
+   *  console.log("Error:", err);
+   * }
+   * ```
+   * 
+   * @param path Variable path in the PLC to read (such as `GVL_Test.ExampleStruct`)
+   * @param targetOpts Optional target settings that override values in `settings`
+   * 
+   * @throws Throws an error if sending the command fails or if the target responds with an error.
    */
   public async createVariableHandle(path: string, targetOpts: Partial<AmsAddress> = {}): Promise<VariableHandle> {
     if (!this.connection.connected) {
@@ -6491,18 +6570,44 @@ export class Client extends EventEmitter<AdsClientEvents> {
   }
 
   /**
-   * **TODO - DOCUMENTATION ONGOING**
+   * Sends multiple {@link createVariableHandle}() commands in one ADS packet.
    * 
-   * Sends multiple createVariableHandle() commands in one ADS packet
+   * Creates a handle to a variable at the target system by variable path (such as `GVL_Test.ExampleStruct`).
    * 
-   * Creates a variable handle for a PLC symbol by given variable path
+   * The handle can be then used for reading and writing the value.
    * 
-   * Variable value can be accessed by using the handle with `readRawByHandle()` and `writeRawByHandle()`
+   * Reading and writing dereferenced `POINTER` and `REFERENCE` values is also possible.
+   * See {@link readRawByHandle}() and {@link writeRawByHandle}().
    * 
-   * Uses ADS sum command under the hood (better perfomance)
+   * NOTE: The handle should be deleted after it's no longer needed,
+   * as there is a limited amount of handles available. See {@link deleteVariableHandle}().
    * 
-   * @param paths Array of full variable paths in the PLC (such as `GVL_Test.ExampleStruct`)
+   * Uses ADS sum command under the hood (better and faster performance). 
+   * See [Beckhoff Information System](https://infosys.beckhoff.com/english.php?content=../content/1033/tc3_adsdll2/9007199379576075.html&id=9180083787138954512) for more info.
+   * 
+   * @example
+   * ```js
+   * try {
+   *  const results = await client.createVariableHandleMulti([
+   *    'GVL_Read.StandardTypes.INT_',
+   *    'GVL_Read.StandardTypes.REAL_'
+   *  ]);
+   *  
+   *  if(results[0].success) {
+   *    console.log(`First handle: ${results[0].handle}`);
+   *  } else {
+   *    console.log(`Creating first handle failed: ${results[0].errorStr}`);
+   *  }
+   * 
+   * } catch (err) {
+   *  console.log("Error:", err);
+   * }
+   * ```
+   * 
+   * @param paths Array of variable paths in the PLC to read (such as `GVL_Test.ExampleStruct`)
    * @param targetOpts Optional target settings that override values in `settings`
+   * 
+   * @throws Throws an error if sending the command fails or if the target responds with an error.
    */
   public async createVariableHandleMulti(paths: string[], targetOpts: Partial<AmsAddress> = {}): Promise<CreateVariableHandleMultiResult[]> {
     if (!this.connection.connected) {
@@ -6635,12 +6740,26 @@ export class Client extends EventEmitter<AdsClientEvents> {
   }
 
   /**
-   * **TODO - DOCUMENTATION ONGOING**
+   * Deletes a variable handle that was previously created 
+   * using {@link createVariableHandle}().
    * 
-   * Deletes a variable handle that was previously created using `createVariableHandle()`
+   * @example
+   * ```js
+   * try {
+   *  const handle = createVariableHandle(...);
+   * 
+   *  //After use, deleting the handle
+   *  await client.deleteVariableHandle(handle);
+   * 
+   * } catch (err) {
+   *  console.log("Error:", err);
+   * }
+   * ```
    * 
    * @param handle Variable handle to delete
-   * @param targetOpts Optional target settings that override values in `settings` (**NOTE:** If used, no caching is available -> possible performance impact)
+   * @param targetOpts Optional target settings that override values in `settings`
+   * 
+   * @throws Throws an error if sending the command fails or if the target responds with an error.
    */
   public async deleteVariableHandle(handle: VariableHandle | number, targetOpts: Partial<AmsAddress> = {}): Promise<void> {
     if (!this.connection.connected) {
@@ -6689,16 +6808,38 @@ export class Client extends EventEmitter<AdsClientEvents> {
 
 
   /**
-   * **TODO - DOCUMENTATION ONGOING**
+   * Sends multiple {@link deleteVariableHandle}() commands in one ADS packet.
    * 
-   * Sends multiple deleteVariableHandle() commands in one ADS packet
+   * Deletes a variable handle that was previously created 
+   * using {@link createVariableHandle}().
    * 
-   * Deletes a variable handle that was previously created using `createVariableHandle()`
+   * Uses ADS sum command under the hood (better and faster performance). 
+   * See [Beckhoff Information System](https://infosys.beckhoff.com/english.php?content=../content/1033/tc3_adsdll2/9007199379576075.html&id=9180083787138954512) for more info.
    * 
-   * Uses ADS sum command under the hood (better performance)
+   * @example
+   * ```js
+   * try {
+   *  const handle1 = createVariableHandle(...);
+   *  const handle2 = createVariableHandle(...);
+   * 
+   *  //After use, deleting the handles
+   *  const results = await client.deleteVariableHandleMulti([handle1, handle2]);
+   * 
+   *  if(results[0].success) {
+   *    console.log(`First deleted`);
+   *  } else {
+   *    console.log(`Deleting first handle failed: ${results[0].errorStr}`);
+   *  }
+   * 
+   * } catch (err) {
+   *  console.log("Error:", err);
+   * }
+   * ```
    * 
    * @param handles Array of variable handles to delete
    * @param targetOpts Optional target settings that override values in `settings`
+   * 
+   * @throws Throws an error if sending the command fails or if the target responds with an error.
    */
   public async deleteVariableHandleMulti(handles: (VariableHandle | number)[], targetOpts: Partial<AmsAddress> = {}): Promise<DeleteVariableHandleMultiResult[]> {
     if (!this.connection.connected) {
@@ -6787,13 +6928,24 @@ export class Client extends EventEmitter<AdsClientEvents> {
   }
 
   /**
-   * **TODO - DOCUMENTATION ONGOING**
+   * Reads raw data from the target system by a previously created variable handle (acquired using {@link createVariableHandle}())
    * 
-   * Reads raw byte data from the target system by previously created variable handle
+   * @example
+   * ```js
+   * try {
+   *  const handle = await client.createVariableHandle('GVL_Read.StandardTypes.INT_'');
+   *  const value = await client.readRawByHandle(handle);
+   *  await client.deleteVariableHandle(handle); 
    * 
+   * } catch (err) {
+   *  console.log("Error:", err);
+   * }
+   * ```
    * @param handle Variable handle
    * @param size Optional data length to read (bytes) - as default, size in handle is used if available. Uses 0xFFFFFFFF as fallback.
-   * @param targetOpts Optional target settings that override values in `settings` (**NOTE:** If used, no caching is available -> possible performance impact)
+   * @param targetOpts Optional target settings that override values in `settings`
+   * 
+   * @throws Throws an error if sending the command fails or if the target responds with an error.
    */
   public async readRawByHandle(handle: VariableHandle | number, size?: number, targetOpts: Partial<AmsAddress> = {}): Promise<Buffer> {
     if (!this.connection.connected) {
@@ -6822,13 +6974,28 @@ export class Client extends EventEmitter<AdsClientEvents> {
   }
 
   /**
-   * **TODO - DOCUMENTATION ONGOING**
+   * Writes raw data to the target system by a previously created variable handle (acquired using {@link createVariableHandle}())
    * 
-   * Writes raw byte data to the target system by previously created variable handle
+   * @example
+   * ```js
+   * try {
+   *  const value = await client.convertToRaw(32767, 'INT');
+   *  console.log(value); //<Buffer ff 7f>
+   * 
+   *  const handle = await client.createVariableHandle('GVL_Read.StandardTypes.INT_');
+   *  await client.writeRawByHandle(handle, value);
+   *  await client.deleteVariableHandle(handle); 
+   * 
+   * } catch (err) {
+   *  console.log("Error:", err);
+   * }
+   * ```
    * 
    * @param handle Variable handle
    * @param value Data to write
-   * @param targetOpts Optional target settings that override values in `settings` (**NOTE:** If used, no caching is available -> possible performance impact)
+   * @param targetOpts Optional target settings that override values in `settings`
+   * 
+   * @throws Throws an error if sending the command fails or if the target responds with an error.
    */
   public async writeRawByHandle(handle: VariableHandle | number, value: Buffer, targetOpts: Partial<AmsAddress> = {}): Promise<void> {
     if (!this.connection.connected) {
@@ -6850,12 +7017,23 @@ export class Client extends EventEmitter<AdsClientEvents> {
   }
 
   /**
-   * **TODO - DOCUMENTATION ONGOING**
+   * Reads raw data from the target system by a symbol object (acquired using `getSymbol()`)
    * 
-   * Reads raw data by symbol
+   * @example
+   * ```js
+   * try {
+   *  const symbol = await client.getSymbol('GVL_Read.StandardTypes.INT_');
+   *  const value = await client.readRawBySymbol(symbol);
    * 
-   * @param symbol Symbol (acquired using `getSymbol()`)
-   * @param targetOpts Optional target settings that override values in `settings` (**NOTE:** If used, no caching is available -> possible performance impact)
+   * } catch (err) {
+   *  console.log("Error:", err);
+   * }
+   * ```
+   * 
+   * @param symbol Symbol
+   * @param targetOpts Optional target settings that override values in `settings`
+   * 
+   * @throws Throws an error if sending the command fails or if the target responds with an error.
    */
   public async readRawBySymbol(symbol: AdsSymbol, targetOpts: Partial<AmsAddress> = {}): Promise<Buffer> {
     if (!this.connection.connected) {
@@ -6877,13 +7055,27 @@ export class Client extends EventEmitter<AdsClientEvents> {
   }
 
   /**
-   * **TODO - DOCUMENTATION ONGOING**
+   * Writes raw data to the target system by a symbol object (acquired using `getSymbol()`)
    * 
-   * Writes raw data by symbol
+   * @example
+   * ```js
+   * try {
+   *  const value = await client.convertToRaw(32767, 'INT');
+   *  console.log(value); //<Buffer ff 7f>
    * 
-   * @param symbol Symbol (acquired using `getSymbol()`)
+   *  const symbol = await client.getSymbol('GVL_Read.StandardTypes.INT_');
+   *  await client.writeRawBySymbol(symbol, value);
+   * 
+   * } catch (err) {
+   *  console.log("Error:", err);
+   * }
+   * ```
+   * 
+   * @param symbol Symbol
    * @param value Data to write
    * @param targetOpts Optional target settings that override values in `settings`
+   * 
+   * @throws Throws an error if sending the command fails or if the target responds with an error.
    */
   public async writeRawBySymbol(symbol: AdsSymbol, value: Buffer, targetOpts: Partial<AmsAddress> = {}): Promise<void> {
     if (!this.connection.connected) {
@@ -6904,21 +7096,40 @@ export class Client extends EventEmitter<AdsClientEvents> {
   }
 
   /**
-   * **TODO - DOCUMENTATION ONGOING**
+   * Invokes a function block RPC method on the target system.
    * 
-   * Invokes/calls a function block RPC method from PLC
+   * Returns the return value of the method and outputs (if any).
    * 
-   * Returns method return value and/or outputs (if any)
+   * NOTE: In the PLC, `{attribute 'TcRpcEnable'}` is required above the `METHOD` definition.
    * 
-   * For RPC support, the method needs to have `{attribute 'TcRpcEnable'}` attribute above the `METHOD` definition
+   * @example
+   * ```js
+   * try {
+   *  const res = await client.invokeRpcMethod('GVL_RPC.RpcBlock', 'Calculator', {
+   *    Value1: 1,
+   *    Value2: 123
+   *  });
    * 
-   * @param path Full function block instance path in the PLC (such as `GVL_Test.ExampleBlock`)
-   * @param method Function block method name to call
-   * @param parameters Function block method parameters (inputs) (if any)
+   *  console.log(res);
+   *  //{
+   *  //  returnValue: true,
+   *  //  outputs: { Sum: 124, Product: 123, Division: 0.008130080997943878 }
+   *  //}
+   * 
+   * } catch (err) {
+   *  console.log("Error:", err);
+   * }
+   * ```
+   * 
+   * @param path Variable path in the PLC of the function block instance (such as `GVL_Test.ExampleBlock`)
+   * @param method Function block method name
+   * @param parameters Method parameters (inputs) (if any)
    * @param targetOpts Optional target settings that override values in `settings`
    * 
    * @template T Typescript data type of the method return value, for example `invokeRpcMethod<number>(...)` or `invokeRpcMethod<ST_TypedStruct>(...)`
    * @template U Typescript data type of the method outputs object, for example `invokeRpcMethod<number, ST_TypedStruct>(...)`
+   * 
+   * @throws Throws an error if sending the command fails or if the target responds with an error.
    */
   public async invokeRpcMethod<T = any, U = Record<string, any>>(path: string, method: string, parameters: Record<string, any> = {}, targetOpts: Partial<AmsAddress> = {}): Promise<RpcMethodCallResult<T, U>> {
     if (!this.connection.connected) {
