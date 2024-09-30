@@ -905,12 +905,16 @@ export class Client extends EventEmitter<AdsClientEvents> {
       //Sometimes close event is not received, so resolve already here
       this.socket.once('end', () => {
         this.debugD(`unregisterAdsPort(): Socket connection ended, connection closed.`);
+        clearTimeout(this.portRegisterTimeoutTimer);
+        this.amsTcpCallback = undefined;
         this.socket?.destroy();
         resolve();
       });
 
       this.amsTcpCallback = (res: AmsTcpPacket) => {
         this.amsTcpCallback = undefined;
+        clearTimeout(this.portRegisterTimeoutTimer);
+
         if (res.amsTcp.command === ADS.AMS_HEADER_FLAG.AMS_TCP_PORT_CLOSE) {
           this.debug(`unregisterAdsPort(): ADS port unregistered`);
           this.socket?.destroy();
@@ -940,7 +944,8 @@ export class Client extends EventEmitter<AdsClientEvents> {
       } catch (err) {
         reject(err);
       } finally {
-        this.portRegisterTimeoutTimer && clearTimeout(this.portRegisterTimeoutTimer);
+        this.amsTcpCallback = undefined;
+        clearTimeout(this.portRegisterTimeoutTimer);
       }
     })
   }
