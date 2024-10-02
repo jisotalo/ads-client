@@ -837,7 +837,7 @@ export class Client extends EventEmitter<AdsClientEvents> {
       this.socket?.once('error', errorHandler);
 
       try {
-        await this.socketWrite(packet);
+        this.socketWrite(packet);
 
       } catch (err) {
         this.socket?.off('error', errorHandler);
@@ -905,14 +905,47 @@ export class Client extends EventEmitter<AdsClientEvents> {
       //Sometimes close event is not received, so resolve already here
       this.socket.once('end', () => {
         this.debugD(`unregisterAdsPort(): Socket connection ended, connection closed.`);
+        clearTimeout(this.portRegisterTimeoutTimer);
+        this.amsTcpCallback = undefined;
         this.socket?.destroy();
         resolve();
       });
 
+      this.amsTcpCallback = (res: AmsTcpPacket) => {
+        this.amsTcpCallback = undefined;
+        clearTimeout(this.portRegisterTimeoutTimer);
+
+        if (res.amsTcp.command === ADS.AMS_HEADER_FLAG.AMS_TCP_PORT_CLOSE) {
+          this.debug(`unregisterAdsPort(): ADS port unregistered`);
+          this.socket?.destroy();
+          resolve();
+        }
+      }
+
+      //Timeout (if no answer from router)
+      this.portRegisterTimeoutTimer = setTimeout(() => {
+        //Callback is no longer needed, delete it
+        this.amsTcpCallback = undefined;
+
+        //Create a custom "ads error" so that the info is passed onwards
+        const adsError = {
+          ads: {
+            error: true,
+            errorCode: -1,
+            errorStr: `Timeout - no response in ${this.settings.timeoutDelay} ms`
+          }
+        };
+        this.debug(`unregisterAdsPort(): Failed to unregister ADS port: Timeout - no response in ${this.settings.timeoutDelay} ms`);
+        return reject(new ClientError(`unregisterAdsPort(): Timeout - no response in ${this.settings.timeoutDelay} ms`, adsError));
+      }, this.settings.timeoutDelay);
+
       try {
-        await this.socketWrite(buffer);
+        this.socketWrite(buffer);
       } catch (err) {
         reject(err);
+      } finally {
+        this.amsTcpCallback = undefined;
+        clearTimeout(this.portRegisterTimeoutTimer);
       }
     })
   }
@@ -1739,7 +1772,11 @@ export class Client extends EventEmitter<AdsClientEvents> {
       //AMS port unregister
       case ADS.AMS_HEADER_FLAG.AMS_TCP_PORT_CLOSE:
         packet.amsTcp.commandStr = 'Port unregister';
-        //No action at the moment
+        if (this.amsTcpCallback) {
+          this.amsTcpCallback(packet);
+        } else {
+          this.debug(`onAmsTcpPacketReceived(): Port unregister response received but no callback was assigned (${packet.amsTcp.commandStr})`);
+        }
         break;
 
       //AMS port register
