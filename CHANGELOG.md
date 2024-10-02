@@ -4,7 +4,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [2.0.0-beta.4] - UNRELEASED
+## [2.0.0-beta.4] - 02.10.2024
 - Improved TwinCAT 2 support
   - Improved performance by caching base data types that aren't available in the PLC (for example, `INT16` in TC2)
   - Bug fix: Building data types for TC2 system didn't always work (`DataType` flag is not set in base types)
@@ -12,6 +12,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added test suites for TwinCAT 2
   - Separate TwinCAT 2 test PLC project created (See [https://github.com/jisotalo/ads-client-test-plc-project/tree/v2-dev](https://github.com/jisotalo/ads-client-test-plc-project/tree/v2-dev))
   - Updated tests to work with TC2 (and removed tests for TC2 unsupported features)
+- Bug fix: Client failed to disconnect when using [AdsRouterConsole](https://github.com/Beckhoff/TF6000_ADS_DOTNET_V5_Samples/tree/main/Sources/RouterSamples/AdsRouterConsoleApp) as a TwinCAT router
+  - Client now waits for port unregistering response, if the connection is not dropped immediately
+
+Thank you [Christian Rishøj](https://github.com/crishoj) for contribution!
 
 ## [2.0.0-beta.3] - 10.09.2024
 - **BREAKING:** Renamed `ReadWriteRawMultiCommand` property `writeData` to `value`

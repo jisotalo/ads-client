@@ -12,7 +12,7 @@ Connect to a Beckhoff TwinCAT automation system using the ADS protocol from a No
 
 ## v2 project status
 
-**10.09.2024:** Beta 3 released! See [CHANGELOG.md](https://github.com/jisotalo/ads-client/blob/v2-dev/CHANGELOG.md) for details.
+**02.10.2024:** Beta 4 released! See [CHANGELOG.md](https://github.com/jisotalo/ads-client/blob/v2-dev/CHANGELOG.md) for details.
 
 All breaking changes are (hopefully) done.
 
