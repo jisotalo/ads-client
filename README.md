@@ -2,7 +2,6 @@
 
 
 [![npm version](https://img.shields.io/npm/v/ads-client)](https://www.npmjs.org/package/ads-client) 
-[![Donate](https://img.shields.io/badge/Support-PayPal-yellow)](https://www.paypal.com/donate/?business=KUWBXXCVGZZME&no_recurring=0&currency_code=EUR)
 [![GitHub](https://img.shields.io/badge/View%20on-GitHub-brightgreen)](https://github.com/jisotalo/ads-client)
 [![License](https://img.shields.io/github/license/jisotalo/ads-client)](https://choosealicense.com/licenses/mit/)
 
@@ -12,21 +11,24 @@ Coded from scratch using [TwinCAT ADS specification](https://infosys.beckhoff.co
 
 There is automatically created documentation available at https://jisotalo.fi/ads-client/
 
-# Project status
+# Version 2 will be released soon
 
-This project is currently "ready". It's maintained actively and used in projects by the author and others (also lot's of commercial projects)
+The 1.4.4 is the the last version for v1, unless some bugs need fixing.
 
-Bugs are fixed if found and new features can be added. Please let me know if you have any ideas!
+<span style="color:red; font-weight:bold;">It might be a good idea to use the version 2 beta for new projects. It will no longer have breaking changes and it's basically ready!</span>
 
-If you want to support my work, you can do it using PayPal. I can provide you support in exchange.
+See [`v2-dev`](https://github.com/jisotalo/ads-client/tree/v2-dev) branch for more info. It's a full rewrite in in TypeScript and it can be installed from npm (`npm i ads-client@beta`). 
 
-[![Donate](https://img.shields.io/badge/Support%20my%20work!-PayPal-yellow)](https://www.paypal.com/donate/?business=KUWBXXCVGZZME&no_recurring=0&currency_code=EUR)
+# Supporting
 
-## Version 2
+If you want to support my work, you can buy me a coffee! 
 
-Version 2 is now released as beta! 
+<a href="https://www.buymeacoffee.com/jisotalo" target="_blank"><img src="https://cdn.buymeacoffee.com/buttons/v2/default-blue.png" alt="Buy Me A Coffee" style="height: 60px !important;width: 217px !important;" ></a>
 
-See [`v2-dev`](https://github.com/jisotalo/ads-client/tree/v2-dev) branch for more info. It's a full rewrite in in TypeScript and it can be installed from npm. 
+[![Donate](https://img.shields.io/badge/Donate-PayPal-yellow)](https://www.paypal.com/donate/?business=KUWBXXCVGZZME&no_recurring=0&currency_code=EUR)
+
+If you need help with integrating the ads-client, I'm available for coding work with invoicing. Please send me email!
+
 
 # Using Node-RED?
 Check out the [node-red-contrib-ads-client](https://www.npmjs.com/package/node-red-contrib-ads-client) package. It's an `ads-client` wrapper for Node-RED to get the same functionality.
@@ -34,8 +36,8 @@ Check out the [node-red-contrib-ads-client](https://www.npmjs.com/package/node-r
 
 # Table of contents
 - [ads-client](#ads-client)
-- [Project status](#project-status)
-  - [Version 2](#version-2)
+- [Version 2 will be released soon](#version-2-will-be-released-soon)
+- [Supporting](#supporting)
 - [Using Node-RED?](#using-node-red)
 - [Table of contents](#table-of-contents)
 - [Installation](#installation)

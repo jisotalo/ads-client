@@ -62,30 +62,50 @@
     <section class="readme usertext">
         <article><h1 id="ads-client">ads-client</h1>
 <p><a href="https://www.npmjs.org/package/ads-client"><img src="https://img.shields.io/npm/v/ads-client" alt="npm version"></a>
-<a href="https://www.paypal.com/donate/?business=KUWBXXCVGZZME&amp;no_recurring=0&amp;currency_code=EUR"><img src="https://img.shields.io/badge/Support-PayPal-yellow" alt="Donate"></a>
 <a href="https://github.com/jisotalo/ads-client"><img src="https://img.shields.io/badge/View%20on-GitHub-brightgreen" alt="GitHub"></a>
 <a href="https://choosealicense.com/licenses/mit/"><img src="https://img.shields.io/github/license/jisotalo/ads-client" alt="License"></a></p>
 <p>Beckhoff TwinCAT ADS client library for Node.js (unofficial). Connects to Beckhoff TwinCAT automation systems using ADS protocol.</p>
 <p>Coded from scratch using <a href="https://infosys.beckhoff.com/content/1033/tc3_ads_intro/116157835.html?id=124964102706356243">TwinCAT ADS specification</a> and <a href="https://www.nuget.org/packages/Beckhoff.TwinCAT.Ads/5.0.0-preview6">Beckhoff.TwinCAT.Ads nuget package</a>. Inspiration from similar projects like <a href="https://www.npmjs.com/package/node-ads">node-ads</a>, <a href="https://www.npmjs.com/package/beckhoff-js">beckhoff-js</a> and <a href="https://www.npmjs.com/package/iecstruct">iecstruct</a>.</p>
 <p>There is automatically created documentation available at https://jisotalo.fi/ads-client/</p>
-<h1 id="project-status">Project status</h1>
-<p>This project is currently &quot;ready&quot;. It's maintained actively and used in projects by the author and others (also lot's of commercial projects)</p>
-<p>Bugs are fixed if found and new features can be added. Please let me know if you have any ideas!</p>
-<p>If you want to support my work, you can do it using PayPal. I can provide you support in exchange.</p>
-<p><a href="https://www.paypal.com/donate/?business=KUWBXXCVGZZME&amp;no_recurring=0&amp;currency_code=EUR"><img src="https://img.shields.io/badge/Support%20my%20work!-PayPal-yellow" alt="Donate"></a></p>
-<h2 id="version-2">Version 2</h2>
-<p>Version 2 is under development in <a href="https://github.com/jisotalo/ads-client/tree/v2-dev"><code>v2-dev</code></a> branch. It's written in TypeScript (including all types!) and will also be more optimized. At the moment basic functions <em>might</em>  work but it's not ready for production use.</p>
+<h1 id="version-2-will-be-released-soon">Version 2 will be released soon</h1>
+<p>The 1.4.4 is the the last version for v1, unless some bugs need fixing.</p>
+<p><span style="color:red; font-weight:bold;">It might be a good idea to use the version 2 beta for new projects. It will no longer have breaking changes and it's basically ready!</span></p>
+<p>See <a href="https://github.com/jisotalo/ads-client/tree/v2-dev"><code>v2-dev</code></a> branch for more info. It's a full rewrite in in TypeScript and it can be installed from npm (<code>npm i ads-client@beta</code>).</p>
+<h1 id="supporting">Supporting</h1>
+<p>If you want to support my work, you can buy me a coffee!</p>
+<p><a href="https://www.buymeacoffee.com/jisotalo" target="_blank"><img src="https://cdn.buymeacoffee.com/buttons/v2/default-blue.png" alt="Buy Me A Coffee" style="height: 60px !important;width: 217px !important;" ></a></p>
+<p><a href="https://www.paypal.com/donate/?business=KUWBXXCVGZZME&amp;no_recurring=0&amp;currency_code=EUR"><img src="https://img.shields.io/badge/Donate-PayPal-yellow" alt="Donate"></a></p>
+<p>If you need help with integrating the ads-client, I'm available for coding work with invoicing. Please send me email!</p>
 <h1 id="using-node-red%3F">Using Node-RED?</h1>
 <p>Check out the <a href="https://www.npmjs.com/package/node-red-contrib-ads-client">node-red-contrib-ads-client</a> package. It's an <code>ads-client</code> wrapper for Node-RED to get the same functionality.</p>
 <h1 id="table-of-contents">Table of contents</h1>
 <ul>
+<li><a href="#ads-client">ads-client</a></li>
+<li><a href="#version-2-will-be-released-soon">Version 2 will be released soon</a></li>
+<li><a href="#supporting">Supporting</a></li>
+<li><a href="#using-node-red">Using Node-RED?</a></li>
+<li><a href="#table-of-contents">Table of contents</a></li>
 <li><a href="#installation">Installation</a></li>
 <li><a href="#features">Features</a></li>
 <li><a href="#supported-and-tested-platforms">Supported and tested platforms</a></li>
-<li><a href="#connection-setups-and-possibilities">Connection setups and possibilities</a></li>
+<li><a href="#connection-setups-and-possibilities">Connection setups and possibilities</a>
+<ul>
+<li><a href="#setup-1---connect-from-windows-pc-to-the-plc">Setup 1 - Connect from Windows PC to the PLC</a></li>
+<li><a href="#setup-2---connecting-from-unixwindowsetc-system-to-the-plc">Setup 2 - Connecting from Unix/Windows/etc. system to the PLC</a></li>
+<li><a href="#setup-3---connecting-from-any-nodejs-supported-system-to-the-plc">Setup 3 - Connecting from any Node.js supported system to the PLC</a></li>
+<li><a href="#setup-4---connect-to-the-localhost-plc-and-client-on-the-same-machine">Setup 4 - Connect to the localhost (PLC and client on the same machine)</a></li>
+</ul>
+</li>
 <li><a href="#enabling-localhost-support-on-twincat-3">Enabling localhost support on TwinCAT 3</a></li>
 <li><a href="#important-writing-struct-variables">IMPORTANT: Writing STRUCT variables</a></li>
-<li><a href="#important-things-to-know-when-using-with-twincat-2">IMPORTANT: Things to know when using with TwinCAT 2</a></li>
+<li><a href="#important-things-to-know-when-using-with-twincat-2">IMPORTANT: Things to know when using with TwinCAT 2</a>
+<ul>
+<li><a href="#twincat-2-first-plc-runtime-ads-port-is-801-instead-of-851">TwinCAT 2 first PLC runtime ADS port is 801 instead of 851</a></li>
+<li><a href="#variable-names-are-returned-in-uppercase-on-tc2-systems">Variable names are returned in UPPERCASE on TC2 systems</a></li>
+<li><a href="#global-variable-paths-are-given-different-on-tc2">Global variable paths are given different on TC2</a></li>
+<li><a href="#invokerpcmethod-is-not-possible-on-tc2">InvokeRpcMethod is not possible on TC2</a></li>
+</ul>
+</li>
 <li><a href="#connecting-to-systems-without-plc-runtime">Connecting to systems without PLC runtime</a></li>
 <li><a href="#getting-started">Getting started</a>
 <ul>
@@ -113,16 +133,16 @@
 <li><a href="#example-writing-string-type-variable">Example: Writing <code>STRING</code> type variable</a></li>
 <li><a href="#example-writing-enum-type-variable">Example: Writing <code>ENUM</code> type variable</a></li>
 <li><a href="#example-writing-struct-type-variable">Example: Writing <code>STRUCT</code> type variable</a></li>
-<li><a href="#example-writing-struct-type-variable-with-autofill-parameter-">Example: Writing <code>STRUCT</code> type variable (with autoFill parameter)</a></li>
+<li><a href="#example-writing-struct-type-variable-with-autofill-parameter">Example: Writing <code>STRUCT</code> type variable (with autoFill parameter)</a></li>
 <li><a href="#example-writing-array-of-int-type-variable">Example: Writing <code>ARRAY OF INT</code> type variable</a></li>
 <li><a href="#example-writing-array-of-struct-type-variable">Example: Writing <code>ARRAY of STRUCT</code> type variable</a></li>
 <li><a href="#example-writing-function-block-type-variable">Example: Writing <code>FUNCTION BLOCK</code> type variable</a></li>
 </ul>
 </li>
-<li><a href="#subscribing-to-plc-variables-device-notifications-">Subscribing to PLC variables (device notifications)</a>
+<li><a href="#subscribing-to-plc-variables-device-notifications">Subscribing to PLC variables (device notifications)</a>
 <ul>
-<li><a href="#subcribe-to-variable-value-on-change-">Subcribe to variable value (on-change)</a></li>
-<li><a href="#subcribe-to-variable-value-cyclic-">Subcribe to variable value (cyclic)</a></li>
+<li><a href="#subcribe-to-variable-value-on-change">Subcribe to variable value (on-change)</a></li>
+<li><a href="#subcribe-to-variable-value-cyclic">Subcribe to variable value (cyclic)</a></li>
 </ul>
 </li>
 <li><a href="#reading-and-writing-raw-data">Reading and writing raw data</a>
@@ -147,7 +167,7 @@
 <li><a href="#writing-a-pointer-to-value">Writing a <code>POINTER TO</code> value</a></li>
 </ul>
 </li>
-<li><a href="#calling-a-function-block-method-with-parameters-using-rpc-remote-procedure-call-">Calling a function block method with parameters using RPC (remote procedure call)</a>
+<li><a href="#calling-a-function-block-method-with-parameters-using-rpc-remote-procedure-call">Calling a function block method with parameters using RPC (remote procedure call)</a>
 <ul>
 <li><a href="#calling-a-simple-rpc-method">Calling a simple RPC method</a></li>
 <li><a href="#using-structs-with-rpc-methods">Using structs with RPC methods</a></li>
@@ -160,7 +180,7 @@
 </li>
 <li><a href="#available-ads-client-events">Available ads-client events</a>
 <ul>
-<li><a href="#example-printing-to-console-when-plc-runtime-state-changes-">Example: Printing to console when PLC runtime state changes:</a></li>
+<li><a href="#example-printing-to-console-when-plc-runtime-state-changes">Example: Printing to console when PLC runtime state changes:</a></li>
 <li><a href="#example-catching-an-error-that-is-not-directly-from-a-method-call">Example: Catching an error that is not directly from a method call</a></li>
 </ul>
 </li>
@@ -170,7 +190,23 @@
 <li><a href="#enabling-debugging-from-terminal">Enabling debugging from terminal</a></li>
 </ul>
 </li>
-<li><a href="#faq">FAQ</a></li>
+<li><a href="#faq">FAQ</a>
+<ul>
+<li><a href="#connection-is-working-very-badly-and-lots-of-timeouts">Connection is working very badly and lot's of timeouts</a></li>
+<li><a href="#when-using-jsonstringify-or-similar-im-getting-a-typeerror-do-not-know-how-to-serialize-a-bigint">When using JSON.stringify or similar I'm getting a <code>TypeError: Do not know how to serialize a BigInt</code></a></li>
+<li><a href="#can-i-connect-from-raspberry-pi-to-twincat">Can I connect from Raspberry Pi to TwinCAT?</a></li>
+<li><a href="#receiving-ads-error-1808-symbol-not-found-even-when-it-should-be-found">Receiving ADS error 1808 <code>Symbol not found</code> even when it should be found</a></li>
+<li><a href="#having-timeouts-andor-mailbox-is-full-errors-when-sending-lots-of-ads-commands">Having timeouts and/or 'mailbox is full' errors when sending lot's of ADS commands</a></li>
+<li><a href="#having-problems-to-connect-from-osx-or-raspberry-pi-to-target-plc">Having problems to connect from OSX or Raspberry Pi to target PLC</a></li>
+<li><a href="#a-data-type-is-not-found-even-when-it-should-be">A data type is not found even when it should be</a></li>
+<li><a href="#clientexception-connection-failed-device-system-manager-state-read-failed">ClientException: Connection failed: Device system manager state read failed</a></li>
+<li><a href="#connection-failed-error-eaddrnotavail">Connection failed (error EADDRNOTAVAIL)</a></li>
+<li><a href="#problems-running-ads-client-with-docker">Problems running ads-client with docker</a></li>
+<li><a href="#how-to-connect-to-plc-that-is-in-config-mode">How to connect to PLC that is in CONFIG mode?</a></li>
+<li><a href="#getting-a-message-ads-notification-received-but-it-has-unknown-notificationhandle--use-unsubscribe-to-save-resources">Getting a message <code>Ads notification received but it has unknown notificationHandle (**). Use unsubscribe() to save resources.</code></a></li>
+<li><a href="#issues-with-twincat-2-low-end-devices-bk9050-bc9050-etc">Issues with TwinCAT 2 low-end devices (BK9050, BC9050 etc.)</a></li>
+</ul>
+</li>
 <li><a href="#automatic-testing">Automatic testing</a></li>
 <li><a href="#documentation">Documentation</a></li>
 <li><a href="#license">License</a></li>
@@ -1705,7 +1741,7 @@ SOFTWARE.</p></article>
 <br class="clear">
 
 <footer>
-    Documentation generated by <a href="https://github.com/jsdoc3/jsdoc">JSDoc 3.6.11</a> on Sat Sep 23 2023 08:34:17 GMT+0300 (Itä-Euroopan kesäaika) using the <a href="https://github.com/clenemt/docdash">docdash</a> theme.
+    Documentation generated by <a href="https://github.com/jsdoc3/jsdoc">JSDoc 3.6.11</a> on Thu Oct 03 2024 20:50:46 GMT+0300 (Itä-Euroopan kesäaika) using the <a href="https://github.com/clenemt/docdash">docdash</a> theme.
 </footer>
 
 <script>prettyPrint();</script>

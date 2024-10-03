@@ -4,6 +4,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.14.4] - 03.10.2023
+### Changed
+- Bug fix: Changed RPC method flags from 16-bit to 32-bit
+- Bug fix: Fix RPC method parsing in TwinCAT 4026
+
+See [PR #127](https://github.com/jisotalo/ads-client/pull/127) for details.
+
+Thank you [icon-bobk](https://github.com/icon-bobk) for contribution!
+
 ## [1.14.3] - 23.09.2023
 ### Changed
 - Bug fix: Some TwinCAT 2 devices (such as BK9050) do not send data length if answering with error code
