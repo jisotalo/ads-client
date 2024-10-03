@@ -4819,6 +4819,7 @@ async function _parseDataType(data) {
 
       //Get method length
       let len = data.readUInt32LE(pos)
+      const methodFinalPos = pos + len;
       pos += 4
 
       //4..7 Version
@@ -4841,33 +4842,33 @@ async function _parseDataType(data) {
       method.reserved = data.readUInt32LE(pos)
       pos += 4
 
-      //24..27 Return type GUID
+      //24..39 Return type GUID
       method.returnTypeGuid = data.slice(pos, pos + 16).toString('hex')
       pos += 16
 
-      //28..31 Return data type
+      //40..43 Return data type
       method.retunAdsDataType = data.readUInt32LE(pos)
       method.retunAdsDataTypeStr = ADS.ADS_DATA_TYPES.toString(method.retunAdsDataType)
       pos += 4
 
-      //27..30 Flags (AdsDataTypeFlags)
-      method.flags = data.readUInt16LE(pos)
+      //44..47 Flags
+      method.flags = data.readUInt32LE(pos)
       method.flagsStr = ADS.ADS_DATA_TYPE_FLAGS.toStringArray(method.flags)
       pos += 4
 
-      //31..32 Name length
+      //48..49 Name length
       method.nameLength = data.readUInt16LE(pos)
       pos += 2
 
-      //33..34 Return type length
+      //50..51 Return type length
       method.returnTypeLength = data.readUInt16LE(pos)
       pos += 2
 
-      //35..36 Comment length
+      //52..53 Comment length
       method.commentLength = data.readUInt16LE(pos)
       pos += 2
 
-      //37..38 Parameter count
+      //54..55 Parameter count
       method.parameterCount = data.readUInt16LE(pos)
       pos += 2
 
@@ -4955,6 +4956,7 @@ async function _parseDataType(data) {
         method.parameters.push(param)
       }
 
+      pos = methodFinalPos;
       dataType.rpcMethods.push(method)
     }
   }
