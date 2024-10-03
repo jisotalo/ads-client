@@ -135,7 +135,7 @@ Install the [npm package](https://www.npmjs.com/package/ads-client) using npm co
 npm i ads-client
 ```
 
-If you are using TypeScript, install unofficial types using npm command (thanks [Christian Rishøj](https://github.com/crishoj)):
+If you are using TypeScript, consider using the [v2 beta version](#version-2-will-be-released-soon). You can also install unofficial types using npm command (thanks [Christian Rishøj](https://github.com/crishoj)):
 ```bash
 npm install --save @types/ads-client
 ```
