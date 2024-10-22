@@ -5727,11 +5727,11 @@ export class Client extends EventEmitter<AdsClientEvents> {
    * 
    * //Writing a POINTER value (Note the dereference operator ^)
    * const ptrValue = ...
-   * await client.writeRawByPath('GVL_Read.ComplexTypes.POINTER_^', ptrValue);
+   * await client.writeRawByPath('GVL_Write.ComplexTypes.POINTER_^', ptrValue);
    * 
    * //Writing a REFERENCE value
    * const refValue = ...
-   * await client.readRawByPath('GVL_Read.ComplexTypes.REFERENCE_');
+   * await client.writeRawByPath('GVL_Write.ComplexTypes.REFERENCE_');
    * 
    * } catch (err) {
    *  console.log("Error:", err);
@@ -6152,11 +6152,9 @@ export class Client extends EventEmitter<AdsClientEvents> {
    * @example
    * ```js
    * try {
-   *  const value = {
-   *    example: true
-   *  };
-   * 
-   *  const res = await client.writeValue('GVL_Read.StandardTypes.INT_', value);
+   *  const res = await client.writeValue('GVL_Write.StandardTypes.INT_', 32767);
+   *  console.log('Value written:', res.value);
+   *  
    * } catch (err) {
    *  console.log("Error:", err);
    * }
