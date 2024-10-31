@@ -942,10 +942,9 @@ export class Client extends EventEmitter<AdsClientEvents> {
       try {
         this.socketWrite(buffer);
       } catch (err) {
-        reject(err);
-      } finally {
         this.amsTcpCallback = undefined;
         clearTimeout(this.portRegisterTimeoutTimer);
+        reject(err);
       }
     })
   }
