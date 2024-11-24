@@ -19,6 +19,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Calls `sendAdsCommand()` with a specific command. If it fails to certain ADS errors, tries the fallback command.
 - Bug fix: If RPC method parameter had attributes, error was thrown
 - Bug fix: If RPC method parameter had multiple flags, error was thrown (`Response with ADS error received (error 1797 - Parameter size not correct)`)
+- When calling `readPlcRuntimeState()` and state has changed, event `plcRuntimeStateChange` is emitted (previously emitted only if notification received from PLC)
+  - See [issue #159](https://github.com/jisotalo/ads-client/issues/159)
+- `startPlc()`, `resetPlc()`, `stopPlc()` and `restartPlc()` call `readPlcRuntimeState()` afterwards to update the runtime state to metadata (and to emit event if needed) 
+  - See [issue #159](https://github.com/jisotalo/ads-client/issues/159)
   
 ## [2.0.0-beta.4] - 02.10.2024
 - Improved TwinCAT 2 support

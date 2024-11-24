@@ -241,28 +241,35 @@ describe('resetting PLC to original state', () => {
 
 describe('testing PLC runtime stop, start, restart', () => {
   test('stopping PLC', async () => {
+    
+    expect(client.metaData.plcRuntimeState.adsState).toBe(ADS.ADS_STATE.Run);
     let state = await client.readPlcRuntimeState();
     expect(state.adsState).toBe(ADS.ADS_STATE.Run);
 
     await client.stopPlc();
 
+    expect(client.metaData.plcRuntimeState.adsState).toBe(ADS.ADS_STATE.Stop);
     state = await client.readPlcRuntimeState();
     expect(state.adsState).toBe(ADS.ADS_STATE.Stop);
   });
 
   test('starting PLC', async () => {
+    expect(client.metaData.plcRuntimeState.adsState).toBe(ADS.ADS_STATE.Stop);
     let state = await client.readPlcRuntimeState();
     expect(state.adsState).toBe(ADS.ADS_STATE.Stop);
 
     await client.startPlc();
 
+    expect(client.metaData.plcRuntimeState.adsState).toBe(ADS.ADS_STATE.Run);
     state = await client.readPlcRuntimeState();
     expect(state.adsState).toBe(ADS.ADS_STATE.Run);
   });
 
   test('restarting PLC', async () => {
+    expect(client.metaData.plcRuntimeState.adsState).toBe(ADS.ADS_STATE.Run);
     let state = await client.readPlcRuntimeState();
     expect(state.adsState).toBe(ADS.ADS_STATE.Run);
+
     await client.writeValue('GVL_AdsClientTests.IsReset', false);
 
     await client.restartPlc();
@@ -270,6 +277,7 @@ describe('testing PLC runtime stop, start, restart', () => {
     //Some delay as PLC was just started
     await delay(500);
 
+    expect(client.metaData.plcRuntimeState.adsState).toBe(ADS.ADS_STATE.Run);
     state = await client.readPlcRuntimeState();
     expect(state.adsState).toBe(ADS.ADS_STATE.Run);
 

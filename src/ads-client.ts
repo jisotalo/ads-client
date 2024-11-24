@@ -1110,28 +1110,39 @@ export class Client extends EventEmitter<AdsClientEvents> {
    * @param subscription The subscription object (unused here)
    */
   private onPlcRuntimeStateChanged(data: SubscriptionData<Buffer>, subscription: ActiveSubscription<Buffer>) {
-    const res = {} as AdsState;
+    const state = {} as AdsState;
     let pos = 0;
 
     //0..1 ADS state
-    res.adsState = data.value.readUInt16LE(pos);
-    res.adsStateStr = ADS.ADS_STATE.toString(res.adsState);
+    state.adsState = data.value.readUInt16LE(pos);
+    state.adsStateStr = ADS.ADS_STATE.toString(state.adsState);
     pos += 2;
 
     //2..3 Device state
-    res.deviceState = data.value.readUInt16LE(pos);
+    state.deviceState = data.value.readUInt16LE(pos);
     pos += 2;
 
-    //Checking if PLC runtime state has changed
+    this.handlePlcRuntimeStateChange(state);
+  }
+
+
+  /**
+   * Checks if PLC runtime state has changed, and if so, emits an event.
+   * 
+   * Call from `onPlcRuntimeStateChanged()` and `readPlcRuntimeState()`.
+   * 
+   * @param state Active PLC runtime state
+   */
+  private handlePlcRuntimeStateChange(state: AdsState) {
     let stateChanged = false;
 
-    if (this.metaData.plcRuntimeState === undefined || this.metaData.plcRuntimeState.adsState !== res.adsState) {
-      this.debug(`onPlcRuntimeStateChanged(): PLC runtime state (adsState) changed from ${this.metaData.plcRuntimeState === undefined ? 'UNKNOWN' : this.metaData.plcRuntimeState.adsStateStr} to ${res.adsStateStr}`);
+    if (this.metaData.plcRuntimeState === undefined || this.metaData.plcRuntimeState.adsState !== state.adsState) {
+      this.debug(`handlePlcRuntimeStateChange(): PLC runtime state (adsState) changed from ${this.metaData.plcRuntimeState === undefined ? 'UNKNOWN' : this.metaData.plcRuntimeState.adsStateStr} to ${state.adsStateStr}`);
       stateChanged = true;
     }
 
-    if (this.metaData.plcRuntimeState === undefined || this.metaData.plcRuntimeState.deviceState !== res.deviceState) {
-      this.debug(`onPlcRuntimeStateChanged(): PLC runtime state (deviceState) changed from ${this.metaData.plcRuntimeState === undefined ? 'UNKNOWN' : this.metaData.plcRuntimeState.deviceState} to ${res.deviceState}`);
+    if (this.metaData.plcRuntimeState === undefined || this.metaData.plcRuntimeState.deviceState !== state.deviceState) {
+      this.debug(`handlePlcRuntimeStateChange(): PLC runtime state (deviceState) changed from ${this.metaData.plcRuntimeState === undefined ? 'UNKNOWN' : this.metaData.plcRuntimeState.deviceState} to ${state.deviceState}`);
       stateChanged = true;
     }
 
@@ -1139,7 +1150,7 @@ export class Client extends EventEmitter<AdsClientEvents> {
       ? { ...this.metaData.plcRuntimeState }
       : undefined;
 
-    this.metaData.plcRuntimeState = res;
+    this.metaData.plcRuntimeState = state;
 
     if (stateChanged) {
       this.emit('plcRuntimeStateChange', this.metaData.plcRuntimeState, oldState);
@@ -3969,6 +3980,10 @@ export class Client extends EventEmitter<AdsClientEvents> {
       await this.writeControl("Run", state.deviceState, undefined, targetOpts);
 
       this.debug(`startPlc(): PLC runtime started at ${this.targetToString(targetOpts)}`);
+
+      //Reading runtime state to make sure metaData is updated asap
+      await this.readPlcRuntimeState(targetOpts);
+
     } catch (err) {
       this.debug(`startPlc(): Starting PLC runtime at ${this.targetToString(targetOpts)} failed: %o`, err);
       throw new ClientError(`startPlc(): Starting PLC runtime at ${this.targetToString(targetOpts)} failed`, err);
@@ -4005,6 +4020,10 @@ export class Client extends EventEmitter<AdsClientEvents> {
       await this.writeControl("Reset", state.deviceState, undefined, targetOpts);
 
       this.debug(`resetPlc(): PLC runtime reset at ${this.targetToString(targetOpts)}`);
+
+      //Reading runtime state to make sure metaData is updated asap
+      await this.readPlcRuntimeState(targetOpts);
+
     } catch (err) {
       this.debug(`resetPlc(): Resetting PLC runtime at ${this.targetToString(targetOpts)} failed: %o`, err);
       throw new ClientError(`resetPlc(): Resetting PLC runtime at ${this.targetToString(targetOpts)} failed`, err);
@@ -4041,6 +4060,10 @@ export class Client extends EventEmitter<AdsClientEvents> {
       await this.writeControl("Stop", state.deviceState, undefined, targetOpts);
 
       this.debug(`stopPlc(): PLC runtime stopped at ${this.targetToString(targetOpts)}`);
+
+      //Reading runtime state to make sure metaData is updated asap
+      await this.readPlcRuntimeState(targetOpts);
+
     } catch (err) {
       this.debug(`stopPlc(): Stopping PLC runtime at ${this.targetToString(targetOpts)} failed: %o`, err);
       throw new ClientError(`stopPlc(): Stopping PLC runtime at ${this.targetToString(targetOpts)} failed`, err);
@@ -4432,8 +4455,8 @@ export class Client extends EventEmitter<AdsClientEvents> {
       this.debug(`readPlcRuntimeState(): Runtime state read successfully. State is %o`, res.ads.payload);
 
       if (!targetOpts.adsPort && !targetOpts.amsNetId) {
-        //Target is not overridden -> save to metadata
-        this.metaData.plcRuntimeState = res.ads.payload;
+        //Target is not overridden -> handle the result (check for change and update metadata)
+        this.handlePlcRuntimeStateChange(res.ads.payload);
       }
 
       return res.ads.payload;
