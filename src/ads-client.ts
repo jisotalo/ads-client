@@ -42,7 +42,6 @@ import type {
   AdsCommandToSend,
   AdsDataTypeContainer,
   AdsSymbolContainer,
-  AdsUploadInfo,
   ConnectionMetaData,
   PlcPrimitiveType,
   SubscriptionData,
@@ -63,7 +62,8 @@ import type {
   WriteRawMultiCommand,
   SubscriptionCallback,
   DebugLevel,
-  AdsClientEvents
+  AdsClientEvents,
+  SendAdsCommandWithFallbackResult
 } from "./types/ads-client-types";
 
 import {
@@ -100,7 +100,8 @@ import {
   AmsTcpPacket,
   BaseAdsResponse,
   EmptyAdsResponse,
-  UnknownAdsResponse
+  UnknownAdsResponse,
+  AdsUploadInfo
 } from "./types/ads-protocol-types";
 
 export type * from "./types/ads-client-types";
@@ -171,6 +172,7 @@ export class Client extends EventEmitter<AdsClientEvents> {
     plcSymbols: {},
     allPlcDataTypesCached: false,
     plcDataTypes: {},
+    adsSymbolsUseUtf8: false
   };
 
   /**
@@ -305,7 +307,8 @@ export class Client extends EventEmitter<AdsClientEvents> {
     allowHalfOpen: false,
     rawClient: false,
     disableCaching: false,
-    deleteUnknownSubscriptions: true
+    deleteUnknownSubscriptions: true,
+    forceUtf8ForAdsSymbols: false
   } as Required<AdsClientSettings>;
 
   /**
@@ -549,6 +552,9 @@ export class Client extends EventEmitter<AdsClientEvents> {
         //When socket errors from now on, we will close the connection
         this.socketErrorHandler = this.onSocketError.bind(this);
         socket.on("error", this.socketErrorHandler);
+
+        //Force ADS UTF-8 (note: this is also set later at readPlcUploadInfo() if target is a PLC)
+        this.metaData.adsSymbolsUseUtf8 = this.settings.forceUtf8ForAdsSymbols;
 
         //If rawClient setting is true, we are done here (just a connection is enough)
         if (this.settings.rawClient !== true) {
@@ -1662,7 +1668,7 @@ export class Client extends EventEmitter<AdsClientEvents> {
           pos += 2;
 
           //8..24 Device name
-          ads.payload.deviceName = ADS.decodePlcStringBuffer(data.subarray(pos, pos + 16));;
+          ads.payload.deviceName = ADS.decodePlcStringBuffer(data.subarray(pos, pos + 16), this.metaData.adsSymbolsUseUtf8);
         }
         break;
 
@@ -2328,15 +2334,15 @@ export class Client extends EventEmitter<AdsClientEvents> {
     pos += 2;
 
     //30.... Symbol name
-    symbol.name = ADS.decodePlcStringBuffer(data.subarray(pos, pos + nameLength + 1));
+    symbol.name = ADS.decodePlcStringBuffer(data.subarray(pos, pos + nameLength + 1), this.metaData.adsSymbolsUseUtf8);
     pos += nameLength + 1;
 
     //.. Symbol type
-    symbol.type = ADS.decodePlcStringBuffer(data.subarray(pos, pos + typeLength + 1));
+    symbol.type = ADS.decodePlcStringBuffer(data.subarray(pos, pos + typeLength + 1), this.metaData.adsSymbolsUseUtf8);
     pos += typeLength + 1;
 
     //.. Symbol comment
-    symbol.comment = ADS.decodePlcStringBuffer(data.subarray(pos, pos + commentLength + 1));
+    symbol.comment = ADS.decodePlcStringBuffer(data.subarray(pos, pos + commentLength + 1), this.metaData.adsSymbolsUseUtf8);
     pos += commentLength + 1;
 
     //Array information
@@ -2379,11 +2385,11 @@ export class Client extends EventEmitter<AdsClientEvents> {
         pos += 1;
 
         //Name
-        attr.name = ADS.decodePlcStringBuffer(data.subarray(pos, pos + nameLength + 1));
+        attr.name = ADS.decodePlcStringBuffer(data.subarray(pos, pos + nameLength + 1), this.metaData.adsSymbolsUseUtf8);
         pos += nameLength + 1;
 
         //Value
-        attr.value = ADS.decodePlcStringBuffer(data.subarray(pos, pos + valueLength + 1));
+        attr.value = ADS.decodePlcStringBuffer(data.subarray(pos, pos + valueLength + 1), this.metaData.adsSymbolsUseUtf8);
         pos += valueLength + 1;
 
         symbol.attributes.push(attr);
@@ -2471,15 +2477,15 @@ export class Client extends EventEmitter<AdsClientEvents> {
     pos += 2;
 
     //38.. Data type name
-    dataType.name = ADS.decodePlcStringBuffer(data.subarray(pos, pos + nameLength + 1));
+    dataType.name = ADS.decodePlcStringBuffer(data.subarray(pos, pos + nameLength + 1), this.metaData.adsSymbolsUseUtf8);
     pos += nameLength + 1;
 
     //.. Data type type
-    dataType.type = ADS.decodePlcStringBuffer(data.subarray(pos, pos + typeLength + 1));
+    dataType.type = ADS.decodePlcStringBuffer(data.subarray(pos, pos + typeLength + 1), this.metaData.adsSymbolsUseUtf8);
     pos += typeLength + 1;
 
     //.. Data type comment
-    dataType.comment = ADS.decodePlcStringBuffer(data.subarray(pos, pos + commentLength + 1));
+    dataType.comment = ADS.decodePlcStringBuffer(data.subarray(pos, pos + commentLength + 1), this.metaData.adsSymbolsUseUtf8);
     pos += commentLength + 1;
 
     //Array information
@@ -2589,15 +2595,15 @@ export class Client extends EventEmitter<AdsClientEvents> {
         pos += 2;
 
         //56.. Name
-        method.name = ADS.decodePlcStringBuffer(data.subarray(pos, pos + nameLength + 1));
+        method.name = ADS.decodePlcStringBuffer(data.subarray(pos, pos + nameLength + 1), this.metaData.adsSymbolsUseUtf8);
         pos += nameLength + 1;
 
         //.. Return data type
-        method.retunDataType = ADS.decodePlcStringBuffer(data.subarray(pos, pos + returnTypeLength + 1));
+        method.retunDataType = ADS.decodePlcStringBuffer(data.subarray(pos, pos + returnTypeLength + 1), this.metaData.adsSymbolsUseUtf8);
         pos += returnTypeLength + 1;
 
         //.. Comment
-        method.comment = ADS.decodePlcStringBuffer(data.subarray(pos, pos + commentLength + 1));
+        method.comment = ADS.decodePlcStringBuffer(data.subarray(pos, pos + commentLength + 1), this.metaData.adsSymbolsUseUtf8);
         pos += commentLength + 1;
 
         //Parameters
@@ -2655,15 +2661,15 @@ export class Client extends EventEmitter<AdsClientEvents> {
           pos += 2;
 
           //38.. Data type name
-          param.name = ADS.decodePlcStringBuffer(data.subarray(pos, pos + nameLength + 1));
+          param.name = ADS.decodePlcStringBuffer(data.subarray(pos, pos + nameLength + 1), this.metaData.adsSymbolsUseUtf8);
           pos += nameLength + 1;
 
           //.. Data type type
-          param.type = ADS.decodePlcStringBuffer(data.subarray(pos, pos + typeLength + 1));
+          param.type = ADS.decodePlcStringBuffer(data.subarray(pos, pos + typeLength + 1), this.metaData.adsSymbolsUseUtf8);
           pos += typeLength + 1;
 
           //.. Data type comment
-          param.comment = ADS.decodePlcStringBuffer(data.subarray(pos, pos + commentLength + 1));
+          param.comment = ADS.decodePlcStringBuffer(data.subarray(pos, pos + commentLength + 1), this.metaData.adsSymbolsUseUtf8);
           pos += commentLength + 1;
 
           //Attributes
@@ -2686,11 +2692,11 @@ export class Client extends EventEmitter<AdsClientEvents> {
               pos += 1;
 
               //Name
-              attr.name = ADS.decodePlcStringBuffer(data.subarray(pos, pos + nameLength + 1));
+              attr.name = ADS.decodePlcStringBuffer(data.subarray(pos, pos + nameLength + 1), this.metaData.adsSymbolsUseUtf8);
               pos += nameLength + 1;
 
               //Value
-              attr.value = ADS.decodePlcStringBuffer(data.subarray(pos, pos + valueLength + 1));
+              attr.value = ADS.decodePlcStringBuffer(data.subarray(pos, pos + valueLength + 1), this.metaData.adsSymbolsUseUtf8);
               pos += valueLength + 1;
 
               method.attributes.push(attr);
@@ -2725,11 +2731,11 @@ export class Client extends EventEmitter<AdsClientEvents> {
             pos += 1;
 
             //Name
-            attr.name = ADS.decodePlcStringBuffer(data.subarray(pos, pos + nameLength + 1));
+            attr.name = ADS.decodePlcStringBuffer(data.subarray(pos, pos + nameLength + 1), this.metaData.adsSymbolsUseUtf8);
             pos += nameLength + 1;
 
             //Value
-            attr.value = ADS.decodePlcStringBuffer(data.subarray(pos, pos + valueLength + 1));
+            attr.value = ADS.decodePlcStringBuffer(data.subarray(pos, pos + valueLength + 1), this.metaData.adsSymbolsUseUtf8);
             pos += valueLength + 1;
 
             method.attributes.push(attr);
@@ -2761,11 +2767,11 @@ export class Client extends EventEmitter<AdsClientEvents> {
         pos += 1;
 
         //Name
-        attr.name = ADS.decodePlcStringBuffer(data.subarray(pos, pos + nameLength + 1));
+        attr.name = ADS.decodePlcStringBuffer(data.subarray(pos, pos + nameLength + 1), this.metaData.adsSymbolsUseUtf8);
         pos += nameLength + 1;
 
         //Value
-        attr.value = ADS.decodePlcStringBuffer(data.subarray(pos, pos + valueLength + 1));
+        attr.value = ADS.decodePlcStringBuffer(data.subarray(pos, pos + valueLength + 1), this.metaData.adsSymbolsUseUtf8);
         pos += valueLength + 1;
 
         dataType.attributes.push(attr);
@@ -2786,7 +2792,7 @@ export class Client extends EventEmitter<AdsClientEvents> {
         pos += 1;
 
         //Enumeration name
-        enumInfo.name = ADS.decodePlcStringBuffer(data.subarray(pos, pos + nameLength + 1));
+        enumInfo.name = ADS.decodePlcStringBuffer(data.subarray(pos, pos + nameLength + 1), this.metaData.adsSymbolsUseUtf8);
         pos += nameLength + 1;
 
         //Enumeration value
@@ -3117,7 +3123,7 @@ export class Client extends EventEmitter<AdsClientEvents> {
    */
   private convertBufferToPrimitiveType(buffer: Buffer, dataType: AdsDataType): PlcPrimitiveType {
     if (dataType.adsDataType === ADS.ADS_DATA_TYPES.ADST_STRING) {
-      return ADS.decodePlcStringBuffer(buffer);
+      return ADS.decodePlcStringBuffer(buffer); //TODO: If symbol has {attribute 'TcEncoding':='UTF-8'}
 
     } else if (dataType.adsDataType === ADS.ADS_DATA_TYPES.ADST_WSTRING) {
       return ADS.decodePlcWstringBuffer(buffer);
@@ -3676,6 +3682,8 @@ export class Client extends EventEmitter<AdsClientEvents> {
    * }
    * ```
    * 
+   * @param command The ADS command to send
+   * 
    * @template T In Typescript, the type of the ADS response. If omitted, generic {@link AdsResponse} type is used.
    * 
    * @throws Throws an error if sending the command fails or if target responds with an error
@@ -3771,6 +3779,87 @@ export class Client extends EventEmitter<AdsClientEvents> {
         return reject(new ClientError(`sendAdsCommand(): Error - Socket is not available (failed to send data)`, err));
       }
     })
+  }
+
+  /**
+   * Sends a raw ADS command to the target with fallback. A wrapper for {@link Client.sendAdsCommand}().
+   * 
+   * Calls `sendAdsCommand(command)` and if it fails with
+   * ADS error 1793 or 1808 then calls the `sendAdsCommand(fallback)`.
+   * 
+   * See {@link Client.readPlcUploadInfo}() for use case.
+   * 
+   * The ideas is copied from TwinCAT.Ads.dll (`TwinCAT.Ads.AdsClientExtensions.ReadWithFallbackAsync()`).
+   * 
+   * @example
+   * ```js
+   * try {
+   *  const data = Buffer.alloc(12);
+   *  //...code omitted...
+   * 
+   *  const command = {
+   *    adsCommand: ADS.ADS_COMMAND.Read,
+   *    targetAmsNetId: targetOpts.amsNetId,
+   *    targetAdsPort: targetOpts.adsPort,
+   *    payload: data
+   *  };
+   * 
+   *  const fbData = Buffer.alloc(12);
+   *  //...code omitted...
+   * 
+   *  const fallback = {
+   *    adsCommand: ADS.ADS_COMMAND.Read,
+   *    targetAmsNetId: targetOpts.amsNetId,
+   *    targetAdsPort: targetOpts.adsPort,
+   *    payload: fbData
+   *  };
+   * 
+   *  const { response: res, fallbackUsed } = await this.sendAdsCommandWithFallback<AdsReadResponse>(command, fallback);
+   *
+   *  //If we are here, one of those commands was succcesful
+   *  if(fallbackUsed) {
+   *    console.log("Fallback was used. Result:", res.ads.payload);
+   *  } else {
+   *    console.log("Fallback was not used. Result:", res.ads.payload);
+   *  }
+   * 
+   * } catch (err) {
+   *  console.log("Error:", err);
+   * }
+   * ```
+   * 
+   * @param command The main ADS command to send
+   * @param fallback The fallback ADS command to send
+   * 
+   * @template T In Typescript, the type of the ADS response. If omitted, generic {@link AdsResponse} type is used.
+   * 
+   * @throws Throws an error if sending the command fails or if target responds with an error
+   */
+  public async sendAdsCommandWithFallback<T = AdsResponse>(command: AdsCommandToSend, fallback: AdsCommandToSend): Promise<SendAdsCommandWithFallbackResult<T>> {
+    try {
+      this.debug(`sendAdsCommandWithFallback(): Sending ADS command with a fallback`);
+
+      return {
+        fallbackUsed: false,
+        response: await this.sendAdsCommand<T>(command)
+      }
+
+    } catch (err) {
+      const clientErr = err as ClientError;
+
+      //If error is "Service is not supported by server" (1793) or "Symbol not found" (1808) then we should try the fallback
+      if (clientErr.adsError?.errorCode === 1793 || clientErr.adsError?.errorCode === 1808) {
+        this.debug(`sendAdsCommandWithFallback(): Sending ADS command failed with ADS error ${clientErr.adsError.errorCode} - trying fallback...`);
+
+        return {
+          fallbackUsed: true,
+          response: await this.sendAdsCommand<T>(fallback)
+        }
+      }
+
+      this.debug(`sendAdsCommandWithFallback(): Sending ADS command failed - skipping fallback (ADS error is not 1793 or 1808)`);
+      throw err;
+    }
   }
 
   /**
@@ -4887,21 +4976,64 @@ export class Client extends EventEmitter<AdsClientEvents> {
     pos += 4;
 
     //8..11 Read data length
-    data.writeUInt32LE(24, pos);
+    data.writeUInt32LE(64, pos); //64 = upload info version 3 size (works also for lower versions)
     pos += 4;
 
+    const command = {
+      adsCommand: ADS.ADS_COMMAND.Read,
+      targetAmsNetId: targetOpts.amsNetId,
+      targetAdsPort: targetOpts.adsPort,
+      payload: data
+    };
+
+    //Fallback read command for version 1
+    //Allocating bytes for request
+    const fbData = Buffer.alloc(12);
+    pos = 0;
+
+    //0..3 IndexGroup 
+    fbData.writeUInt32LE(ADS.ADS_RESERVED_INDEX_GROUPS.SymbolUploadInfo, pos);
+    pos += 4;
+
+    //4..7 IndexOffset
+    fbData.writeUInt32LE(0, pos);
+    pos += 4;
+
+    //8..11 Read data length
+    fbData.writeUInt32LE(8, pos); //8 = upload info version 1 size
+    pos += 4;
+
+    const fallback = {
+      adsCommand: ADS.ADS_COMMAND.Read,
+      targetAmsNetId: targetOpts.amsNetId,
+      targetAdsPort: targetOpts.adsPort,
+      payload: fbData
+    };
+
     try {
-      const res = await this.sendAdsCommand<AdsReadResponse>({
-        adsCommand: ADS.ADS_COMMAND.Read,
-        targetAmsNetId: targetOpts.amsNetId,
-        targetAdsPort: targetOpts.adsPort,
-        payload: data
-      });
+      const { response: res, fallbackUsed } = await this.sendAdsCommandWithFallback<AdsReadResponse>(command, fallback);
+
+      this.debug(`readPlcUploadInfo(): Upload info read - fallback was needed: ${fallbackUsed}`);
 
       const uploadInfo = {} as AdsUploadInfo;
-
       let pos = 0;
       const response = res.ads.payload;
+
+      //If we are here, either the command or fallback was successful
+      //Detect version from byte count
+      if (response.byteLength === 8) {
+        uploadInfo.version = 1;
+
+      } else if (response.byteLength === 24) {
+        uploadInfo.version = 2;
+
+      } else if (response.byteLength === 64) {
+        uploadInfo.version = 3;
+
+      } else {
+        //Shouldn't happen as we request max 64 bytes
+        throw new Error(`Upload info version is unknown (received ${response.byteLength} bytes) - create a GitHub issue`);
+      }
 
       //0..3 Symbol count
       uploadInfo.symbolCount = response.readUInt32LE(pos);
@@ -4911,21 +5043,44 @@ export class Client extends EventEmitter<AdsClientEvents> {
       uploadInfo.symbolLength = response.readUInt32LE(pos);
       pos += 4;
 
-      //8..11 Data type count
-      uploadInfo.dataTypeCount = response.readUInt32LE(pos);
-      pos += 4;
+      if (uploadInfo.version >= 2) {
+        //8..11 Data type count
+        uploadInfo.dataTypeCount = response.readUInt32LE(pos);
+        pos += 4;
 
-      //12..15 Data type length
-      uploadInfo.dataTypeLength = response.readUInt32LE(pos);
-      pos += 4;
+        //12..15 Data type length
+        uploadInfo.dataTypeLength = response.readUInt32LE(pos);
+        pos += 4;
 
-      //16..19 Extra count
-      uploadInfo.extraCount = response.readUInt32LE(pos);
-      pos += 4;
+        //16..19 Max. allowed dynamic symbol count
+        uploadInfo.maxDynamicSymbolCount = response.readUInt32LE(pos);
+        pos += 4;
 
-      //20..23 Extra length
-      uploadInfo.extraLength = response.readUInt32LE(pos);
-      pos += 4;
+        //20..23 Number of dynamic symbols used (version >= 2)
+        uploadInfo.dynamicSymbolCount = response.readUInt32LE(pos);
+        pos += 4;
+
+        if (uploadInfo.version >= 3) {
+          //24..27 Invalid dynamic symbol count
+          uploadInfo.invalidDynamicSymbolCount = response.readUInt32LE(pos);
+          pos += 4;
+
+          //28..31 Encoding code page used for STRING encoding
+          uploadInfo.encodingCodePage = response.readUInt32LE(pos);
+          pos += 4;
+
+          //32..35 Upload info flags
+          uploadInfo.flags = response.readUInt32LE(pos);
+          uploadInfo.flagsStr = ADS.ADS_UPLOAD_INFO_FLAGS.toStringArray(uploadInfo.flags);
+          pos += 4;
+
+          //36..63 Reserved
+          uploadInfo.reserved = response.subarray(pos);
+        }
+      }
+
+      //Target has UTF-8 encoded ADS symbols if encodingCodePage is 65001 (or if forced from settings)
+      this.metaData.adsSymbolsUseUtf8 = uploadInfo.encodingCodePage === 65001 || this.settings.forceUtf8ForAdsSymbols;
 
       if (!targetOpts.adsPort && !targetOpts.amsNetId) {
         //Target is not overridden -> save to metadata
@@ -5143,7 +5298,7 @@ export class Client extends EventEmitter<AdsClientEvents> {
     pos += 4;
 
     //8..11 Read data length
-    data.writeUInt32LE(uploadInfo.dataTypeLength, pos);
+    data.writeUInt32LE(uploadInfo.dataTypeLength ?? 0xFFFFFFFF, pos); //Using 0xFFFFFFFF is upload info is version 1 (= we don't know the length)
     pos += 4;
 
     try {
@@ -6591,7 +6746,7 @@ export class Client extends EventEmitter<AdsClientEvents> {
       pos += 2;
 
       //10..n Data type
-      result.dataType = ADS.decodePlcStringBuffer(response.subarray(pos, pos + dataTypeLength + 1));
+      result.dataType = ADS.decodePlcStringBuffer(response.subarray(pos, pos + dataTypeLength + 1), this.metaData.adsSymbolsUseUtf8);
 
       this.debug(`createVariableHandle(): Variable handle created to ${path}`);
 
@@ -6755,7 +6910,7 @@ export class Client extends EventEmitter<AdsClientEvents> {
           pos += 2;
 
           //10..n Data type
-          result.dataType = ADS.decodePlcStringBuffer(response.subarray(pos, pos + dataTypeLength + 1));
+          result.dataType = ADS.decodePlcStringBuffer(response.subarray(pos, pos + dataTypeLength + 1), this.metaData.adsSymbolsUseUtf8);
           pos += dataTypeLength + 1;
 
           results[i].handle = result;

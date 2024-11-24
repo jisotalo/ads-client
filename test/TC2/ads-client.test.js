@@ -113,7 +113,8 @@ describe('connection', () => {
       allPlcSymbolsCached: false,
       plcSymbols: {},
       allPlcDataTypesCached: false,
-      plcDataTypes: {}
+      plcDataTypes: {},
+      adsSymbolsUseUtf8: false
     }));
 
     expect(client.metaData.tcSystemState).toStrictEqual({
@@ -130,12 +131,13 @@ describe('connection', () => {
 
     //Note: checking only keys
     expect(Object.keys(client.metaData.plcUploadInfo)).toStrictEqual(Object.keys({
+      version: 0,
       symbolCount: 0,
       symbolLength: 0,
       dataTypeCount: 0,
       dataTypeLength: 0,
-      extraCount: 0,
-      extraLength: 0
+      maxDynamicSymbolCount: 0,
+      dynamicSymbolCount: 0,
     }));
 
     expect(client.metaData.allPlcSymbolsCached).toBe(false);
@@ -337,12 +339,13 @@ describe('symbols and data types', () => {
 
     //Note: checking only keys
     expect(Object.keys(res)).toStrictEqual(Object.keys({
+      version: 0,
       symbolCount: 0,
       symbolLength: 0,
       dataTypeCount: 0,
       dataTypeLength: 0,
-      extraCount: 0,
-      extraLength: 0
+      maxDynamicSymbolCount: 0,
+      dynamicSymbolCount: 0,
     }));
   });
 

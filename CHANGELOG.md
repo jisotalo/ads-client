@@ -4,6 +4,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.0-beta.5] - UNRELEASED
+- Added support for UTF-8 encoded ADS symbols
+  - Required for TwinCAT 3.1.4026 support
+  - Required for TwinCAT 3.1.4022/3.1.4024 with  `UTF-8 Encoding` checked under `TwinCAT XAE -> SYSTEM -> Settings -> ADS Symbolic`.
+- Added new `metaData.adsSymbolsUseUtf8`
+  - Set `true` if target system is using UTF-8 for ADS symbol encoding
+- Added new setting `forceUtf8ForAdsSymbols` (default: `false`)
+  - If set, client always handles ADS symbols as UTF-8 encoded
+  - Otherwise tries to detect the encoding or fallbacks to cp1252
+- `readPlcUploadInfo()` updated to support new version 3 upload info (inc. ADS symbol encoding info)
+  - Also added support for old version 1 upload info (perhaps old TC2 devices..?)
+- New method `sendAdsCommandWithFallback()`
+  - Calls `sendAdsCommand()` with a specific command. If it fails to certain ADS errors, tries the fallback command.
+  
 ## [2.0.0-beta.4] - 02.10.2024
 - Improved TwinCAT 2 support
   - Improved performance by caching base data types that aren't available in the PLC (for example, `INT16` in TC2)

@@ -467,9 +467,9 @@ export const ADS_TRANS_MODE = {
 
   /** Returns the corresponding key as string by given value (number) */
   toString: function (value: number): string {
-    const val = Object.keys(this).find((key) => this[key as keyof typeof ADS_TRANS_MODE] == value)
+    const val = Object.keys(this).find((key) => this[key as keyof typeof ADS_TRANS_MODE] == value);
 
-    return (val !== undefined ? val : 'UNKNOWN')
+    return (val !== undefined ? val : 'UNKNOWN');
   }
 }
 
@@ -502,9 +502,9 @@ export const ADS_STATE = {
 
   /** Returns the corresponding key as string by given value (number) */
   toString: function (value: number): string {
-    const val = Object.keys(this).find((key) => this[key as keyof typeof ADS_STATE] == value)
+    const val = Object.keys(this).find((key) => this[key as keyof typeof ADS_STATE] == value);
 
-    return (val !== undefined ? val : 'UNKNOWN')
+    return (val !== undefined ? val : 'UNKNOWN');
   }
 }
 
@@ -605,9 +605,9 @@ export const ADS_RESERVED_INDEX_GROUPS = {
 
   /** Returns the corresponding key as string by given value (number) */
   toString: function (value: number): string {
-    const val = Object.keys(this).find((key) => this[key as keyof typeof ADS_RESERVED_INDEX_GROUPS] == value)
+    const val = Object.keys(this).find((key) => this[key as keyof typeof ADS_RESERVED_INDEX_GROUPS] == value);
 
-    return (val !== undefined ? val : 'UNKNOWN')
+    return (val !== undefined ? val : 'UNKNOWN');
   }
 }
 
@@ -651,18 +651,20 @@ export const ADS_SYMBOL_FLAGS = {
     const flagsArr: Array<string> = []
 
     for (const key of Object.keys(this)) {
-      const typedKey = key as keyof typeof ADS_SYMBOL_FLAGS
+      const typedKey = key as keyof typeof ADS_SYMBOL_FLAGS;
 
       if (typeof this[typedKey] !== 'number')
-        continue
+        continue;
 
       //Check if flag is available
       if ((flags & this[typedKey] as number) === this[typedKey]) {
-        if (flags === 0 || this[typedKey] !== 0) flagsArr.push(key)
+        if (flags === 0 || this[typedKey] !== 0) {
+          flagsArr.push(key);
+        }
       }
     }
 
-    return flagsArr
+    return flagsArr;
   },
   toString: function (flag: number): string {
     const index = Object.values(this).findIndex(val => val === flag);
@@ -690,21 +692,23 @@ export const ADS_SYMBOL_FLAGS_2 = {
 
   /** Return given flag value as string array */
   toStringArray: function (flags: number): string[] {
-    const flagsArr: Array<string> = []
+    const flagsArr: Array<string> = [];
 
     for (const key of Object.keys(this)) {
-      const typedKey = key as keyof typeof ADS_SYMBOL_FLAGS_2
+      const typedKey = key as keyof typeof ADS_SYMBOL_FLAGS_2;
 
       if (typeof this[typedKey] !== 'number')
-        continue
+        continue;
 
       //Check if flag is available
       if ((flags & this[typedKey] as number) === this[typedKey]) {
-        if (flags === 0 || this[typedKey] !== 0) flagsArr.push(key)
+        if (flags === 0 || this[typedKey] !== 0) {
+          flagsArr.push(key);
+        }
       }
     }
 
-    return flagsArr
+    return flagsArr;
   },
   toString: function (flag: number): string {
     const index = Object.values(this).findIndex(val => val === flag);
@@ -781,21 +785,23 @@ export const ADS_DATA_TYPE_FLAGS = {
 
   /** Return given flag value as string array */
   toStringArray: function (flags: number): string[] {
-    const flagsArr: Array<string> = []
+    const flagsArr: Array<string> = [];
 
     for (const key of Object.keys(this)) {
-      const typedKey = key as keyof typeof ADS_DATA_TYPE_FLAGS
+      const typedKey = key as keyof typeof ADS_DATA_TYPE_FLAGS;
 
       if (typeof this[typedKey] !== 'number')
-        continue
+        continue;
 
       //Check if flag is available
       if ((flags & this[typedKey] as number) === this[typedKey]) {
-        if (flags === 0 || this[typedKey] !== 0) flagsArr.push(key)
+        if (flags === 0 || this[typedKey] !== 0) {
+          flagsArr.push(key);
+        }
       }
     }
 
-    return flagsArr
+    return flagsArr;
   }
 }
 
@@ -842,9 +848,9 @@ export const ADS_DATA_TYPES = {
 
   /** Returns the corresponding key as string by given value (number) */
   toString: function (value: number): string {
-    const val = Object.keys(this).find((key) => this[key as keyof typeof ADS_DATA_TYPES] == value)
+    const val = Object.keys(this).find((key) => this[key as keyof typeof ADS_DATA_TYPES] == value);
 
-    return (val !== undefined ? val : 'UNKNOWN')
+    return (val !== undefined ? val : 'UNKNOWN');
   }
 }
 
@@ -865,21 +871,23 @@ export const ADS_RCP_METHOD_FLAGS = {
 
   /** Return given flag value as string array */
   toStringArray: function (flags: number): string[] {
-    const flagsArr: Array<string> = []
+    const flagsArr: Array<string> = [];
 
     for (const key of Object.keys(this)) {
-      const typedKey = key as keyof typeof ADS_RCP_METHOD_FLAGS
+      const typedKey = key as keyof typeof ADS_RCP_METHOD_FLAGS;
 
       if (typeof this[typedKey] !== 'number')
-        continue
+        continue;
 
       //Check if flag is available
       if ((flags & this[typedKey] as number) === this[typedKey]) {
-        if (flags === 0 || this[typedKey] !== 0) flagsArr.push(key)
+        if (flags === 0 || this[typedKey] !== 0) {
+          flagsArr.push(key);
+        }
       }
     }
 
-    return flagsArr
+      return flagsArr;
   }
 }
 
@@ -907,21 +915,60 @@ export const ADS_RCP_METHOD_PARAM_FLAGS = {
 
   /** Return given flag value as string array */
   toStringArray: function (flags: number): string[] {
-    const flagsArr: Array<string> = []
+    const flagsArr: Array<string> = [];
 
     for (const key of Object.keys(this)) {
-      const typedKey = key as keyof typeof ADS_RCP_METHOD_PARAM_FLAGS
+      const typedKey = key as keyof typeof ADS_RCP_METHOD_PARAM_FLAGS;
 
       if (typeof this[typedKey] !== 'number')
-        continue
+        continue;
 
       //Check if flag is available
       if ((flags & this[typedKey] as number) === this[typedKey]) {
-        if (flags === 0 || this[typedKey] !== 0) flagsArr.push(key)
+        if (flags === 0 || this[typedKey] !== 0) {
+          flagsArr.push(key);
+        }
       }
     }
 
-    return flagsArr
+    return flagsArr;
+  }
+}
+
+/**
+ * ADS symbol upload info flags
+ * 
+ * Source: TwinCAT.Ads.dll By Beckhoff
+ */
+export const ADS_UPLOAD_INFO_FLAGS = {
+  //None / Unititialized
+  None: 0,
+  //Target is 64 Bit Platform
+  Is64BitPlatform: 1,
+  //Symbol Server includes Base types.
+  IncludesBaseTypes: 2,
+  //String data is encoded in UTF-8 (All PLC STRING data is encoded in UTF8. This flag is used from TwinCAT 4026 on.)
+  Utf8EncodedStringData: 4,
+
+  /** Return given flag value as string array */
+  toStringArray: function (flags: number): string[] {
+    const flagsArr: Array<string> = [];
+
+    for (const key of Object.keys(this)) {
+      const typedKey = key as keyof typeof ADS_UPLOAD_INFO_FLAGS;
+
+      if (typeof this[typedKey] !== 'number')
+        continue;
+
+      //Check if flag is available
+      if ((flags & this[typedKey] as number) === this[typedKey]) {
+        if (flags === 0 || this[typedKey] !== 0) {
+          flagsArr.push(key);
+        }
+      }
+    }
+
+    return flagsArr;
   }
 }
 
@@ -1289,12 +1336,14 @@ export const amsNetIdStrToByteArray = (str: string): number[] => {
 export const trimPlcString = (str: string) => str.substring(0, str.indexOf("\0"));
 
 /**
- * Decodes provided Buffer object to plc STRING using cp1252 encoding.
+ * Decodes provided Buffer object to plc STRING using cp1252 encoding or UTF-8.
  * Also removes empty bytes from the end.
+ * 
  * @param data Buffer data that contains plc STRING
+ * @param UTF8 If true, the value is handled as UTF-8, otherwise as cp1252.
  * @returns 
  */
-export const decodePlcStringBuffer = (data: Buffer) => trimPlcString(iconv.decode(data, "cp1252"));
+export const decodePlcStringBuffer = (data: Buffer, UTF8: boolean = false) => trimPlcString(UTF8 ? data.toString('utf8') : iconv.decode(data, "cp1252") );
 
 /**
  * Encodes provided string to a Buffer object as plc STRING using cp1252 encoding

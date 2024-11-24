@@ -1,5 +1,5 @@
 import ClientError from "../client-error";
-import { AdsDataType, AdsDeviceInfo, AdsRawAddress, AdsResponse, AdsState, AdsSymbol, AmsAddress, AmsRouterState, AmsTcpPacket, BaseAdsResponse } from "./ads-protocol-types";
+import { AdsDataType, AdsDeviceInfo, AdsRawAddress, AdsResponse, AdsState, AdsSymbol, AdsUploadInfo, AmsAddress, AmsRouterState, AmsTcpPacket, BaseAdsResponse } from "./ads-protocol-types";
 
 /**
  * Possible debug levels
@@ -433,7 +433,16 @@ export interface AdsClientSettings {
    * As default, the client automatically deletes unknown subscriptions on the PLC to conserve resources.
    * A warning will be emitted when an unknown subscription is deleted.
    */
-  deleteUnknownSubscriptions?: boolean
+  deleteUnknownSubscriptions?: boolean,
+
+  /**
+   * **Optional**: If set, the client **always** uses UTF-8 for encoding/decoding ADS symbols (default: `false`).
+   * 
+   * Otherwise, the client detects target system encoding automatically. TwinCAT 4026 and newer always use UTF-8.
+   * 
+   * When connecting to a non-PLC system with UTF-8 encoded ADS symbols, this setting needs to be set.
+   */
+  forceUtf8ForAdsSymbols?: boolean
 }
 
 /**
@@ -574,29 +583,9 @@ export interface ConnectionMetaData {
   allPlcDataTypesCached: boolean,
   /** Cached target PLC runtime data types without subitems (if available) */
   plcDataTypes: AdsDataTypeContainer,
+  /** Set to `true` if target ADS symbols/datatypes are UTF-8 encoded (always in TwinCAT 4026->) */
+  adsSymbolsUseUtf8: boolean
 };
-
-/**
- * PLC runtime upload info
- * 
- * Contains information about symbols and data types
- * 
- * @category Types
- */
-export interface AdsUploadInfo {
-  /** Number of symbols in the target runtime */
-  symbolCount: number,
-  /** Length of downloadable symbol description data (bytes) */
-  symbolLength: number,
-  /** Number of datatypes in the target runtime */
-  dataTypeCount: number,
-  /** Length of downloadable data type description data (bytes) */
-  dataTypeLength: number,
-  /** Unknown */
-  extraCount: number,
-  /** Unknown */
-  extraLength: number
-}
 
 /**
  * Object containing PLC runtime symbol information objects
@@ -630,6 +619,18 @@ export interface AdsCommandToSend {
   targetAdsPort?: number
   /** Payload data */
   payload?: Buffer
+}
+
+/**
+ * Return value of `sendAdsCommandWithFallback()`
+ * 
+ * @category Types
+ */
+export interface SendAdsCommandWithFallbackResult<T> {
+  /** True if fallback command was used (main command failed) */
+  fallbackUsed: boolean,
+  /** The response */
+  response: AmsTcpPacket<T>
 }
 
 /**

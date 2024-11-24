@@ -357,7 +357,11 @@ await client.readSymbol('.ExampleSTRUCT') //TwinCAT 2
 
 ## Documentation
 
-The documentation is available at [https://jisotalo.fi/ads-client](TODO-DOC-URL-HERE/classes/Client.html)
+The documentation is available at [https://jisotalo.fi/ads-client](TODO-DOC-URL-HERE/classes/Client.html) and `./docs` folder.
+
+Examples in the getting started are based on a PLC project from [https://github.com/jisotalo/ads-client-test-plc-project](https://github.com/jisotalo/ads-client-test-plc-project).
+
+You can use the test PLC project as reference together with the [ads-client.test.js](https://github.com/jisotalo/ads-client/blob/master/test/TC3/ads-client.test.js) to see and try out all available features.
 
 ## Available methods
 
@@ -442,7 +446,8 @@ const client = new Client({
 
 ## Connecting
 
-It's a good practice to start a connection at startup and keep it open until the app is closed. If there are connection issues or the PLC software updated, the client will handle everything automatically.
+It's a good practice to start a connection at startup and keep it open until the app is closed. 
+If there are connection issues or the PLC software is updated, the client will handle everything automatically.
 
 
 ```js
@@ -473,25 +478,86 @@ The only exception is the dereferenced value of a reference/pointer, see [Readin
 
 ```js
 try {
+  let res;
+
   //Example: INT
-  const res = await client.readValue('GVL_Read.StandardTypes.INT_');
-  console.log(res.value);
+  res = await client.readValue('GVL_Read.StandardTypes.INT_');
+  console.log(res.value); 
+  // 32767
 
   //Example: STRING
-  //TODO - README in progress
+  res = await client.readValue('GVL_Read.StandardTypes.STRING_');
+  console.log(res.value); 
+  // A test string ääöö!!@@
+
+  //Example: DT
+  res = await client.readValue('GVL_Read.StandardTypes.DT_');
+  console.log(res.value); 
+  // 2106-02-06T06:28:15.000Z (Date object)
   
   //Example: STRUCT
-  //TODO - README in progress
+  res = await client.readValue('GVL_Read.ComplexTypes.STRUCT_');
+  console.log(res.value); 
+  /* 
+  {
+    BOOL_: true,
+    BOOL_2: false,
+    BYTE_: 255,
+    WORD_: 65535,
+    //...and so on
+  }
+  */
+  
+  //Example: FUNCTION_BLOCK
+  res = await client.readValue('GVL_Read.ComplexTypes.BLOCK_2'); //TON
+  console.log(res.value); 
+  // { IN: false, PT: 2500, Q: false, ET: 0, M: false, StartTime: 0 }
 
   //Example: ARRAY
-  //TODO - README in progress
+  res = await client.readValue('GVL_Read.StandardArrays.REAL_3');
+  console.log(res.value); 
+  // [ 75483.546875, 0, -75483.546875 ]
 
   //Example: ENUM
-  //TODO - README in progress
+  res = await client.readValue('GVL_Read.ComplexTypes.ENUM_');
+  console.log(res.value); 
+  // { name: 'Running', value: 100 }
 
 } catch (err) {
  console.log("Error:", err);
 }
+```
+
+**Typescript example**:
+
+```ts
+let res;
+
+//Example: INT
+res = await client.readValue<number>('GVL_Read.StandardTypes.INT_');
+console.log(res.value); //res.value is typed as number
+// 32767
+
+//Example: STRUCT
+interface ST_ComplexTypes {
+  BOOL_: boolean,
+  BOOL_2: boolean,
+  BYTE_: number,
+  WORD_: number,
+  //..and so on
+}
+
+res = await client.readValue<ST_ComplexTypes>('GVL_Read.ComplexTypes.STRUCT_');
+console.log(res.value); //res.value is typed as ST_ComplexTypes
+/* 
+{
+  BOOL_: true,
+  BOOL_2: false,
+  BYTE_: 255,
+  WORD_: 65535,
+  //..and so on
+}
+*/
 ```
 
 ### Reading raw data
@@ -604,20 +670,54 @@ The only exception is the dereferenced value of a reference/pointer, see [Writin
 ```js
 try {
   //Example: INT
-  const res = await client.writeValue('GVL_Write.StandardTypes.INT_', 32767);
-  console.log('Value written:', res.value);
+  await client.writeValue('GVL_Write.StandardTypes.INT_', 32767);
 
   //Example: STRING
-  //TODO - README in progress
+  await client.writeValue('GVL_Write.StandardTypes.STRING_', 'This is a test');
   
-  //Example: STRUCT
-  //TODO - README in progress
+  //Example: DT
+  await client.writeValue('GVL_Write.StandardTypes.DT_', new Date());
+
+  //Example: STRUCT (all properties)
+  await client.writeValue('GVL_Write.ComplexTypes.STRUCT_', {
+    BOOL_: true,
+    BOOL_2: false,
+    BYTE_: 255,
+    WORD_: 65535,
+    //...and so on
+  });
+
+  //Example: STRUCT (only some properties)
+  await client.writeValue('GVL_Write.ComplexTypes.STRUCT_', {
+    WORD_: 65535
+  }, true); //<-- NOTE: autoFill set
+
+  //Example: FUNCTION_BLOCK (all properties)
+  await client.writeValue('GVL_Write.ComplexTypes.BLOCK_2', {
+    IN: false, 
+    PT: 2500, 
+    Q: false, 
+    ET: 0, 
+    M: false, 
+    StartTime: 0
+  });
+
+  //Example: FUNCTION_BLOCK (only some properties)
+  await client.writeValue('GVL_Write.ComplexTypes.BLOCK_2', {
+    IN: true
+  }, true); //<-- NOTE: autoFill set
 
   //Example: ARRAY
-  //TODO - README in progress
+  await client.writeValue('GVL_Write.StandardArrays.REAL_3', [
+    75483.546875, 
+    0, 
+    -75483.546875
+  ]);
 
   //Example: ENUM
-  //TODO - README in progress
+  res = await client.writeValue('GVL_Write.ComplexTypes.ENUM_', 'Running');
+  //...or...
+  res = await client.writeValue('GVL_Write.ComplexTypes.ENUM_', 100);
 
 } catch (err) {
  console.log("Error:", err);
@@ -831,11 +931,67 @@ await sub.unsubscribe();
 
 ## Using variable handles
 
-README in progress.
+Variable handles are another alternative to read and write raw data.
+
+A handle is created to a specific PLC variable and after that, read and write operations are available.
+There is no need to use `indexGroup` or `indexOffset`.
+
+Handles should always be deleted after no longer needed, as the PLC has limited number of handles.
+However, it's a perfectly valid practice to keep the handles open as long as needed.
+
+Handles can also be used to read/write reference and pointer values, see [Reading reference/pointer](#reading-referencepointer).
+
+### Reading a value using a variable handle
+
+```js
+//Creating a handle
+const handle = await client.createVariableHandle('GVL_Read.StandardTypes.INT_');
+
+//Reading a value
+const data = await client.readRawByHandle(handle);
+
+//Deleting the handle
+await client.deleteVariableHandle(handle);
+
+//Converting to a Javascript value
+const converted = await client.convertFromRaw(data, 'INT');
+console.log(data); //<Buffer ff 7f>
+console.log(converted); //32767
+```
+
+### Writing a value using a variable handle
+
+```js
+//Creating a raw value
+const data = await client.convertToRaw(32767, 'INT');
+console.log(data); //<Buffer ff 7f>
+
+//Creating a handle
+const handle = await client.createVariableHandle('GVL_Write.StandardTypes.INT_');
+
+//Writing the value
+await client.writeRawByHandle(handle, data);
+
+//Deleting the handle
+await client.deleteVariableHandle(handle);
+```
 
 ## Calling function block RPC methods
 
-README in progress.
+If a function block method has pragma `{attribute 'TcRpcEnable'}`, the method can be called from ads-client.
+
+Read more at [Beckhoff Infosys: Attribute 'TcRpcEnable'](https://infosys.beckhoff.com/english.php?content=../content/1033/tc3_plc_intro/7145472907.html).
+
+### Things to note when using RPC Methods
+
+- Do not use online change if you change RPC method parameters or return data types
+- Make sure that parameters and return value have no pack-mode pragmas defined, otherwise data might be corrupted
+- Do not use `ARRAY` values directly in parameters or return value, encapsulate arrays inside struct and use the struct instead
+- The feature isn't well documented by Bechkhoff, so there might be some things that aren't taken into account
+
+### Simple RPC method example
+
+### RPC methods with structs
 
 ## Converting from/to raw data
 

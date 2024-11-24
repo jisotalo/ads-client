@@ -599,3 +599,37 @@ export interface AdsEnumInfoEntry {
   /** Enumeration value */
   value: PlcPrimitiveType
 }
+
+/**
+ * PLC runtime upload info
+ * 
+ * Contains information about symbols, data types and target system.
+ * 
+ * @category Types
+ */
+export interface AdsUploadInfo {
+  /** Upload info version - depends on target TwinCAT version (1 = 8 bytes, 2 = 24 bytes, 3 = 64 bytes of data) */
+  version: 1 | 2 | 3,
+  /** Number of symbols in the target runtime (version >= 1) */
+  symbolCount: number,
+  /** Length of downloadable symbol description data (bytes) (version >= 1) */
+  symbolLength: number,
+  /** Number of datatypes in the target runtime (version >= 2) */
+  dataTypeCount?: number,
+  /** Length of downloadable data type description data (bytes) (version >= 2) */
+  dataTypeLength?: number,
+  /** Max. allowed dynamic symbol count (version >= 2) */
+  maxDynamicSymbolCount?: number,
+  /** Number of dynamic symbols used (version >= 2) */
+  dynamicSymbolCount?: number
+  /** Invalid dynamic symbol count (version >= 3) */
+  invalidDynamicSymbolCount?: number,
+  /** Encoding code page used for STRING encoding (version >= 3) */
+  encodingCodePage?: number,  
+  /** Upload info flags as bit-notation (see ADS.ADS_SYMBOL_FLAGS) (version >= 3) */
+  flags?: number,
+  /** Upload info flags as string array (see ADS.ADS_SYMBOL_FLAGS) (version >= 3) */
+  flagsStr?: (keyof typeof ADS.ADS_UPLOAD_INFO_FLAGS | string)[], 
+  /** Reserved bytes (version >= 3) */
+  reserved?: Buffer
+}
