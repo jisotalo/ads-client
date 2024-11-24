@@ -17,6 +17,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Also added support for old version 1 upload info (perhaps old TC2 devices..?)
 - New method `sendAdsCommandWithFallback()`
   - Calls `sendAdsCommand()` with a specific command. If it fails to certain ADS errors, tries the fallback command.
+- Bug fix: If RPC method parameter had attributes, error was thrown
+- Bug fix: If RPC method parameter had multiple flags, error was thrown (`Response with ADS error received (error 1797 - Parameter size not correct)`)
   
 ## [2.0.0-beta.4] - 02.10.2024
 - Improved TwinCAT 2 support

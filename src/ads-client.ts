@@ -2699,7 +2699,7 @@ export class Client extends EventEmitter<AdsClientEvents> {
               attr.value = ADS.decodePlcStringBuffer(data.subarray(pos, pos + valueLength + 1), this.metaData.adsSymbolsUseUtf8);
               pos += valueLength + 1;
 
-              method.attributes.push(attr);
+              param.attributes.push(attr);
             }
           }
 
@@ -7360,8 +7360,8 @@ export class Client extends EventEmitter<AdsClientEvents> {
       }
 
       //Method inputs and outputs
-      const inputs = rpcMethod.parameters.filter(p => p.flags === ADS.ADS_RCP_METHOD_PARAM_FLAGS.In);
-      const outputs = rpcMethod.parameters.filter(p => p.flags === ADS.ADS_RCP_METHOD_PARAM_FLAGS.Out);
+      const inputs = rpcMethod.parameters.filter(p => (p.flags & ADS.ADS_RCP_METHOD_PARAM_FLAGS.In) === ADS.ADS_RCP_METHOD_PARAM_FLAGS.In);
+      const outputs = rpcMethod.parameters.filter(p => (p.flags & ADS.ADS_RCP_METHOD_PARAM_FLAGS.Out) === ADS.ADS_RCP_METHOD_PARAM_FLAGS.Out);
 
       //Creating data buffer for inputs
       let inputsData = Buffer.alloc(0);
