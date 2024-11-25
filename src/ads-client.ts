@@ -2719,6 +2719,8 @@ export class Client extends EventEmitter<AdsClientEvents> {
             param.reserved2 = data.subarray(pos);
           }
 
+          pos = beginPosition + entryLength;
+
           method.parameters.push(param);
         }
 
@@ -2791,8 +2793,10 @@ export class Client extends EventEmitter<AdsClientEvents> {
 
     //If flag EnumInfos set
     dataType.enumInfos = [];
+    let enumInfoCount = 0;
+
     if ((dataType.flags & ADS.ADS_DATA_TYPE_FLAGS.EnumInfos) === ADS.ADS_DATA_TYPE_FLAGS.EnumInfos) {
-      const enumInfoCount = data.readUInt16LE(pos);
+      enumInfoCount = data.readUInt16LE(pos);
       pos += 2;
 
       for (let i = 0; i < enumInfoCount; i++) {
@@ -2836,9 +2840,55 @@ export class Client extends EventEmitter<AdsClientEvents> {
 
     //If flag ExtendedEnumInfos set
     if ((dataType.flags & ADS.ADS_DATA_TYPE_FLAGS.ExtendedEnumInfos) === ADS.ADS_DATA_TYPE_FLAGS.ExtendedEnumInfos) {
-      //TODO: this is not working now
-      //Things probably break now
-      this.warn(`Data type ${dataType.name} (${dataType.type}) has flag "ExtendedEnumInfos" which is not supported. Things might not work now. Please open an issue at Github`);
+      for (let i = 0; i < enumInfoCount; i++) {
+        let beginPosition = pos;
+
+        //Total entry length (bytes)
+        const entryLength = data.readUInt16LE(pos);
+        pos += 2;
+
+        //Comment length
+        const commentLength = data.readUInt8(pos);
+        pos += 1;
+
+        //Attribute count
+        const attributeCount = data.readUInt8(pos);
+        pos += 1;
+
+        //Enumeration comment
+        dataType.enumInfos[i].comment = ADS.decodePlcStringBuffer(data.subarray(pos, pos + commentLength + 1), this.metaData.adsSymbolsUseUtf8);
+        pos += commentLength + 1;
+
+        //Enumeration attributes
+        dataType.enumInfos[i].attributes = [];
+
+        //console.log(enumInfoCount, num1, commentLength, attributeCount, test, attributes);
+        //Attributes
+        for (let i = 0; i < attributeCount; i++) {
+          const attr = {} as AdsAttributeEntry;
+
+          //Name length
+          const nameLength = data.readUInt8(pos);
+          pos += 1;
+
+          //Value length
+          const valueLength = data.readUInt8(pos);
+          pos += 1;
+
+          //Name
+          attr.name = ADS.decodePlcStringBuffer(data.subarray(pos, pos + nameLength + 1), this.metaData.adsSymbolsUseUtf8);
+          pos += nameLength + 1;
+
+          //Value
+          attr.value = ADS.decodePlcStringBuffer(data.subarray(pos, pos + valueLength + 1), this.metaData.adsSymbolsUseUtf8);
+          pos += valueLength + 1;
+
+          dataType.enumInfos[i].attributes!.push(attr);
+        }
+
+        //If there are some reserved bytes -> skip
+        pos = beginPosition + entryLength;
+      }
     }
 
     //If flag SoftwareProtectionLevels set

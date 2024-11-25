@@ -597,7 +597,11 @@ export interface AdsEnumInfoEntry {
   /** Enumeration name*/
   name: string,
   /** Enumeration value */
-  value: PlcPrimitiveType
+  value: PlcPrimitiveType,
+  /** Comment (only available in TC 4026 and newer) */
+  comment?: string,
+  /** Attributes (only available in TC 4026 and newer) */
+  attributes?: AdsAttributeEntry[],
 }
 
 /**

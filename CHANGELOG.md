@@ -4,7 +4,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [2.0.0-beta.5] - UNRELEASED
+## [2.0.0-beta.5] - 25.11.2024
 - Added support for UTF-8 encoded ADS symbols
   - Required for TwinCAT 3.1.4026 support
   - Required for TwinCAT 3.1.4022/3.1.4024 with  `UTF-8 Encoding` checked under `TwinCAT XAE -> SYSTEM -> Settings -> ADS Symbolic`.
@@ -23,6 +23,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - See [issue #159](https://github.com/jisotalo/ads-client/issues/159)
 - `startPlc()`, `resetPlc()`, `stopPlc()` and `restartPlc()` call `readPlcRuntimeState()` afterwards to update the runtime state to metadata (and to emit event if needed) 
   - See [issue #159](https://github.com/jisotalo/ads-client/issues/159)
+- Added support for ENUM value comments and attributes (TwinCAT 3.1.4026 and newer)
+  - See [issue #163](https://github.com/jisotalo/ads-client/issues/163)
   
 ## [2.0.0-beta.4] - 02.10.2024
 - Improved TwinCAT 2 support

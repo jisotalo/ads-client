@@ -1234,7 +1234,9 @@ describe('reading values', () => {
       }
       {
         const res = await client.readValue('GVL_Read.ComplexTypes.BLOCK_3');
-        expect(res.value).toStrictEqual({
+
+        //Using toMatchObject instead of toStrictEqual, as TC 4026 has more enum info available -> ePath fails
+        expect(res.value).toMatchObject({
           sNetId: '',
           sPathName: 'C:\\Test',
           ePath: {
@@ -1475,7 +1477,8 @@ describe('reading values', () => {
           nErrId: 0
         };
 
-        expect(res.value).toStrictEqual([
+        //Using toMatchObject instead of toStrictEqual, as TC 4026 has more enum info available -> ePath fails
+        expect(res.value).toMatchObject([
           {
             ...base,
             sPathName: 'C:\\Test'
@@ -2452,7 +2455,9 @@ describe('writing values', () => {
         await client.writeValue('GVL_Write.ComplexTypes.BLOCK_3', value);
 
         const res = await client.readValue('GVL_Write.ComplexTypes.BLOCK_3');
-        expect(res.value).toStrictEqual(value);
+        
+        //Using toMatchObject instead of toStrictEqual, as TC 4026 has more enum info available -> ePath fails
+        expect(res.value).toMatchObject(value);
       }
       {
         const value = {
@@ -2815,7 +2820,9 @@ describe('writing values', () => {
         await client.writeValue('GVL_Write.ComplexArrayTypes.BLOCK_3', value);
 
         const res = await client.readValue('GVL_Write.ComplexArrayTypes.BLOCK_3');
-        expect(res.value).toStrictEqual(value);
+        
+        //Using toMatchObject instead of toStrictEqual, as TC 4026 has more enum info available -> ePath fails
+        expect(res.value).toMatchObject(value);
       }
       {
         const value = [
