@@ -799,6 +799,11 @@ describe('reading values', () => {
       }
     });
 
+    test('reading UTF-8 encoded STRING', async () => {
+      const res = await client.readValue('GVL_Read.StandardTypes.STRING_3');
+      expect(res.value).toStrictEqual(ST_STANDARD_TYPES.STRING_3);
+    });
+
     test('reading DATE', async () => {
       const res = await client.readValue('GVL_Read.StandardTypes.DATE_');
       expect(res.value).toStrictEqual(ST_STANDARD_TYPES.DATE_);
@@ -1553,8 +1558,8 @@ describe('reading values', () => {
           name: 'pack_mode',
           value: '1'
         }]);
-        expect(res.symbol.size).toBe(1145);
-        expect(res.rawValue.byteLength).toBe(1145);
+        expect(res.symbol.size).toBe(1226);
+        expect(res.rawValue.byteLength).toBe(1226);
         expect(res.value).toStrictEqual(ST_STANDARD_TYPES);
       }
 
@@ -1569,8 +1574,8 @@ describe('reading values', () => {
           name: 'pack_mode',
           value: '8'
         }]);
-        expect(res.symbol.size).toBe(1160);
-        expect(res.rawValue.byteLength).toBe(1160);
+        expect(res.symbol.size).toBe(1240);
+        expect(res.rawValue.byteLength).toBe(1240);
         expect(res.value).toStrictEqual(ST_STANDARD_TYPES);
       }
 
@@ -1903,6 +1908,12 @@ describe('writing values', () => {
         const res = await client.readValue('GVL_Write.StandardTypes.STRING_2');
         expect(res.value).toStrictEqual(ST_STANDARD_TYPES.STRING_2);
       }
+    });
+
+    test('writing UTF-8 encoded STRING', async () => {
+      await client.writeValue('GVL_Write.StandardTypes.STRING_3', ST_STANDARD_TYPES_WRITE.STRING_3);
+      const res = await client.readValue('GVL_Write.StandardTypes.STRING_3');
+      expect(res.value).toStrictEqual(ST_STANDARD_TYPES.STRING_3);
     });
 
     test('writing DATE', async () => {

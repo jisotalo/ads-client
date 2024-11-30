@@ -1347,10 +1347,11 @@ export const decodePlcStringBuffer = (data: Buffer, UTF8: boolean = false) => tr
 
 /**
  * Encodes provided string to a Buffer object as plc STRING using cp1252 encoding
- * @param str String to encode 
- * @returns 
+ * @param str String to encode
+ * @param UTF8 If true, the value is encoded as UTF-8, otherwise as cp1252.
+ * @returns
  */
-export const encodeStringToPlcStringBuffer = (str: string) => iconv.encode(str, "cp1252");
+export const encodeStringToPlcStringBuffer = (str: string, UTF8: boolean = false) => UTF8 ? iconv.encode(str, "utf8") : iconv.encode(str, "cp1252");
 
 /**
  * Decodes provided Buffer object to plc WSTRING using ucs2 encoding.

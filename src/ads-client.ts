@@ -3003,7 +3003,7 @@ export class Client extends EventEmitter<AdsClientEvents> {
    * @param isRootType If `true`, this is the root type / first call / not recursive call (default: `true`)
    * @param knownSize Data type size (if known) - used with pseudo data types and TwinCAT 2 primite types
    */
-  private async buildDataType(name: string, targetOpts: Partial<AmsAddress> = {}, isRootType = true, knownSize?: number): Promise<AdsDataType> {
+  private async buildDataType(name: string, targetOpts: Partial<AmsAddress> = {}, isRootType = true, knownSize?: number, attributes?: AdsAttributeEntry[]): Promise<AdsDataType> {
     try {
       this.debug(`buildDataType(): Building data type for ${name}`);
 
@@ -3100,6 +3100,7 @@ export class Client extends EventEmitter<AdsClientEvents> {
             subItemType.hashValue = dataType.subItems[i].hashValue;
             subItemType.offset = dataType.subItems[i].offset;
             subItemType.comment = dataType.subItems[i].comment;
+            subItemType.attributes = [...subItemType.attributes, ...dataType.subItems[i].attributes];
           }
 
           builtType.subItems.push(subItemType);
@@ -3112,6 +3113,9 @@ export class Client extends EventEmitter<AdsClientEvents> {
 
         //This is final form (no need to go deeper)
         builtType = { ...dataType };
+        if (attributes) {
+          builtType.attributes = [...builtType.attributes, ...attributes];
+        }
 
       } else if (dataType.arrayDimension > 0) {
         //Data type is an array - get array subtype
@@ -3184,7 +3188,7 @@ export class Client extends EventEmitter<AdsClientEvents> {
    */
   private convertBufferToPrimitiveType(buffer: Buffer, dataType: AdsDataType): PlcPrimitiveType {
     if (dataType.adsDataType === ADS.ADS_DATA_TYPES.ADST_STRING) {
-      return ADS.decodePlcStringBuffer(buffer); //TODO: If symbol has {attribute 'TcEncoding':='UTF-8'}
+      return ADS.decodePlcStringBuffer(buffer, this.dataTypeEncoding(dataType) === 'UTF-8');
 
     } else if (dataType.adsDataType === ADS.ADS_DATA_TYPES.ADST_WSTRING) {
       return ADS.decodePlcWstringBuffer(buffer);
@@ -3192,6 +3196,15 @@ export class Client extends EventEmitter<AdsClientEvents> {
     } else {
       return ADS.BASE_DATA_TYPES.fromBuffer(dataType.type, buffer, this.settings.convertDatesToJavascript);
     }
+  }
+
+  /**
+   * Extracts TcEncoding from datatype attributes
+   *
+   * @param dataType The data type
+   */
+  private dataTypeEncoding(dataType: AdsDataType): string | undefined {
+    return dataType.attributes.find((attr) => attr.name === 'TcEncoding')?.value
   }
 
   /**
@@ -3506,9 +3519,11 @@ export class Client extends EventEmitter<AdsClientEvents> {
     }
 
     if (dataType.adsDataType === ADS.ADS_DATA_TYPES.ADST_STRING) {
+      const isUTF8 = this.dataTypeEncoding(dataType) === 'UTF-8'
+      const encoded = ADS.encodeStringToPlcStringBuffer(value as string, isUTF8);
       //If string is too long for target data type, truncate it
-      const length = Math.min(dataType.size - 1, (value as string).length);
-      ADS.encodeStringToPlcStringBuffer(value as string).copy(buffer, 0, 0, length);
+      const length = Math.min(dataType.size - 1, encoded.length);
+      encoded.copy(buffer, 0, 0, length);
 
     } else if (dataType.adsDataType === ADS.ADS_DATA_TYPES.ADST_WSTRING) {
       ADS.encodeStringToPlcWstringBuffer(value as string).copy(buffer);
@@ -6285,7 +6300,7 @@ export class Client extends EventEmitter<AdsClientEvents> {
       this.debugD(`readValue(): Getting data type for ${path}`);
 
       //Also passing size for TC2 pointer/pseudo type support
-      dataType = await this.buildDataType(symbol.type, targetOpts, true, symbol.size);
+      dataType = await this.buildDataType(symbol.type, targetOpts, true, symbol.size, symbol.attributes);
 
     } catch (err) {
       this.debug(`readValue(): Getting data type for ${path} failed: %o`, err);
@@ -6419,7 +6434,7 @@ export class Client extends EventEmitter<AdsClientEvents> {
       this.debugD(`writeValue(): Getting data type for ${path}`);
 
       //Also passing size for TC2 pointer/pseudo type support
-      dataType = await this.buildDataType(symbol.type, targetOpts, true, symbol.size);
+      dataType = await this.buildDataType(symbol.type, targetOpts, true, symbol.size, symbol.attributes);
 
     } catch (err) {
       this.debug(`writeValue(): Getting data type for ${path} failed: %o`, err);
