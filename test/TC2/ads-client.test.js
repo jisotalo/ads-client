@@ -32,8 +32,9 @@ About this test file:
  * This must match with .VERSION
  */
 const PLC_PROJECT_VERSION = '2.0.0';
-const AMS_NET_ID = '5.19.100.19.1.1';
 
+const AMS_NET_ID = process.env.AMS_NET_ID ?? '5.19.100.19.1.1';
+const LOCAL_AMS_NET_ID = process.env.LOCAL_AMS_NET_ID ?? '192.168.68.101.1.1';
 
 const { Client, ADS } = require('../../dist/ads-client');
 const util = require('util');
@@ -89,7 +90,7 @@ describe('connection', () => {
     expect(Object.keys(client.connection)).toStrictEqual(Object.keys({
       connected: true,
       isLocal: false,
-      localAmsNetId: '192.168.68.101.1.1',
+      localAmsNetId: LOCAL_AMS_NET_ID,
       localAdsPort: 32891,
       targetAmsNetId: client.settings.targetAmsNetId,
       targetAdsPort: 851
