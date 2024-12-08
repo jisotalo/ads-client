@@ -35,6 +35,10 @@ Version 2 is almost ready!
 - Automatic byte alignment support (all pack-modes automatically supported)
 
 # Table of contents
+- [ads-client](#ads-client)
+- [Project status](#project-status)
+- [Features](#features)
+- [Table of contents](#table-of-contents)
 - [Support](#support)
 - [Installing](#installing)
 - [Connection setup](#connection-setup)
@@ -66,8 +70,16 @@ Version 2 is almost ready!
     - [Raw data](#raw-data)
     - [Unsubscribing](#unsubscribing)
   - [Using variable handles](#using-variable-handles)
+    - [Reading a value using a variable handle](#reading-a-value-using-a-variable-handle)
+    - [Writing a value using a variable handle](#writing-a-value-using-a-variable-handle)
   - [Calling function block RPC methods](#calling-function-block-rpc-methods)
-  - [Converting from/to raw data](#converting-fromto-raw-data)
+    - [Things to note when using RPC Methods](#things-to-note-when-using-rpc-methods)
+    - [About examples](#about-examples)
+    - [RPC method with standard data types](#rpc-method-with-standard-data-types)
+    - [RPC method with struct](#rpc-method-with-struct)
+  - [Converting data between raw data and Javascript objects](#converting-data-between-raw-data-and-javascript-objects)
+    - [Converting a raw value to a Javascript object](#converting-a-raw-value-to-a-javascript-object)
+    - [Converting a Javascript object to a raw value](#converting-a-javascript-object-to-a-raw-value)
   - [Other features](#other-features)
   - [Disconnecting](#disconnecting)
   - [FAQ](#faq)
@@ -935,7 +947,7 @@ await sub.unsubscribe();
 Variable handles are another alternative to read and write raw data.
 
 A handle is created to a specific PLC variable and after that, read and write operations are available.
-There is no need to use `indexGroup` or `indexOffset`.
+There is no need to use `indexGroup`/`indexOffset`.
 
 Handles should always be deleted after no longer needed, as the PLC has limited number of handles.
 However, it's a perfectly valid practice to keep the handles open as long as needed.
@@ -979,28 +991,241 @@ await client.deleteVariableHandle(handle);
 
 ## Calling function block RPC methods
 
-If a function block method has pragma `{attribute 'TcRpcEnable'}`, the method can be called from ads-client.
+If a function block method has pragma `{attribute 'TcRpcEnable'}`, 
+the method can be called from ads-client.
 
 Read more at [Beckhoff Infosys: Attribute 'TcRpcEnable'](https://infosys.beckhoff.com/english.php?content=../content/1033/tc3_plc_intro/7145472907.html).
 
 ### Things to note when using RPC Methods
 
+These are my own observations.
+
 - Do not use online change if you change RPC method parameters or return data types
 - Make sure that parameters and return value have no pack-mode pragmas defined, otherwise data might be corrupted
 - Do not use `ARRAY` values directly in parameters or return value, encapsulate arrays inside struct and use the struct instead
-- The feature isn't well documented by Bechkhoff, so there might be some things that aren't taken into account
+- The feature isn't well documented by Beckhoff, so there might be some things that aren't taken into account
 
-### Simple RPC method example
+### About examples
 
-### RPC methods with structs
+These examples use `FB_RPC` from the test PLC project at [https://github.com/jisotalo/ads-client-test-plc-project](https://github.com/jisotalo/ads-client-test-plc-project). 
 
-## Converting from/to raw data
+![](img/fb_rpc.png)
 
-README in progress.
+There is an instance of the function block at `GVL_RPC.RpcBlock`.
+
+### RPC method with standard data types
+
+The `Calculator()` method calculates sum, product and division of the input values. The method returns `true`, if all calculations were successful.
+```
+{attribute 'TcRpcEnable'}
+METHOD Calculator : BOOL
+VAR_INPUT
+	Value1	: REAL;
+	Value2	: REAL;
+END_VAR
+VAR_OUTPUT
+	Sum			: REAL;
+	Product 	: REAL;
+	Division	: REAL;
+END_VAR
+
+//--- Code starts ---
+
+//Return TRUE if all success
+Calculator := TRUE;
+
+Sum := Value1 + Value2;
+Product := Value1 * Value2;
+
+IF Value2 <> 0 THEN
+	Division := Value1 / Value2;
+ELSE
+	Division := 0;
+	Calculator := FALSE;
+END_IF
+```
+
+Example call:
+
+```js
+const res = await client.invokeRpcMethod('GVL_RPC.RpcBlock', 'Calculator', {
+  Value1: 1,
+  Value2: 123
+});
+* 
+console.log(res);
+/*
+{
+  returnValue: true,
+  outputs: { 
+    Sum: 124, 
+    Product: 123, 
+    Division: 0.008130080997943878 
+  }
+}
+*/
+```
+
+### RPC method with struct
+
+The `Structs()` method takes a struct value as input, changes its values and then returns the result.
+
+```
+{attribute 'TcRpcEnable'}
+METHOD Structs : ST_Struct
+VAR_INPUT
+	Input	: ST_Struct;
+END_VAR
+
+//--- Code starts ---
+
+Structs.SomeText := CONCAT('Response: ', Input.SomeText);
+Structs.SomeReal := Input.SomeReal * 10.0;
+Structs.SomeDate := Input.SomeDate + T#24H;
+```
+
+Example call:
+
+```js
+const res = await client.invokeRpcMethod('GVL_RPC.RpcBlock', 'Structs', {
+  Input: {
+    SomeText: 'Hello ads-client',
+    SomeReal: 3.14,
+    SomeDate: new Date('2024-12-24T00:00:00.000Z') 
+  }
+});
+* 
+console.log(res);
+/*
+{
+  returnValue: {
+    SomeText: 'Response: Hello ads-client',
+    SomeReal: 31.4,
+    SomeDate: 2024-12-24T01:00:00.000Z
+  },
+  outputs: {
+}
+*/
+```
+
+## Converting data between raw data and Javascript objects
+
+The raw data in this context means sent or received bytes (a `Buffer` object).
+
+When using methods such as [`readValue()`](TODO-DOC-URL-HERE/classes/Client.html#readValue), [`writeValue()`](TODO-DOC-URL-HERE/classes/Client.html#writeValue) and [`subscribeValue()`](TODO-DOC-URL-HERE/classes/Client.html#subscribeValue),
+the client converts data automatically. The conversion can be done manually as well, by using [`convertFromRaw()`](TODO-DOC-URL-HERE/classes/Client.html#convertFromRaw) and [`convertToRaw()`](TODO-DOC-URL-HERE/classes/Client.html#convertToRaw).
+
+See my other library [iec-61131-3](https://github.com/jisotalo/iec-61131-3) for other possibilities to convert data between Javascript and IEC 61131-3 types.
+
+### Converting a raw value to a Javascript object
+
+The [`convertFromRaw()`](TODO-DOC-URL-HERE/classes/Client.html#convertFromRaw) can be used to convert raw data to objects.
+
+Converting raw data to INT
+
+```js
+const data = await client.readRaw(16448, 414816, 2);
+console.log(data); //<Buffer ff 7f>
+
+const converted = await client.convertFromRaw(data, 'INT');
+console.log(converted); //32767
+```
+
+Converting raw data to a custom struct
+
+```js
+const converted = await client.convertFromRaw(data, 'ST_Struct');
+console.log(converted);
+/*
+{ 
+  SomeText: 'Hello ads-client',
+  SomeReal: 3.1415927410125732,
+  SomeDate: 2020-04-13T12:25:33.000Z 
+}
+*/
+```
+
+
+### Converting a Javascript object to a raw value
+
+The [`convertToRaw()`](TODO-DOC-URL-HERE/classes/Client.html#convertToRaw) can be used to convert objects to raw data.
+
+Converting a numeric value to raw data (INT)
+
+```js
+const data = await client.convertToRaw(12345, 'INT');
+console.log(data); //<Buffer 39 30>
+```
+
+Converting an object to raw data (custom struct)
+
+```js
+const obj = { 
+  SomeText: 'Hello ads-client',
+  SomeReal: 3.1415927410125732,
+  SomeDate: new Date(2020-04-13T12:25:33.000Z)
+};
+
+const data = await client.convertToRaw(obj, 'ST_Struct');
+console.log(data); //<Buffer ...>
+```
+
+Converting an object with missing properties to raw data (custom struct)
+
+```js
+const obj = { 
+  SomeText: 'Hello ads-client',
+  SomeDate: new Date(2020-04-13T12:25:33.000Z)
+};
+
+//Note: SomeReal property is missing from obj. 
+//It is set to 0 as autoFill is set below
+const data = await client.convertToRaw(obj, 'ST_Struct', true); //<-- NOTE: autoFill set
+console.log(data); //<Buffer ...>
+```
 
 ## Other features
 
-README in progress.
+### ADS sum commands
+
+ADS sum commands can be used to have multiple ADS commands in one request. This can be useful if efficiency reasons.
+
+See [Beckhoff Information System](https://infosys.beckhoff.com/english.php?content=../content/1033/tc3_adsdll2/9007199379576075.html&id=9180083787138954512) for more info.
+
+- [`createVariableHandleMulti()`](TODO-DOC-URL-HERE/classes/Client.html#createVariableHandleMulti)
+- [`deleteVariableHandleMulti()`](TODO-DOC-URL-HERE/classes/Client.html#deleteVariableHandleMulti)
+- [`readRawMulti()`](TODO-DOC-URL-HERE/classes/Client.html#readRawMulti)
+- [`writeRawMulti()`](TODO-DOC-URL-HERE/classes/Client.html#writeRawMulti)
+- [`readWriteRawMulti()`](TODO-DOC-URL-HERE/classes/Client.html#readWriteRawMulti)
+
+### Starting and stopping a PLC 
+
+- [`startPlc()`](TODO-DOC-URL-HERE/classes/Client.html#startPlc)
+- [`stopPlc()`](TODO-DOC-URL-HERE/classes/Client.html#stopPlc)
+- [`resetPlc()`](TODO-DOC-URL-HERE/classes/Client.html#resetPlc)
+- [`restartPlc()`](TODO-DOC-URL-HERE/classes/Client.html#restartPlc)
+
+### Starting and stopping TwinCAT system
+
+- [`setTcSystemToConfig()`](TODO-DOC-URL-HERE/classes/Client.html#setTcSystemToConfig)
+- [`setTcSystemToRun()`](TODO-DOC-URL-HERE/classes/Client.html#setTcSystemToRun)
+- [`restartTcSystem()`](TODO-DOC-URL-HERE/classes/Client.html#restartTcSystem)
+
+### Client events
+
+See [`AdsClientEvents`](TODO-DOC-URL-HERE/interfaces/AdsClientEvents.html) for all available events, their descriptions and examples.
+
+### Debugging
+
+Use [`setDebugging()`](TODO-DOC-URL-HERE/classes/Client.html#setDebugging) to change debug level.
+
+ - 0: no debugging (default)
+ - 1: basic debugging (`$env:DEBUG='ads-client'`)
+ - 2: detailed debugging (`$env:DEBUG='ads-client,ads-client:details'`)
+ - 3: detailed debugging with raw I/O data (`$env:DEBUG='ads-client,ads-client:details,ads-client:raw-data'`)
+
+Debug data is available in the console (See [Debug](https://www.npmjs.com/package/debug) library for mode).
+
 
 ## Disconnecting
 
@@ -1111,493 +1336,9 @@ PLC projects for running test suites are located in the following repository:
 
 Tests are run with command `npm run test-tc3`. TwinCAT 3 test PLC projects needs to be running in the target system.
 
-**Results 28.09.2024:**
-
-<details>
-<summary>Click to show test results</summary>
-<pre>
-  PASS  test/TC3/ads-client.test.js (24.801 s)
-  √ IMPORTANT NOTE: This test requires running a specific TwinCAT 3 PLC project (https://github.com/jisotalo/ads-client-test-plc-project) (1 ms)                                                                                                                        
-  connection
-    √ client is not connected at beginning (1 ms)                                                                                   
-    √ checking ads client settings (1 ms)                                                                                           
-    √ connecting to the target (41 ms)                                                                                              
-    √ checking that test PLC project is active (13 ms)                                                                              
-    √ checking that test PLC project version is correct (10 ms)                                                                     
-    √ checking 32/64 bitness (4 ms)                                                                                                 
-    √ caching of symbols and data types                                                                                             
-    √ reconnecting (34 ms)                                                                                                          
-  resetting PLC to original state                                                                                                   
-    √ resetting PLC (514 ms)                                                                                                        
-    √ checking that reset was successful (8 ms)                                                                                     
-    √ checking that PLC is not running (11 ms)                                                                                      
-    √ setting IsReset to false (6 ms)                                                                                               
-    √ starting PLC (7 ms)                                                                                                           
-    √ checking that test PLC project is running (505 ms)                                                                            
-  testing PLC runtime stop, start, restart                                                                                          
-    √ stopping PLC (15 ms)                                                                                                          
-    √ starting PLC (14 ms)                                                                                                          
-    √ restarting PLC (528 ms)                                                                                                       
-  system state, PLC runtime states and device information                                                                           
-    √ reading TwinCAT system state (5 ms)                                                                                           
-    √ reading PLC runtime (port 851) state (3 ms)                                                                                   
-    √ reading PLC runtime (port 852) state (3 ms)                                                                                   
-    √ reading PLC runtime device info (3 ms)                                                                                        
-    √ reading TwinCAT system device info (5 ms)                                                                                     
-    √ reading PLC runtime symbol version (4 ms)                                                                                     
-  symbols and data types                                                                                                            
-    √ reading upload info (4 ms)                                                                                                    
-    √ reading all symbols (16 ms)                                                                                                   
-    √ reading single symbol information (1 ms)                                                                                      
-    √ reading all data type information (19 ms)                                                                                     
-    √ reading single data type information (2 ms)                                                                                   
-  data conversion                                                                                                                   
-    √ converting a raw PLC value to a Javascript variable (4 ms)                                                                    
-    √ converting a Javascript value to a raw PLC value (40 ms)                                                                      
-  reading values                                                                                                                    
-    reading standard values                                                                                                         
-      √ reading BOOL (16 ms)                                                                                                        
-      √ reading BYTE (8 ms)                                                                                                         
-      √ reading WORD (9 ms)                                                                                                         
-      √ reading DWORD (7 ms)                                                                                                        
-      √ reading SINT (15 ms)                                                                                                        
-      √ reading USINT (7 ms)                                                                                                        
-      √ reading INT (14 ms)                                                                                                         
-      √ reading UINT (7 ms)                                                                                                         
-      √ reading DINT (13 ms)                                                                                                        
-      √ reading UDINT (7 ms)                                                                                                        
-      √ reading REAL (31 ms)                                                                                                        
-      √ reading STRING (16 ms)                                                                                                      
-      √ reading DATE (7 ms)                                                                                                         
-      √ reading DT (14 ms)                                                                                                          
-      √ reading TOD (16 ms)                                                                                                         
-      √ reading TIME (8 ms)                                                                                                         
-      √ reading LWORD (8 ms)                                                                                                        
-      √ reading LINT (13 ms)                                                                                                        
-      √ reading ULINT (7 ms)                                                                                                        
-      √ reading LREAL (31 ms)                                                                                                       
-      √ reading WSTRING (16 ms)                                                                                                     
-      √ reading LDATE (---- TODO: Needs TC 3.1.4026 ----)                                                                           
-      √ reading LDT (---- TODO: Needs TC 3.1.4026 ----) (1 ms)                                                                      
-      √ reading LTOD (---- TODO: Needs TC 3.1.4026 ----)                                                                            
-      √ reading LTIME (9 ms)                                                                                                        
-    reading standard array values                                                                                                   
-      √ reading ARRAY OF BOOL (14 ms)                                                                                               
-      √ reading ARRAY OF BYTE (8 ms)                                                                                                
-      √ reading ARRAY OF WORD (9 ms)                                                                                                
-      √ reading ARRAY OF DWORD (8 ms)                                                                                               
-      √ reading ARRAY OF SINT (13 ms)                                                                                               
-      √ reading ARRAY OF USINT (7 ms)                                                                                               
-      √ reading ARRAY OF INT (13 ms)                                                                                                
-      √ reading ARRAY OF UINT (8 ms)                                                                                                
-      √ reading ARRAY OF DINT (16 ms)                                                                                               
-      √ reading ARRAY OF UDINT (7 ms)                                                                                               
-      √ reading ARRAY OF REAL (31 ms)                                                                                               
-      √ reading ARRAY OF STRING (15 ms)                                                                                             
-      √ reading ARRAY OF DATE (8 ms)                                                                                                
-      √ reading ARRAY OF DT (15 ms)                                                                                                 
-      √ reading ARRAY OF TOD (14 ms)                                                                                                
-      √ reading ARRAY OF TIME (5 ms)                                                                                                
-      √ reading ARRAY OF LWORD (8 ms)                                                                                               
-      √ reading ARRAY OF LINT (16 ms)                                                                                               
-      √ reading ARRAY OF ULINT (7 ms)                                                                                               
-      √ reading ARRAY OF LREAL (26 ms)                                                                                              
-      √ reading ARRAY OF WSTRING (13 ms)                                                                                            
-      √ reading ARRAY OF LDATE (---- TODO: Needs TC 3.1.4026 ----)                                                                  
-      √ reading ARRAY OF LDT (---- TODO: Needs TC 3.1.4026 ----)                                                                    
-      √ reading ARRAY OF LTOD (---- TODO: Needs TC 3.1.4026 ----)                                                                   
-      √ reading ARRAY OF LTIME (6 ms)                                                                                               
-    reading complex values                                                                                                          
-      √ reading STRUCT (14 ms)                                                                                                      
-      √ reading ALIAS (7 ms)                                                                                                        
-      √ reading ENUM (44 ms)                                                                                                        
-      √ reading POINTER (address) (8 ms)                                                                                            
-      √ reading SUBRANGE (8 ms)                                                                                                     
-      √ reading UNION (22 ms)                                                                                                       
-      √ reading FUNCTION_BLOCK (28 ms)                                                                                              
-      √ reading INTERFACE (8 ms)                                                                                                    
-    reading complex array values                                                                                                    
-      √ reading ARRAY OF STRUCT (19 ms)                                                                                             
-      √ reading ARRAY OF ALIAS (9 ms)                                                                                               
-      √ reading ARRAY OF ENUM (38 ms)                                                                                               
-      √ reading ARRAY OF POINTER (address) (6 ms)                                                                                   
-      √ reading ARRAY OF SUBRANGE (6 ms)                                                                                            
-      √ reading ARRAY OF UNION (8 ms)                                                                                               
-      √ reading ARRAY OF FUNCTION_BLOCK (27 ms)                                                                                     
-      √ reading ARRAY OF INTERFACE (6 ms)                                                                                           
-    reading special types / cases                                                                                                   
-      √ reading ARRAY with negative index (9 ms)                                                                                    
-      √ reading multi-dimensional ARRAY (9 ms)                                                                                      
-      √ reading ARRAY OF ARRAY (7 ms)                                                                                               
-      √ reading STRUCT with pragma: {attribute 'pack_mode' := '1'} (8 ms)                                                           
-      √ reading STRUCT with pragma: {attribute 'pack_mode' := '8'} (8 ms)                                                           
-      √ reading an empty FUNCTION_BLOCK (7 ms)                                                                                      
-      √ reading an empty STRUCT (8 ms)                                                                                              
-      √ reading an empty ARRAY (9 ms)                                                                                               
-      √ reading a single BIT (15 ms)                                                                                                
-      √ reading a struct with BIT types (8 ms)                                                                                      
-    reading dereferenced POINTER and REFERENCE values                                                                               
-      √ reading POINTER (value) (8 ms)                                                                                              
-      √ reading REFERENCE (value) (5 ms)                                                                                            
-    reading raw data                                                                                                                
-      √ reading a raw value (4 ms)                                                                                                  
-      √ reading a raw value using symbol (3 ms)                                                                                     
-      √ reading a raw value using path (4 ms)                                                                                       
-      √ reading multiple raw values (multi/sum command) (5 ms)                                                                      
-    reading (misc)                                                                                                                  
-      √ reading a value using symbol (3 ms)                                                                                         
-  writing values                                                                                                                    
-    writing standard values                                                                                                         
-      √ writing BOOL (22 ms)                                                                                                        
-      √ writing BYTE (12 ms)                                                                                                        
-      √ writing WORD (12 ms)                                                                                                        
-      √ writing DWORD (12 ms)                                                                                                       
-      √ writing SINT (24 ms)                                                                                                        
-      √ writing USINT (10 ms)                                                                                                       
-      √ writing INT (23 ms)                                                                                                         
-      √ writing UINT (11 ms)                                                                                                        
-      √ writing DINT (25 ms)                                                                                                        
-      √ writing UDINT (11 ms)                                                                                                       
-      √ writing REAL (46 ms)                                                                                                        
-      √ writing STRING (21 ms)                                                                                                      
-      √ writing DATE (11 ms)                                                                                                        
-      √ writing DT (22 ms)                                                                                                          
-      √ writing TOD (22 ms)                                                                                                         
-      √ writing TIME (11 ms)                                                                                                        
-      √ writing LWORD (7 ms)                                                                                                        
-      √ writing LINT (24 ms)                                                                                                        
-      √ writing ULINT (9 ms)                                                                                                        
-      √ writing LREAL (44 ms)                                                                                                       
-      √ writing WSTRING (22 ms)                                                                                                     
-      √ writing LDATE (---- TODO: Needs TC 3.1.4026 ----)                                                                           
-      √ writing LDT (---- TODO: Needs TC 3.1.4026 ----) (1 ms)                                                                      
-      √ writing LTOD (---- TODO: Needs TC 3.1.4026 ----)                                                                            
-      √ writing LTIME (7 ms)                                                                                                        
-    writing standard array values                                                                                                   
-      √ writing ARRAY OF BOOL (24 ms)                                                                                               
-      √ writing ARRAY OF BYTE (13 ms)                                                                                               
-      √ writing ARRAY OF WORD (12 ms)                                                                                               
-      √ writing ARRAY OF DWORD (13 ms)                                                                                              
-      √ writing ARRAY OF SINT (22 ms)                                                                                               
-      √ writing ARRAY OF USINT (12 ms)                                                                                              
-      √ writing ARRAY OF INT (19 ms)                                                                                                
-      √ writing ARRAY OF UINT (11 ms)                                                                                               
-      √ writing ARRAY OF DINT (22 ms)                                                                                               
-      √ writing ARRAY OF UDINT (12 ms)                                                                                              
-      √ writing ARRAY OF REAL (44 ms)                                                                                               
-      √ writing ARRAY OF STRING (23 ms)                                                                                             
-      √ writing ARRAY OF DATE (11 ms)                                                                                               
-      √ writing ARRAY OF DT (20 ms)                                                                                                 
-      √ writing ARRAY OF TOD (22 ms)                                                                                                
-      √ writing ARRAY OF TIME (11 ms)                                                                                               
-      √ writing ARRAY OF LWORD (12 ms)                                                                                              
-      √ writing ARRAY OF LINT (21 ms)
-      √ writing ARRAY OF ULINT (12 ms)                                                                                              
-      √ writing ARRAY OF LREAL (46 ms)                                                                                              
-      √ writing ARRAY OF WSTRING (22 ms)                                                                                            
-      √ writing ARRAY OF LDATE (---- TODO: Needs TC 3.1.4026 ----) (1 ms)                                                           
-      √ writing ARRAY OF LDT (---- TODO: Needs TC 3.1.4026 ----) (1 ms)                                                             
-      √ writing ARRAY OF LTOD (---- TODO: Needs TC 3.1.4026 ----)                                                                   
-      √ writing ARRAY OF LTIME (10 ms)                                                                                              
-    writing complex values                                                                                                          
-      √ writing STRUCT (26 ms)                                                                                                      
-      √ writing ALIAS (11 ms)                                                                                                       
-      √ writing ENUM (49 ms)                                                                                                        
-      √ writing POINTER (address) (14 ms)                                                                                           
-      √ writing SUBRANGE (17 ms)                                                                                                    
-      √ writing UNION (46 ms)                                                                                                       
-      √ writing FUNCTION_BLOCK (46 ms)                                                                                              
-      √ writing INTERFACE (13 ms)                                                                                                   
-    writing complex array values                                                                                                    
-      √ writing ARRAY OF STRUCT (24 ms)                                                                                             
-      √ writing ARRAY OF ALIAS (10 ms)                                                                                              
-      √ writing ARRAY OF ENUM (57 ms)                                                                                               
-      √ writing ARRAY OF POINTER (address) (12 ms)                                                                                  
-      √ writing ARRAY OF SUBRANGE (11 ms)                                                                                           
-      √ writing ARRAY OF UNION (16 ms)                                                                                              
-      √ writing ARRAY OF FUNCTION_BLOCK (48 ms)                                                                                     
-      √ writing ARRAY OF INTERFACE (16 ms)                                                                                          
-    writing special types / cases                                                                                                   
-      √ writing ARRAY with negative index (14 ms)                                                                                   
-      √ writing multi-dimensional ARRAY (15 ms)                                                                                     
-      √ writing ARRAY OF ARRAY (16 ms)                                                                                              
-      √ writing STRUCT with pragma: {attribute 'pack_mode' := '1'} (14 ms)                                                          
-      √ writing STRUCT with pragma: {attribute 'pack_mode' := '8'} (16 ms)                                                          
-      √ writing an empty FUNCTION_BLOCK (8 ms)                                                                                      
-      √ writing an empty STRUCT (7 ms)                                                                                              
-      √ writing an empty ARRAY (7 ms)                                                                                               
-      √ writing a single BIT (36 ms)                                                                                                
-      √ writing a struct with BIT types (11 ms)                                                                                     
-    writing dereferenced POINTER and REFERENCE values                                                                               
-      √ writing POINTER (value) (22 ms)                                                                                             
-      √ writing REFERENCE (value) (23 ms)                                                                                           
-    writing raw data                                                                                                                
-      √ writing a raw value (6 ms)                                                                                                  
-      √ writing a raw value using symbol (7 ms)                                                                                     
-      √ writing a raw value using path (11 ms)                                                                                      
-      √ writing multiple raw values (multi/sum command) (20 ms)                                                                     
-    writing (misc)                                                                                                                  
-      √ writing a value using symbol (8 ms)                                                                                         
-  variable handles                                                                                                                  
-    √ creating and deleting a varible handle (14 ms)                                                                                
-    √ reading value using a variable handle (12 ms)                                                                                 
-    √ writing value using a variable handle (30 ms)                                                                                 
-    √ creating and deleting multiple varible handles (multi/sum command) (9 ms)                                                     
-  subscriptions (ADS notifications)                                                                                                 
-    √ subscribing and unsubscribing successfully (2033 ms)                                                                          
-    √ subscribing to a changing value (10 ms) with default cycle time (3023 ms)                                                     
-    √ subscribing to a changing value (10 ms) with 10 ms cycle time (28 ms)                                                         
-    √ subscribing to a constant value with maximum delay of 2000 ms (2016 ms)                                                       
-    √ subscribing to a raw ADS address (222 ms)                                                                                     
-    √ subscribing using subscribeValue() (2030 ms)                                                                                  
-    √ subscribing to a raw ADS address using subscribeRaw() (219 ms)                                                                
-  remote procedure calls (RPC methods)                                                                                              
-    √ calling a RPC method (13 ms)                                                                                                  
-    √ calling a RPC method with struct parameters (9 ms)                                                                            
-    √ calling a RPC method without return value and without parameters (11 ms)                                                      
-  miscellaneous                                                                                                                     
-    √ sending read write ADS command (6 ms)                                                                                         
-    √ sending multiple read write ADS commands (multi/sum command) (12 ms)                                                          
-  issue specific tests                                                                                                              
-    issue 103 (https://github.com/jisotalo/ads-client/issues/103)                                                                   
-      √ calling unsubscribeAll() multiple times (should not crash to unhandled exception) (50 ms)                                   
-  disconnecting                                                                                                                     
-    √ disconnecting client (9 ms)                                                                                                   
-  controlling TwinCAT system service                                                                                                
-    √ connecting (1 ms)                                                                                                             
-    √ setting TwinCAT system to config (4024 ms)                                                                                    
-    √ setting TwinCAT system to run (4018 ms)                                                                                       
-    √ disconnecting (2 ms)                                                                                                          
-  handling unknown/stale ADS notifications                                                                                          
-    √ connecting (27 ms)                                                                                                            
-    √ creating an unknown notification handle by forced disconnecting (1040 ms)                                                     
-    √ deleting an unknown notification handle automatically (1034 ms)                                                               
-    √ disconnecting (1 ms)                                                                                                          
-                                                                                                                                    
-Test Suites: 1 passed, 1 total                                                                                                      
-Tests:       223 passed, 223 total                                                                                                  
-Snapshots:   0 total
-Time:        24.889 s, estimated 25 s
-Ran all test suites matching /TC3\\ads-client.test.js/i.
-</pre>
-</details>
-
 ### TwinCAT 2 tests
 
 Tests are run with command `npm run test-tc2`. TwinCAT 2 test PLC projects needs to be running in the target system.
-
-TwinCAT 2 tests only have features that are supported by TC2.
-
-**Results 28.09.2024:**
-
-<details>
-<summary>Click to show test results</summary>
-<pre>
- PASS  test/TC2/ads-client.test.js (26.971 s)
-  √ IMPORTANT NOTE: This test requires running a specific TwinCAT 2 PLC project (https://github.com/jisotalo/ads-client-test-plc-project)                                                                                                                               
-  connection
-    √ client is not connected at beginning                                                                                          
-    √ checking ads client settings                                                                                                  
-    √ connecting to the target (35 ms)                                                                                              
-    √ checking that test PLC project is active (58 ms)                                                                              
-    √ checking that test PLC project version is correct (9 ms)                                                                      
-    √ checking 32/64 bitness (2 ms)                                                                                                 
-    √ caching of symbols and data types (1 ms)                                                                                      
-    √ reconnecting (22 ms)                                                                                                          
-  resetting PLC to original state                                                                                                   
-    √ resetting PLC (507 ms)                                                                                                        
-    √ checking that reset was successful (5 ms)                                                                                     
-    √ checking that PLC is not running (8 ms)                                                                                       
-    √ setting IsReset to false (3 ms)                                                                                               
-    √ starting PLC (5 ms)                                                                                                           
-    √ checking that test PLC project is running (506 ms)                                                                            
-  testing PLC runtime stop, start, restart                                                                                          
-    √ stopping PLC (13 ms)                                                                                                          
-    √ starting PLC (10 ms)                                                                                                          
-    √ restarting PLC (523 ms)                                                                                                       
-  system state, PLC runtime states and device information                                                                           
-    √ reading TwinCAT system state (2 ms)                                                                                           
-    √ reading PLC runtime (port 801) state (2 ms)                                                                                   
-    √ reading PLC runtime device info (2 ms)                                                                                        
-    √ reading TwinCAT system device info (2 ms)                                                                                     
-    √ reading PLC runtime symbol version (2 ms)                                                                                     
-  symbols and data types                                                                                                            
-    √ reading upload info (2 ms)                                                                                                    
-    √ reading all symbols (15 ms)                                                                                                   
-    √ reading single symbol information                                                                                             
-    √ reading all data type information (33 ms)                                                                                     
-    √ reading single data type information (9 ms)                                                                                   
-  data conversion                                                                                                                   
-    √ converting a raw PLC value to a Javascript variable (7 ms)                                                                    
-    √ converting a Javascript value to a raw PLC value (41 ms)                                                                      
-  reading values                                                                                                                    
-    reading standard values                                                                                                         
-      √ reading BOOL (12 ms)                                                                                                        
-      √ reading BYTE (6 ms)                                                                                                         
-      √ reading WORD (6 ms)                                                                                                         
-      √ reading DWORD (7 ms)                                                                                                        
-      √ reading SINT (11 ms)
-      √ reading USINT (7 ms)                                                                                                        
-      √ reading INT (11 ms)                                                                                                         
-      √ reading UINT (7 ms)                                                                                                         
-      √ reading DINT (13 ms)                                                                                                        
-      √ reading UDINT (6 ms)                                                                                                        
-      √ reading REAL (19 ms)                                                                                                        
-      √ reading STRING (10 ms)                                                                                                      
-      √ reading DATE (4 ms)                                                                                                         
-      √ reading DT (9 ms)                                                                                                           
-      √ reading TOD (8 ms)                                                                                                          
-      √ reading TIME (6 ms)                                                                                                         
-      √ reading LREAL (26 ms)                                                                                                       
-    reading standard array values                                                                                                   
-      √ reading ARRAY OF BOOL (9 ms)                                                                                                
-      √ reading ARRAY OF BYTE (5 ms)                                                                                                
-      √ reading ARRAY OF WORD (5 ms)                                                                                                
-      √ reading ARRAY OF DWORD (4 ms)                                                                                               
-      √ reading ARRAY OF SINT (10 ms)                                                                                               
-      √ reading ARRAY OF USINT (6 ms)                                                                                               
-      √ reading ARRAY OF INT (9 ms)                                                                                                 
-      √ reading ARRAY OF UINT (6 ms)                                                                                                
-      √ reading ARRAY OF DINT (10 ms)                                                                                               
-      √ reading ARRAY OF UDINT (3 ms)                                                                                               
-      √ reading ARRAY OF REAL (18 ms)                                                                                               
-      √ reading ARRAY OF STRING (9 ms)                                                                                              
-      √ reading ARRAY OF DATE (7 ms)                                                                                                
-      √ reading ARRAY OF DT (11 ms)                                                                                                 
-      √ reading ARRAY OF TOD (9 ms)                                                                                                 
-      √ reading ARRAY OF TIME (4 ms)                                                                                                
-      √ reading ARRAY OF LREAL (24 ms)                                                                                              
-    reading complex values                                                                                                          
-      √ reading STRUCT (15 ms)                                                                                                      
-      √ reading ALIAS (8 ms)                                                                                                        
-      √ reading ENUM (16 ms)                                                                                                        
-      √ reading POINTER (address) (6 ms)                                                                                            
-      √ reading SUBRANGE (6 ms)                                                                                                     
-      √ reading FUNCTION_BLOCK (23 ms)                                                                                              
-    reading complex array values                                                                                                    
-      √ reading ARRAY OF STRUCT (12 ms)                                                                                             
-      √ reading ARRAY OF ALIAS (6 ms)                                                                                               
-      √ reading ARRAY OF ENUM (20 ms)                                                                                               
-      √ reading ARRAY OF POINTER (address) (5 ms)                                                                                   
-      √ reading ARRAY OF SUBRANGE (3 ms)                                                                                            
-      √ reading ARRAY OF FUNCTION_BLOCK (22 ms)                                                                                     
-    reading special types / cases                                                                                                   
-      √ reading ARRAY with negative index (8 ms)                                                                                    
-      √ reading multi-dimensional ARRAY (5 ms)                                                                                      
-      √ reading ARRAY OF ARRAY (5 ms)                                                                                               
-    reading dereferenced POINTER values                                                                                             
-      √ reading POINTER (value) (5 ms)                                                                                              
-    reading raw data                                                                                                                
-      √ reading a raw value (3 ms)                                                                                                  
-      √ reading a raw value using symbol (2 ms)                                                                                     
-      √ reading a raw value using path (2 ms)                                                                                       
-      √ reading multiple raw values (multi/sum command) (4 ms)                                                                      
-    reading (misc)                                                                                                                  
-      √ reading a value using symbol (3 ms)                                                                                         
-  writing values                                                                                                                    
-    writing standard values                                                                                                         
-      √ writing BOOL (22 ms)                                                                                                        
-      √ writing BYTE (10 ms)                                                                                                        
-      √ writing WORD (8 ms)                                                                                                         
-      √ writing DWORD (10 ms)                                                                                                       
-      √ writing SINT (18 ms)                                                                                                        
-      √ writing USINT (6 ms)                                                                                                        
-      √ writing INT (16 ms)                                                                                                         
-      √ writing UINT (8 ms)                                                                                                         
-      √ writing DINT (13 ms)                                                                                                        
-      √ writing UDINT (7 ms)                                                                                                        
-      √ writing REAL (30 ms)                                                                                                        
-      √ writing STRING (14 ms)                                                                                                      
-      √ writing DATE (6 ms)                                                                                                         
-      √ writing DT (15 ms)                                                                                                          
-      √ writing TOD (15 ms)                                                                                                         
-      √ writing TIME (8 ms)                                                                                                         
-      √ writing LREAL (28 ms)                                                                                                       
-    writing standard array values                                                                                                   
-      √ writing ARRAY OF BOOL (14 ms)                                                                                               
-      √ writing ARRAY OF BYTE (7 ms)                                                                                                
-      √ writing ARRAY OF WORD (7 ms)                                                                                                
-      √ writing ARRAY OF DWORD (9 ms)                                                                                               
-      √ writing ARRAY OF SINT (13 ms)                                                                                               
-      √ writing ARRAY OF USINT (7 ms)                                                                                               
-      √ writing ARRAY OF INT (15 ms)                                                                                                
-      √ writing ARRAY OF UINT (7 ms)                                                                                                
-      √ writing ARRAY OF DINT (13 ms)                                                                                               
-      √ writing ARRAY OF UDINT (9 ms)                                                                                               
-      √ writing ARRAY OF REAL (25 ms)                                                                                               
-      √ writing ARRAY OF STRING (17 ms)                                                                                             
-      √ writing ARRAY OF DATE (7 ms)                                                                                                
-      √ writing ARRAY OF DT (18 ms)                                                                                                 
-      √ writing ARRAY OF TOD (18 ms)                                                                                                
-      √ writing ARRAY OF TIME (10 ms)                                                                                               
-      √ writing ARRAY OF LREAL (35 ms)                                                                                              
-    writing complex values                                                                                                          
-      √ writing STRUCT (19 ms)                                                                                                      
-      √ writing ALIAS (10 ms)                                                                                                       
-      √ writing ENUM (25 ms)                                                                                                        
-      √ writing POINTER (address) (13 ms)                                                                                           
-      √ writing SUBRANGE (12 ms)                                                                                                    
-      √ writing FUNCTION_BLOCK (39 ms)                                                                                              
-    writing complex array values                                                                                                    
-      √ writing ARRAY OF STRUCT (24 ms)                                                                                             
-      √ writing ARRAY OF ALIAS (11 ms)                                                                                              
-      √ writing ARRAY OF ENUM (28 ms)                                                                                               
-      √ writing ARRAY OF POINTER (address) (14 ms)                                                                                  
-      √ writing ARRAY OF SUBRANGE (11 ms)                                                                                           
-      √ writing ARRAY OF FUNCTION_BLOCK (48 ms)                                                                                     
-    writing special types / cases                                                                                                   
-      √ writing ARRAY with negative index (18 ms)                                                                                   
-      √ writing multi-dimensional ARRAY (13 ms)                                                                                     
-      √ writing ARRAY OF ARRAY (12 ms)                                                                                              
-      √ writing an empty FUNCTION_BLOCK (7 ms)                                                                                      
-    writing dereferenced POINTER and REFERENCE values                                                                               
-      √ writing POINTER (value) (15 ms)                                                                                             
-    writing raw data                                                                                                                
-      √ writing a raw value (7 ms)                                                                                                  
-      √ writing a raw value using symbol (4 ms)                                                                                     
-      √ writing a raw value using path (10 ms)                                                                                      
-      √ writing multiple raw values (multi/sum command) (11 ms)                                                                     
-    writing (misc)                                                                                                                  
-      √ writing a value using symbol (5 ms)                                                                                         
-  variable handles                                                                                                                  
-    √ creating and deleting a varible handle (12 ms)                                                                                
-    √ reading value using a variable handle (6 ms)                                                                                  
-    √ writing value using a variable handle (19 ms)                                                                                 
-    √ creating and deleting multiple varible handles (multi/sum command) (5 ms)                                                     
-  subscriptions (ADS notifications)                                                                                                 
-    √ subscribing and unsubscribing successfully (2010 ms)                                                                          
-    √ subscribing to a changing value (10 ms) with default cycle time (3018 ms)                                                     
-    √ subscribing to a changing value (10 ms) with 10 ms cycle time (30 ms)                                                         
-    √ subscribing to a constant value with maximum delay of 2000 ms (2010 ms)                                                       
-    √ subscribing to a raw ADS address (220 ms)
-    √ subscribing using subscribeValue() (2010 ms)                                                                                  
-    √ subscribing to a raw ADS address using subscribeRaw() (218 ms)                                                                
-  miscellaneous                                                                                                                     
-    √ sending read write ADS command (7 ms)                                                                                         
-    √ sending multiple read write ADS commands (multi/sum command) (10 ms)                                                          
-  issue specific tests                                                                                                              
-    issue 103 (https://github.com/jisotalo/ads-client/issues/103)                                                                   
-      √ calling unsubscribeAll() multiple times (should not crash to unhandled exception) (28 ms)                                   
-  disconnecting                                                                                                                     
-    √ disconnecting client (6 ms)                                                                                                   
-  controlling TwinCAT system service                                                                                                
-    √ connecting (2 ms)                                                                                                             
-    √ setting TwinCAT system to config (5248 ms)                                                                                    
-    √ setting TwinCAT system to run (6303 ms)                                                                                       
-    √ disconnecting (1 ms)                                                                                                          
-  handling unknown/stale ADS notifications                                                                                          
-    √ connecting (23 ms)                                                                                                            
-    √ creating an unknown notification handle by forced disconnecting (1033 ms)                                                     
-    √ deleting an unknown notification handle automatically (1021 ms)                                                               
-    √ disconnecting (1 ms)                                                                                                          
-                                                                                                                                    
-Test Suites: 1 passed, 1 total
-Tests:       164 passed, 164 total                                                                                                  
-Snapshots:   0 total
-Time:        27.056 s
-Ran all test suites matching /TC2\\ads-client.test.js/i.
-</pre>
-</details>
 
 # License
 
