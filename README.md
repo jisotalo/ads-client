@@ -141,7 +141,7 @@ You can also clone the repository and run `npm run build`. After that, the libra
 
 The ads-client can be used with multiple system configurations.
 
-[![ads-client-setups](https://user-images.githubusercontent.com/13457157/82724547-8dde0800-9cdf-11ea-8dd1-0a1f06f8559f.PNG)](https://user-images.githubusercontent.com/13457157/82724547-8dde0800-9cdf-11ea-8dd1-0a1f06f8559f.PNG)
+![ads-client-setups](https://raw.githubusercontent.com/jisotalo/ads-client/refs/heads/v2-dev/img/connection_setup.png)
 
 
 ## Setup 1 - Connect from Windows
@@ -1009,7 +1009,7 @@ These are my own observations.
 
 These examples use `FB_RPC` from the test PLC project at [https://github.com/jisotalo/ads-client-test-plc-project](https://github.com/jisotalo/ads-client-test-plc-project). 
 
-![](img/fb_rpc.png)
+![](https://raw.githubusercontent.com/jisotalo/ads-client/refs/heads/v2-dev/img/fb_rpc.png)
 
 There is an instance of the function block at `GVL_RPC.RpcBlock`.
 
