@@ -301,7 +301,7 @@ export const ADS_STATE_FLAGS = {
 
   /** Returns the flags as comma separated list by given flag value (number) */
   toString: function (value: number): string {
-    const flags: Array<string> = []
+    const flags: string[] = []
 
     for (const key of Object.keys(this)) {
       const typedKey = key as keyof typeof ADS_STATE_FLAGS
@@ -648,7 +648,7 @@ export const ADS_SYMBOL_FLAGS = {
 
   /** Return given flag value as string array */
   toStringArray: function (flags: number): string[] {
-    const flagsArr: Array<string> = []
+    const flagsArr: string[] = []
 
     for (const key of Object.keys(this)) {
       const typedKey = key as keyof typeof ADS_SYMBOL_FLAGS;
@@ -692,7 +692,7 @@ export const ADS_SYMBOL_FLAGS_2 = {
 
   /** Return given flag value as string array */
   toStringArray: function (flags: number): string[] {
-    const flagsArr: Array<string> = [];
+    const flagsArr: string[] = [];
 
     for (const key of Object.keys(this)) {
       const typedKey = key as keyof typeof ADS_SYMBOL_FLAGS_2;
@@ -785,7 +785,7 @@ export const ADS_DATA_TYPE_FLAGS = {
 
   /** Return given flag value as string array */
   toStringArray: function (flags: number): string[] {
-    const flagsArr: Array<string> = [];
+    const flagsArr: string[] = [];
 
     for (const key of Object.keys(this)) {
       const typedKey = key as keyof typeof ADS_DATA_TYPE_FLAGS;
@@ -871,7 +871,7 @@ export const ADS_RCP_METHOD_FLAGS = {
 
   /** Return given flag value as string array */
   toStringArray: function (flags: number): string[] {
-    const flagsArr: Array<string> = [];
+    const flagsArr: string[] = [];
 
     for (const key of Object.keys(this)) {
       const typedKey = key as keyof typeof ADS_RCP_METHOD_FLAGS;
@@ -915,7 +915,7 @@ export const ADS_RCP_METHOD_PARAM_FLAGS = {
 
   /** Return given flag value as string array */
   toStringArray: function (flags: number): string[] {
-    const flagsArr: Array<string> = [];
+    const flagsArr: string[] = [];
 
     for (const key of Object.keys(this)) {
       const typedKey = key as keyof typeof ADS_RCP_METHOD_PARAM_FLAGS;
@@ -952,7 +952,7 @@ export const ADS_UPLOAD_INFO_FLAGS = {
 
   /** Return given flag value as string array */
   toStringArray: function (flags: number): string[] {
-    const flagsArr: Array<string> = [];
+    const flagsArr: string[] = [];
 
     for (const key of Object.keys(this)) {
       const typedKey = key as keyof typeof ADS_UPLOAD_INFO_FLAGS;
@@ -1343,14 +1343,15 @@ export const trimPlcString = (str: string) => str.substring(0, str.indexOf("\0")
  * @param UTF8 If true, the value is handled as UTF-8, otherwise as cp1252.
  * @returns 
  */
-export const decodePlcStringBuffer = (data: Buffer, UTF8: boolean = false) => trimPlcString(UTF8 ? data.toString('utf8') : iconv.decode(data, "cp1252") );
+export const decodePlcStringBuffer = (data: Buffer, UTF8: boolean = false) => trimPlcString(UTF8 ? iconv.decode(data, "utf8") : iconv.decode(data, "cp1252") );
 
 /**
  * Encodes provided string to a Buffer object as plc STRING using cp1252 encoding
- * @param str String to encode 
- * @returns 
+ * @param str String to encode
+ * @param UTF8 If true, the value is encoded as UTF-8, otherwise as cp1252.
+ * @returns
  */
-export const encodeStringToPlcStringBuffer = (str: string) => iconv.encode(str, "cp1252");
+export const encodeStringToPlcStringBuffer = (str: string, UTF8: boolean = false) => UTF8 ? iconv.encode(str, "utf8") : iconv.encode(str, "cp1252");
 
 /**
  * Decodes provided Buffer object to plc WSTRING using ucs2 encoding.

@@ -243,7 +243,7 @@ describe('resetting PLC to original state', () => {
 
 describe('testing PLC runtime stop, start, restart', () => {
   test('stopping PLC', async () => {
-    
+
     expect(client.metaData.plcRuntimeState.adsState).toBe(ADS.ADS_STATE.Run);
     let state = await client.readPlcRuntimeState();
     expect(state.adsState).toBe(ADS.ADS_STATE.Run);
@@ -663,21 +663,31 @@ describe('symbols and data types', () => {
 describe('data conversion', () => {
 
   test('converting a raw PLC value to a Javascript variable', async () => {
-    //Only testing once, as this is used internally in readValue(), which is tested very well
-    const res = await client.readRawByPath('GVL_Read.StandardTypes.WORD_');
+    //Only few tests, as this is used internally in readValue(), which is tested very well
+    {
+      const res = await client.readRawByPath('GVL_Read.StandardTypes.WORD_');
+      const value = await client.convertFromRaw(res, 'WORD');
+      expect(value).toBe(ST_STANDARD_TYPES.WORD_);
+    }
+    {
+      //UTF-8 encoded string
+      const attributes = [{ name: 'TcEncoding', value: 'UTF-8' }];
 
-    const value = await client.convertFromRaw(res, 'WORD');
-    expect(value).toBe(ST_STANDARD_TYPES.WORD_);
+      const res = await client.readRawByPath('GVL_Read.StandardTypes.STRING_3');
+      const value = await client.convertFromRaw(res, 'STRING(80)', attributes);
+      expect(value).toBe(ST_STANDARD_TYPES.STRING_3);
+    }
   });
 
   test('converting a Javascript value to a raw PLC value', async () => {
-    //Only doing small tests, as the convertObjectToBuffer() used is also used by writeymbol(), which is tested very well
+    //Only few tests, as the convertObjectToBuffer() used is also used by writeymbol(), which is tested very well
     {
       const res = await client.readRawByPath('GVL_Read.StandardTypes.WORD_');
       const value = await client.convertFromRaw(res, 'WORD');
 
       expect(await client.convertToRaw(value, 'WORD')).toStrictEqual(res);
-    } {
+    }
+    {
       const obj = { ...ST_STANDARD_TYPES_WRITE };
       delete obj.INT_;
 
@@ -690,6 +700,31 @@ describe('data conversion', () => {
       //When converting back to object, INT_ should exist but with value of 0
       const converted = await client.convertFromRaw(res, 'ST_StandardTypes');
       expect(converted).toStrictEqual({ ...obj, INT_: 0 });
+    }
+    {
+      //UTF-8 encoded string
+      const attributes = [{ name: 'TcEncoding', value: 'UTF-8' }];
+
+      const res = await client.readRawByPath('GVL_Read.StandardTypes.STRING_3');
+      const value = await client.convertFromRaw(res, 'STRING(80)', attributes);
+      expect(value).toBe(ST_STANDARD_TYPES.STRING_3);
+
+      const converted = await client.convertToRaw(ST_STANDARD_TYPES.STRING_3, 'STRING(80)', false, attributes);
+
+      //Finding the string length as bytes (first \0)
+      //Reason: In TC, it seems that wsLiteral_TO_UTF8() doesn't clear the memory, so that directly
+      //comparing these two buffers will most probably fail (there are bytes that aren't 0 - convertToRaw() sets all to 0 as default)
+      let length = res.byteLength;
+
+      for (let i = 0; i < res.byteLength; i++) {
+        if (res[i] === 0) {
+          length = i + 1;
+          break
+        }
+      }
+
+      //Now we can compare the bytes that really matter
+      expect(converted.subarray(0, length)).toStrictEqual(res.subarray(0, length));
     }
   });
 });
@@ -799,6 +834,11 @@ describe('reading values', () => {
         const res = await client.readValue('GVL_Read.StandardTypes.STRING_2');
         expect(res.value).toStrictEqual(ST_STANDARD_TYPES.STRING_2);
       }
+    });
+
+    test('reading UTF-8 encoded STRING', async () => {
+      const res = await client.readValue('GVL_Read.StandardTypes.STRING_3');
+      expect(res.value).toStrictEqual(ST_STANDARD_TYPES.STRING_3);
     });
 
     test('reading DATE', async () => {
@@ -1555,8 +1595,8 @@ describe('reading values', () => {
           name: 'pack_mode',
           value: '1'
         }]);
-        expect(res.symbol.size).toBe(1145);
-        expect(res.rawValue.byteLength).toBe(1145);
+        expect(res.symbol.size).toBe(1226);
+        expect(res.rawValue.byteLength).toBe(1226);
         expect(res.value).toStrictEqual(ST_STANDARD_TYPES);
       }
 
@@ -1571,8 +1611,8 @@ describe('reading values', () => {
           name: 'pack_mode',
           value: '8'
         }]);
-        expect(res.symbol.size).toBe(1160);
-        expect(res.rawValue.byteLength).toBe(1160);
+        expect(res.symbol.size).toBe(1240);
+        expect(res.rawValue.byteLength).toBe(1240);
         expect(res.value).toStrictEqual(ST_STANDARD_TYPES);
       }
 
@@ -1905,6 +1945,12 @@ describe('writing values', () => {
         const res = await client.readValue('GVL_Write.StandardTypes.STRING_2');
         expect(res.value).toStrictEqual(ST_STANDARD_TYPES.STRING_2);
       }
+    });
+
+    test('writing UTF-8 encoded STRING', async () => {
+      await client.writeValue('GVL_Write.StandardTypes.STRING_3', ST_STANDARD_TYPES_WRITE.STRING_3);
+      const res = await client.readValue('GVL_Write.StandardTypes.STRING_3');
+      expect(res.value).toStrictEqual(ST_STANDARD_TYPES.STRING_3);
     });
 
     test('writing DATE', async () => {
@@ -2457,7 +2503,7 @@ describe('writing values', () => {
         await client.writeValue('GVL_Write.ComplexTypes.BLOCK_3', value);
 
         const res = await client.readValue('GVL_Write.ComplexTypes.BLOCK_3');
-        
+
         //Using toMatchObject instead of toStrictEqual, as TC 4026 has more enum info available -> ePath fails
         expect(res.value).toMatchObject(value);
       }
@@ -2822,7 +2868,7 @@ describe('writing values', () => {
         await client.writeValue('GVL_Write.ComplexArrayTypes.BLOCK_3', value);
 
         const res = await client.readValue('GVL_Write.ComplexArrayTypes.BLOCK_3');
-        
+
         //Using toMatchObject instead of toStrictEqual, as TC 4026 has more enum info available -> ePath fails
         expect(res.value).toMatchObject(value);
       }
