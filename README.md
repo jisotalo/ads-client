@@ -14,17 +14,16 @@ If you are using Node-RED, check out the [node-red-contrib-ads-client](https://w
 
 # Project status
 
-<u><b>NOTE: DOCUMENTATION LINKS ARE NOT WORKING UNTIL RELEASED - CLONE REPOSITORY FOR DOCS</b></u>
-
-Version 2 is almost ready! 
+XX.12.2024 - version 2 released!
 
 - Rewritten in Typescript
 - See [CHANGELOG.md](https://github.com/jisotalo/ads-client/blob/v2-dev/CHANGELOG.md) for details.
-- See [MIGRATION.md](https://github.com/jisotalo/ads-client/blob/v2-dev/MIGRATION.md) for guide of migrating v1 -> v2 (breaking changes!)
-- See the new [documentation](TODO-DOC-URL-HERE/classes/Client.html)
+- See [MIGRATION.md](https://github.com/jisotalo/ads-client/blob/v2-dev/MIGRATION.md) for guide of migrating v1 -> v2 (**breaking changes!**)
+- See the new [documentation](https://jisotalo.fi/ads-client/classes/Client.html)
 
 # Features
 - Supports TwinCAT 2 and 3
+- Supports connecting to the local TwinCAT 3 runtime 
 - Supports any kind of target systems with ADS protocol (local runtime, PLC, EtherCAT I/O...)
 - Supports multiple connections from the same host
 - Reading and writing any kind of variables
@@ -369,7 +368,7 @@ await client.readSymbol('.ExampleSTRUCT') //TwinCAT 2
 
 ## Documentation
 
-The documentation is available at [https://jisotalo.fi/ads-client](TODO-DOC-URL-HERE/classes/Client.html) and `./docs` folder.
+The documentation is available at [https://jisotalo.fi/ads-client](https://jisotalo.fi/ads-client/classes/Client.html) and `./docs` folder.
 
 Examples in the getting started are based on a PLC project from [https://github.com/jisotalo/ads-client-test-plc-project](https://github.com/jisotalo/ads-client-test-plc-project).
 
@@ -381,66 +380,98 @@ Click a method to open it's documentation.
 
 | Method                                                                                             | Description                                                                                                                                                                      |
 | -------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| [`cacheDataTypes()`](TODO-DOC-URL-HERE/classes/Client.html#cacheDataTypes)                         | Caches all data types from the target PLC runtime.                                                                                                                               |
-| [`cacheSymbols()`](TODO-DOC-URL-HERE/classes/Client.html#cacheSymbols)                             | Caches all symbols from the target PLC runtime.                                                                                                                                  |
-| [`connect()`](TODO-DOC-URL-HERE/classes/Client.html#connect)                                       | Connects to the target.                                                                                                                                                          |
-| [`convertFromRaw()`](TODO-DOC-URL-HERE/classes/Client.html#convertFromRaw)                         | Converts raw data to a Javascript object by using the provided data type.                                                                                                        |
-| [`convertToRaw()`](TODO-DOC-URL-HERE/classes/Client.html#convertToRaw)                             | Converts a Javascript object to raw data by using the provided data type.                                                                                                        |
-| [`createVariableHandle()`](TODO-DOC-URL-HERE/classes/Client.html#createVariableHandle)             | Creates a handle to a variable at the target system by variable path  (such as `GVL_Test.ExampleStruct`).                                                                        |
-| [`createVariableHandleMulti()`](TODO-DOC-URL-HERE/classes/Client.html#createVariableHandleMulti)   | Sends multiple `createVariableHandle()` commands in one ADS packet (ADS sum command).                                                                                            |
-| [`deleteVariableHandle()`](TODO-DOC-URL-HERE/classes/Client.html#deleteVariableHandle)             | Deletes a variable handle that was previously created using `createVariableHandle()`.                                                                                            |
-| [`deleteVariableHandleMulti()`](TODO-DOC-URL-HERE/classes/Client.html#deleteVariableHandleMulti)   | Sends multiple `deleteVariableHandle()` commands in one ADS packet (ADS sum command).                                                                                            |
-| [`disconnect()`](TODO-DOC-URL-HERE/classes/Client.html#disconnect)                                 | Disconnects from the target and closes active connection.                                                                                                                        |
-| [`getDataType()`](TODO-DOC-URL-HERE/classes/Client.html#getDataType)                               | Returns full data type declaration for requested data type (such as `ST_Struct`).                                                                                                |
-| [`getDataTypes()`](TODO-DOC-URL-HERE/classes/Client.html#getDataTypes)                             | Returns all target PLC runtime data types.                                                                                                                                       |
-| [`getDefaultPlcObject()`](TODO-DOC-URL-HERE/classes/Client.html#getDefaultPlcObject)               | Returns a default (empty) Javascript object representing provided PLC data type.                                                                                                 |
-| [`getSymbol()`](TODO-DOC-URL-HERE/classes/Client.html#getSymbol)                                   | Returns a symbol object for given variable path (such as `GVL_Test.ExampleStruct`).                                                                                              |
-| [`getSymbols()`](TODO-DOC-URL-HERE/classes/Client.html#getSymbols)                                 | Returns all symbols from the target PLC runtime.                                                                                                                                 |
-| [`invokeRpcMethod()`](TODO-DOC-URL-HERE/classes/Client.html#invokeRpcMethod)                       | Invokes a function block RPC method on the target system.                                                                                                                        |
-| [`readDeviceInfo()`](TODO-DOC-URL-HERE/classes/Client.html#readDeviceInfo)                         | Reads target device information.                                                                                                                                                 |
-| [`readPlcRuntimeState()`](TODO-DOC-URL-HERE/classes/Client.html#readPlcRuntimeState)               | Reads target PLC runtime state (`Run`, `Stop` etc.)                                                                                                                              |
-| [`readPlcSymbolVersion()`](TODO-DOC-URL-HERE/classes/Client.html#readPlcSymbolVersion)             | Reads target PLC runtime symbol version.                                                                                                                                         |
-| [`readPlcUploadInfo()`](TODO-DOC-URL-HERE/classes/Client.html#readPlcUploadInfo)                   | Reads target PLC runtime upload information.                                                                                                                                     |
-| [`readRaw()`](TODO-DOC-URL-HERE/classes/Client.html#readRaw)                                       | Reads raw data from the target system by a raw ADS address (index group, index offset and data length).                                                                          |
-| [`readRawByHandle()`](TODO-DOC-URL-HERE/classes/Client.html#readRawByHandle)                       | Reads raw data from the target system by a previously created variable handle (acquired using `createVariableHandle()`).                                                         |
-| [`readRawByPath()`](TODO-DOC-URL-HERE/classes/Client.html#readRawByPath)                           | Reads raw data from the target system by variable path (such as `GVL_Test.ExampleStruct`).                                                                                       |
-| [`readRawBySymbol()`](TODO-DOC-URL-HERE/classes/Client.html#readRawBySymbol)                       | Reads raw data from the target system by a symbol object (acquired using `getSymbol()`).                                                                                         |
-| [`readRawMulti()`](TODO-DOC-URL-HERE/classes/Client.html#readRawMulti)                             | Sends multiple `readRaw()` commands in one ADS packet (ADS sum command).                                                                                                         |
-| [`readState()`](TODO-DOC-URL-HERE/classes/Client.html#readState)                                   | Reads target ADS state.                                                                                                                                                          |
-| [`readTcSystemState()`](TODO-DOC-URL-HERE/classes/Client.html#readTcSystemState)                   | Reads target TwinCAT system state from ADS port 10000 (usually `Run` or `Config`).                                                                                               |
-| [`readValue()`](TODO-DOC-URL-HERE/classes/Client.html#readValue)                                   | Reads variable's value from the target system by a variable path (such as `GVL_Test.ExampleStruct`) and returns the value as a Javascript object.                                |
-| [`readValueBySymbol()`](TODO-DOC-URL-HERE/classes/Client.html#readValueBySymbol)                   | Reads variable's value from the target system by a symbol object (acquired using `getSymbol()`) and returns the value as a Javascript object.                                    |
-| [`readWriteRaw()`](TODO-DOC-URL-HERE/classes/Client.html#readWriteRaw)                             | Writes raw data to the target system by a raw ADS address (index group, index offset) and reads the result as raw data.                                                          |
-| [`readWriteRawMulti()`](TODO-DOC-URL-HERE/classes/Client.html#readWriteRawMulti)                   | Sends multiple `readWriteRaw()` commands in one ADS packet (ADS sum command).                                                                                                    |
-| [`reconnect()`](TODO-DOC-URL-HERE/classes/Client.html#reconnect)                                   | Reconnects to the target (disconnects and then connects again).                                                                                                                  |
-| [`resetPlc()`](TODO-DOC-URL-HERE/classes/Client.html#resetPlc)                                     | Resets the target PLC runtime. Same as reset cold in TwinCAT XAE.                                                                                                                |
-| [`restartPlc()`](TODO-DOC-URL-HERE/classes/Client.html#restartPlc)                                 | Restarts the PLC runtime. Same as calling `resetPlc()` and then `startPlc()`.                                                                                                    |
-| [`restartTcSystem()`](TODO-DOC-URL-HERE/classes/Client.html#restartTcSystem)                       | Restarts the target TwinCAT system.                                                                                                                                              |
-| [`sendAdsCommand()`](TODO-DOC-URL-HERE/classes/Client.html#sendAdsCommand)                         | Sends a raw ADS command to the target.                                                                                                                                           |
-| [`sendAdsCommandWithFallback()`](TODO-DOC-URL-HERE/classes/Client.html#sendAdsCommandWithFallback) | Sends a raw ADS command to the target. If it fails to specific ADS error codes, sends the fallback ADS command.                                                                  |
-| [`setDebugLevel()`](TODO-DOC-URL-HERE/classes/Client.html#setDebugLevel)                           | Sets active debug level.                                                                                                                                                         |
-| [`setTcSystemToConfig()`](TODO-DOC-URL-HERE/classes/Client.html#setTcSystemToConfig)               | Sets the target TwinCAT system to config mode. Same as `Restart TwinCAT (Config mode)` in TwinCAT XAE.                                                                           |
-| [`setTcSystemToRun()`](TODO-DOC-URL-HERE/classes/Client.html#setTcSystemToRun)                     | Sets the target TwinCAT system to run mode. Same as `Restart TwinCAT system` in TwinCAT XAE.                                                                                     |
-| [`startPlc()`](TODO-DOC-URL-HERE/classes/Client.html#startPlc)                                     | Starts the target PLC runtime. Same as pressing the green play button in TwinCAT XAE.                                                                                            |
-| [`stopPlc()`](TODO-DOC-URL-HERE/classes/Client.html#stopPlc)                                       | Stops the target PLC runtime. Same as pressing the red stop button in TwinCAT XAE.                                                                                               |
-| [`subscribe()`](TODO-DOC-URL-HERE/classes/Client.html#subscribe)                                   | Subscribes to value change notifications (ADS notifications) by variable path (such as `GVL_Test.ExampleStruct`) or raw ADS address (index group, index offset and data length). |
-| [`subscribeRaw()`](TODO-DOC-URL-HERE/classes/Client.html#subscribeRaw)                             | Subscribes to raw value change notifications (ADS notifications) by a raw ADS address (index group, index offset and data length).                                               |
-| [`subscribeValue()`](TODO-DOC-URL-HERE/classes/Client.html#subscribeValue)                         | Subscribes to value change notifications (ADS notifications) by a variable path, such as `GVL_Test.ExampleStruct`.                                                               |
-| [`unsubscribe()`](TODO-DOC-URL-HERE/classes/Client.html#unsubscribe)                               | Unsubscribes a subscription (deletes ADS notification).                                                                                                                          |
-| [`unsubscribeAll()`](TODO-DOC-URL-HERE/classes/Client.html#unsubscribeAll)                         | Unsubscribes all active subscription (deletes all ADS notifications).                                                                                                            |
-| [`writeControl()`](TODO-DOC-URL-HERE/classes/Client.html#writeControl)                             | Sends an ADS `WriteControl` command to the target.                                                                                                                               |
-| [`writeRaw()`](TODO-DOC-URL-HERE/classes/Client.html#writeRaw)                                     | Writes raw data to the target system by a raw ADS address (index group, index offset and data length).                                                                           |
-| [`writeRawByHandle()`](TODO-DOC-URL-HERE/classes/Client.html#writeRawByHandle)                     | Writes raw data to the target system by a previously created variable handle (acquired using `createVariableHandle()`).                                                          |
-| [`writeRawByPath()`](TODO-DOC-URL-HERE/classes/Client.html#writeRawByPath)                         | Writes raw data to the target system by variable path (such as `GVL_Test.ExampleStruct`).                                                                                        |
-| [`writeRawBySymbol()`](TODO-DOC-URL-HERE/classes/Client.html#writeRawBySymbol)                     | Writes raw data to the target system by a symbol object (acquired using `getSymbol()`).                                                                                          |
-| [`writeRawMulti()`](TODO-DOC-URL-HERE/classes/Client.html#writeRawMulti)                           | Sends multiple `writeRaw()` commands in one ADS packet (ADS sum command).                                                                                                        |
-| [`writeValue()`](TODO-DOC-URL-HERE/classes/Client.html#writeValue)                                 | Writes variable's value to the target system by a variable path (such as `GVL_Test.ExampleStruct`). Converts the value from a Javascript object to a raw value.                  |
-| [`writeValueBySymbol()`](TODO-DOC-URL-HERE/classes/Client.html#writeValueBySymbol)                 | Writes variable's value to the target system by a symbol object (acquired using `getSymbol()`). Converts the value from a Javascript object to a raw value.                      |
+| [`cacheDataTypes()`](https://jisotalo.fi/ads-client/classes/Client.html#cacheDataTypes)                         | Caches all data types from the target PLC runtime.                                                                                                                               |
+| [`cacheSymbols()`](https://jisotalo.fi/ads-client/classes/Client.html#cacheSymbols)                             | Caches all symbols from the target PLC runtime.                                                                                                                                  |
+| [`connect()`](https://jisotalo.fi/ads-client/classes/Client.html#connect)                                       | Connects to the target.                                                                                                                                                          |
+| [`convertFromRaw()`](https://jisotalo.fi/ads-client/classes/Client.html#convertFromRaw)                         | Converts raw data to a Javascript object by using the provided data type.                                                                                                        |
+| [`convertToRaw()`](https://jisotalo.fi/ads-client/classes/Client.html#convertToRaw)                             | Converts a Javascript object to raw data by using the provided data type.                                                                                                        |
+| [`createVariableHandle()`](https://jisotalo.fi/ads-client/classes/Client.html#createVariableHandle)             | Creates a handle to a variable at the target system by variable path  (such as `GVL_Test.ExampleStruct`).                                                                        |
+| [`createVariableHandleMulti()`](https://jisotalo.fi/ads-client/classes/Client.html#createVariableHandleMulti)   | Sends multiple `createVariableHandle()` commands in one ADS packet (ADS sum command).                                                                                            |
+| [`deleteVariableHandle()`](https://jisotalo.fi/ads-client/classes/Client.html#deleteVariableHandle)             | Deletes a variable handle that was previously created using `createVariableHandle()`.                                                                                            |
+| [`deleteVariableHandleMulti()`](https://jisotalo.fi/ads-client/classes/Client.html#deleteVariableHandleMulti)   | Sends multiple `deleteVariableHandle()` commands in one ADS packet (ADS sum command).                                                                                            |
+| [`disconnect()`](https://jisotalo.fi/ads-client/classes/Client.html#disconnect)                                 | Disconnects from the target and closes active connection.                                                                                                                        |
+| [`getDataType()`](https://jisotalo.fi/ads-client/classes/Client.html#getDataType)                               | Returns full data type declaration for requested data type (such as `ST_Struct`).                                                                                                |
+| [`getDataTypes()`](https://jisotalo.fi/ads-client/classes/Client.html#getDataTypes)                             | Returns all target PLC runtime data types.                                                                                                                                       |
+| [`getDefaultPlcObject()`](https://jisotalo.fi/ads-client/classes/Client.html#getDefaultPlcObject)               | Returns a default (empty) Javascript object representing provided PLC data type.                                                                                                 |
+| [`getSymbol()`](https://jisotalo.fi/ads-client/classes/Client.html#getSymbol)                                   | Returns a symbol object for given variable path (such as `GVL_Test.ExampleStruct`).                                                                                              |
+| [`getSymbols()`](https://jisotalo.fi/ads-client/classes/Client.html#getSymbols)                                 | Returns all symbols from the target PLC runtime.                                                                                                                                 |
+| [`invokeRpcMethod()`](https://jisotalo.fi/ads-client/classes/Client.html#invokeRpcMethod)                       | Invokes a function block RPC method on the target system.                                                                                                                        |
+| [`readDeviceInfo()`](https://jisotalo.fi/ads-client/classes/Client.html#readDeviceInfo)                         | Reads target device information.                                                                                                                                                 |
+| [`readPlcRuntimeState()`](https://jisotalo.fi/ads-client/classes/Client.html#readPlcRuntimeState)               | Reads target PLC runtime state (`Run`, `Stop` etc.)                                                                                                                              |
+| [`readPlcSymbolVersion()`](https://jisotalo.fi/ads-client/classes/Client.html#readPlcSymbolVersion)             | Reads target PLC runtime symbol version.                                                                                                                                         |
+| [`readPlcUploadInfo()`](https://jisotalo.fi/ads-client/classes/Client.html#readPlcUploadInfo)                   | Reads target PLC runtime upload information.                                                                                                                                     |
+| [`readRaw()`](https://jisotalo.fi/ads-client/classes/Client.html#readRaw)                                       | Reads raw data from the target system by a raw ADS address (index group, index offset and data length).                                                                          |
+| [`readRawByHandle()`](https://jisotalo.fi/ads-client/classes/Client.html#readRawByHandle)                       | Reads raw data from the target system by a previously created variable handle (acquired using `createVariableHandle()`).                                                         |
+| [`readRawByPath()`](https://jisotalo.fi/ads-client/classes/Client.html#readRawByPath)                           | Reads raw data from the target system by variable path (such as `GVL_Test.ExampleStruct`).                                                                                       |
+| [`readRawBySymbol()`](https://jisotalo.fi/ads-client/classes/Client.html#readRawBySymbol)                       | Reads raw data from the target system by a symbol object (acquired using `getSymbol()`).                                                                                         |
+| [`readRawMulti()`](https://jisotalo.fi/ads-client/classes/Client.html#readRawMulti)                             | Sends multiple `readRaw()` commands in one ADS packet (ADS sum command).                                                                                                         |
+| [`readState()`](https://jisotalo.fi/ads-client/classes/Client.html#readState)                                   | Reads target ADS state.                                                                                                                                                          |
+| [`readTcSystemState()`](https://jisotalo.fi/ads-client/classes/Client.html#readTcSystemState)                   | Reads target TwinCAT system state from ADS port 10000 (usually `Run` or `Config`).                                                                                               |
+| [`readValue()`](https://jisotalo.fi/ads-client/classes/Client.html#readValue)                                   | Reads variable's value from the target system by a variable path (such as `GVL_Test.ExampleStruct`) and returns the value as a Javascript object.                                |
+| [`readValueBySymbol()`](https://jisotalo.fi/ads-client/classes/Client.html#readValueBySymbol)                   | Reads variable's value from the target system by a symbol object (acquired using `getSymbol()`) and returns the value as a Javascript object.                                    |
+| [`readWriteRaw()`](https://jisotalo.fi/ads-client/classes/Client.html#readWriteRaw)                             | Writes raw data to the target system by a raw ADS address (index group, index offset) and reads the result as raw data.                                                          |
+| [`readWriteRawMulti()`](https://jisotalo.fi/ads-client/classes/Client.html#readWriteRawMulti)                   | Sends multiple `readWriteRaw()` commands in one ADS packet (ADS sum command).                                                                                                    |
+| [`reconnect()`](https://jisotalo.fi/ads-client/classes/Client.html#reconnect)                                   | Reconnects to the target (disconnects and then connects again).                                                                                                                  |
+| [`resetPlc()`](https://jisotalo.fi/ads-client/classes/Client.html#resetPlc)                                     | Resets the target PLC runtime. Same as reset cold in TwinCAT XAE.                                                                                                                |
+| [`restartPlc()`](https://jisotalo.fi/ads-client/classes/Client.html#restartPlc)                                 | Restarts the PLC runtime. Same as calling `resetPlc()` and then `startPlc()`.                                                                                                    |
+| [`restartTcSystem()`](https://jisotalo.fi/ads-client/classes/Client.html#restartTcSystem)                       | Restarts the target TwinCAT system.                                                                                                                                              |
+| [`sendAdsCommand()`](https://jisotalo.fi/ads-client/classes/Client.html#sendAdsCommand)                         | Sends a raw ADS command to the target.                                                                                                                                           |
+| [`sendAdsCommandWithFallback()`](https://jisotalo.fi/ads-client/classes/Client.html#sendAdsCommandWithFallback) | Sends a raw ADS command to the target. If it fails to specific ADS error codes, sends the fallback ADS command.                                                                  |
+| [`setDebugLevel()`](https://jisotalo.fi/ads-client/classes/Client.html#setDebugLevel)                           | Sets active debug level.                                                                                                                                                         |
+| [`setTcSystemToConfig()`](https://jisotalo.fi/ads-client/classes/Client.html#setTcSystemToConfig)               | Sets the target TwinCAT system to config mode. Same as `Restart TwinCAT (Config mode)` in TwinCAT XAE.                                                                           |
+| [`setTcSystemToRun()`](https://jisotalo.fi/ads-client/classes/Client.html#setTcSystemToRun)                     | Sets the target TwinCAT system to run mode. Same as `Restart TwinCAT system` in TwinCAT XAE.                                                                                     |
+| [`startPlc()`](https://jisotalo.fi/ads-client/classes/Client.html#startPlc)                                     | Starts the target PLC runtime. Same as pressing the green play button in TwinCAT XAE.                                                                                            |
+| [`stopPlc()`](https://jisotalo.fi/ads-client/classes/Client.html#stopPlc)                                       | Stops the target PLC runtime. Same as pressing the red stop button in TwinCAT XAE.                                                                                               |
+| [`subscribe()`](https://jisotalo.fi/ads-client/classes/Client.html#subscribe)                                   | Subscribes to value change notifications (ADS notifications) by variable path (such as `GVL_Test.ExampleStruct`) or raw ADS address (index group, index offset and data length). |
+| [`subscribeRaw()`](https://jisotalo.fi/ads-client/classes/Client.html#subscribeRaw)                             | Subscribes to raw value change notifications (ADS notifications) by a raw ADS address (index group, index offset and data length).                                               |
+| [`subscribeValue()`](https://jisotalo.fi/ads-client/classes/Client.html#subscribeValue)                         | Subscribes to value change notifications (ADS notifications) by a variable path, such as `GVL_Test.ExampleStruct`.                                                               |
+| [`unsubscribe()`](https://jisotalo.fi/ads-client/classes/Client.html#unsubscribe)                               | Unsubscribes a subscription (deletes ADS notification).                                                                                                                          |
+| [`unsubscribeAll()`](https://jisotalo.fi/ads-client/classes/Client.html#unsubscribeAll)                         | Unsubscribes all active subscription (deletes all ADS notifications).                                                                                                            |
+| [`writeControl()`](https://jisotalo.fi/ads-client/classes/Client.html#writeControl)                             | Sends an ADS `WriteControl` command to the target.                                                                                                                               |
+| [`writeRaw()`](https://jisotalo.fi/ads-client/classes/Client.html#writeRaw)                                     | Writes raw data to the target system by a raw ADS address (index group, index offset and data length).                                                                           |
+| [`writeRawByHandle()`](https://jisotalo.fi/ads-client/classes/Client.html#writeRawByHandle)                     | Writes raw data to the target system by a previously created variable handle (acquired using `createVariableHandle()`).                                                          |
+| [`writeRawByPath()`](https://jisotalo.fi/ads-client/classes/Client.html#writeRawByPath)                         | Writes raw data to the target system by variable path (such as `GVL_Test.ExampleStruct`).                                                                                        |
+| [`writeRawBySymbol()`](https://jisotalo.fi/ads-client/classes/Client.html#writeRawBySymbol)                     | Writes raw data to the target system by a symbol object (acquired using `getSymbol()`).                                                                                          |
+| [`writeRawMulti()`](https://jisotalo.fi/ads-client/classes/Client.html#writeRawMulti)                           | Sends multiple `writeRaw()` commands in one ADS packet (ADS sum command).                                                                                                        |
+| [`writeValue()`](https://jisotalo.fi/ads-client/classes/Client.html#writeValue)                                 | Writes variable's value to the target system by a variable path (such as `GVL_Test.ExampleStruct`). Converts the value from a Javascript object to a raw value.                  |
+| [`writeValueBySymbol()`](https://jisotalo.fi/ads-client/classes/Client.html#writeValueBySymbol)                 | Writes variable's value to the target system by a symbol object (acquired using `getSymbol()`). Converts the value from a Javascript object to a raw value.                      |
 
+## Minimal example (TLDR)
 
+This connects to a local PLC runtime, reads a value, writes a value, reads it again and then disconnects. The value is a string and it's located in `GVL_Global.StringValue`.
 
+```js
+const { Client } = require('ads-client');
 
+const client = new Client({
+  targetAmsNetId: 'localhost',
+  targetAdsPort: 851
+});
 
+client.connect()
+  .then(async (res) => {   
+    console.log(`Connected to the ${res.targetAmsNetId}`);
+    console.log(`Router assigned us AmsNetId ${res.localAmsNetId} and port ${res.localAdsPort}`);
+
+    //Reading a value
+    const read = await client.readValue('GVL_Global.StringValue');
+    console.log('Value read (before):', read.value); 
+
+    //Writing a value
+    await client.writeValue('GVL_Global.StringValue', 'This is a new value');
+
+    //Reading a value
+    const read2 = await client.readValue('GVL_Global.StringValue');
+    console.log('Value read (after):', read2.value); 
+
+    //Disconnecting
+    await client.disconnect();
+    console.log('Disconnected');
+
+  }).catch(err => {
+    console.log('Error:', err);
+  });
+```
 
 ## Creating a client
 
@@ -469,15 +500,15 @@ const { Client } = require('ads-client');
 const client = new Client({
   targetAmsNetId: 'localhost',
   targetAdsPort: 851
-})
+});
 
 client.connect()
   .then(res => {   
-    console.log(`Connected to the ${res.targetAmsNetId}`)
-    console.log(`Router assigned us AmsNetId ${res.localAmsNetId} and port ${res.localAdsPort}`)
+    console.log(`Connected to the ${res.targetAmsNetId}`);
+    console.log(`Router assigned us AmsNetId ${res.localAmsNetId} and port ${res.localAdsPort}`);
 
   }).catch(err => {
-    console.log('Error:', err)
+    console.log('Error:', err);
   });
 ```
 
@@ -485,73 +516,86 @@ client.connect()
 
 ### Reading any value
 
-Use [`readValue()`](TODO-DOC-URL-HERE/classes/Client.html#readValue) to read any PLC value as a Javascript object. If using Typescript, the type of the PLC variable can be passed as well (`readValue<T>()`).
+Use [`readValue()`](https://jisotalo.fi/ads-client/classes/Client.html#readValue) to read any PLC value as a Javascript object. 
 
 The only exception is the dereferenced value of a reference/pointer, see [Reading reference/pointer](#reading-referencepointer).
 
+**Reading INT**
+
 ```js
-try {
-  let res;
-
-  //Example: INT
-  res = await client.readValue('GVL_Read.StandardTypes.INT_');
-  console.log(res.value); 
-  // 32767
-
-  //Example: STRING
-  res = await client.readValue('GVL_Read.StandardTypes.STRING_');
-  console.log(res.value); 
-  // A test string ääöö!!@@
-
-  //Example: DT
-  res = await client.readValue('GVL_Read.StandardTypes.DT_');
-  console.log(res.value); 
-  // 2106-02-06T06:28:15.000Z (Date object)
-  
-  //Example: STRUCT
-  res = await client.readValue('GVL_Read.ComplexTypes.STRUCT_');
-  console.log(res.value); 
-  /* 
-  {
-    BOOL_: true,
-    BOOL_2: false,
-    BYTE_: 255,
-    WORD_: 65535,
-    //...and so on
-  }
-  */
-  
-  //Example: FUNCTION_BLOCK
-  res = await client.readValue('GVL_Read.ComplexTypes.BLOCK_2'); //TON
-  console.log(res.value); 
-  // { IN: false, PT: 2500, Q: false, ET: 0, M: false, StartTime: 0 }
-
-  //Example: ARRAY
-  res = await client.readValue('GVL_Read.StandardArrays.REAL_3');
-  console.log(res.value); 
-  // [ 75483.546875, 0, -75483.546875 ]
-
-  //Example: ENUM
-  res = await client.readValue('GVL_Read.ComplexTypes.ENUM_');
-  console.log(res.value); 
-  // { name: 'Running', value: 100 }
-
-} catch (err) {
- console.log("Error:", err);
-}
+//Example: INT
+const res = await client.readValue('GVL_Read.StandardTypes.INT_');
+console.log(res.value); 
+// 32767
 ```
 
-**Typescript example**:
+**Reading STRING**
+
+```js
+const res = await client.readValue('GVL_Read.StandardTypes.STRING_');
+console.log(res.value); 
+// A test string ääöö!!@@
+```
+
+**Reading DT**
+
+```js
+const res = await client.readValue('GVL_Read.StandardTypes.DT_');
+console.log(res.value); 
+// 2106-02-06T06:28:15.000Z (Date object)
+```
+
+**Reading STRUCT**
+
+```js
+const res = await client.readValue('GVL_Read.ComplexTypes.STRUCT_');
+console.log(res.value); 
+/* 
+{
+  BOOL_: true,
+  BOOL_2: false,
+  BYTE_: 255,
+  WORD_: 65535,
+  //...and so on
+}
+*/
+```
+
+**Reading FUNCTION_BLOCK**
+
+```js
+const res = await client.readValue('GVL_Read.ComplexTypes.BLOCK_2'); //TON
+console.log(res.value); 
+// { IN: false, PT: 2500, Q: false, ET: 0, M: false, StartTime: 0 }
+```
+
+**Reading ARRAY**
+
+```js
+const res = await client.readValue('GVL_Read.StandardArrays.REAL_3');
+console.log(res.value); 
+// [ 75483.546875, 0, -75483.546875 ]
+```
+
+**Reading ENUM**
+
+```js
+const res = await client.readValue('GVL_Read.ComplexTypes.ENUM_');
+console.log(res.value); 
+// { name: 'Running', value: 100 }
+```
+
+**Typescript example: Reading INT**
 
 ```ts
-let res;
-
-//Example: INT
-res = await client.readValue<number>('GVL_Read.StandardTypes.INT_');
+const res = await client.readValue<number>('GVL_Read.StandardTypes.INT_');
 console.log(res.value); //res.value is typed as number
 // 32767
+``` 
 
-//Example: STRUCT
+**Typescript example: Reading STRUCT**
+
+```ts
 interface ST_ComplexTypes {
   BOOL_: boolean,
   BOOL_2: boolean,
@@ -560,7 +604,7 @@ interface ST_ComplexTypes {
   //..and so on
 }
 
-res = await client.readValue<ST_ComplexTypes>('GVL_Read.ComplexTypes.STRUCT_');
+const res = await client.readValue<ST_ComplexTypes>('GVL_Read.ComplexTypes.STRUCT_');
 console.log(res.value); //res.value is typed as ST_ComplexTypes
 /* 
 {
@@ -575,108 +619,124 @@ console.log(res.value); //res.value is typed as ST_ComplexTypes
 
 ### Reading raw data
 
-Use [`readRaw()`](TODO-DOC-URL-HERE/classes/Client.html#readRaw) to read any PLC value as raw data. Raw data is a `Buffer` object, containing the data as bytes.
+Use [`readRaw()`](https://jisotalo.fi/ads-client/classes/Client.html#readRaw) or [`readRawByPath()`](https://jisotalo.fi/ads-client/classes/Client.html#readRawByPath) to read any PLC value as raw data (`Buffer` object, data as bytes).
 
 The only exception is the dereferenced value of a reference/pointer, see [Reading reference/pointer](#reading-referencepointer).
 
-The `indexGroup` and `indexOffset` can be acquired for example by using [`getSymbol()`](TODO-DOC-URL-HERE/classes/Client.html#getSymbol).
+For converting the data between raw data and Javascript object, see [Converting data between raw data and Javascript objects](#converting-data-between-raw-data-and-javascript-objects)
+
+**readRaw()**
+
+The `indexGroup` and `indexOffset` can be acquired by using [`getSymbol()`](https://jisotalo.fi/ads-client/classes/Client.html#getSymbol).
+
 
 ```js
-try {
-  //Example: Reading raw data by index offset and index group 
-  //and converting it to a Javascript object manually
-  const data = await client.readRaw(16448, 414816, 2);
-  console.log(data); //<Buffer ff 7f>
-
-  const converted = await client.convertFromRaw(data, 'INT');
-  console.log(converted); //32767
-
-} catch (err) {
-  console.log("Error:", err);
-}
+//Read 2 bytes from indexGroup 16448 and indexOffset 414816
+const data = await client.readRaw(16448, 414816, 2);
+console.log(data); //<Buffer ff 7f>
 ```
 
-[`readRawByPath()`](TODO-DOC-URL-HERE/classes/Client.html#readRawByPath) can be used to read raw data by a variable path.
+**readRawByPath()**
 
 ```js
-try {
-  //Example: Reading raw data by variable path 
-  //and converting it to a Javascript object manually
-  const data = await client.readRawByPath('GVL_Read.StandardTypes.INT_');
-  console.log(data); //<Buffer ff 7f>
-
-  const converted = await client.convertFromRaw(data, 'INT');
-  console.log(converted); //32767
-
-} catch (err) {
-  console.log("Error:", err);
-}
+const data = await client.readRawByPath('GVL_Read.StandardTypes.INT_');
+console.log(data); //<Buffer ff 7f>
 ```
+
 
 ### Reading reference/pointer
 
-The dereferenced value of a reference (`REFERENCE TO`) or a pointer (`POINTER TO`)  can be read 
-using [`readRawByPath()`](TODO-DOC-URL-HERE/classes/Client.html#readRawByPath).
+The dereferenced value of a reference (`REFERENCE TO`) or a pointer (`POINTER TO`)  can be read with [`readRawByPath()`](https://jisotalo.fi/ads-client/classes/Client.html#readRawByPath) or by using [variable handles](https://jisotalo.fi/ads-client/classes/Client.html#createVariableHandle).
+
+**Reading POINTER (readRawByPath())**
 
 ```js
-try {
-  //Reading a raw POINTER value (Note the dereference operator ^)
-  const rawPtrValue = await client.readRawByPath('GVL_Read.ComplexTypes.POINTER_^');
+//Reading a raw POINTER value (Note the dereference operator ^)
+const rawPtrValue = await client.readRawByPath('GVL_Read.ComplexTypes.POINTER_^');
 
-  //Converting to a Javascript object
-  const ptrValue = await client.convertFromRaw(rawPtrValue, 'ST_StandardTypes');
-  console.log(ptrValue);
-
-  //Reading a raw REFERENCE value
-  const rawRefValue = await client.readRawByPath('GVL_Read.ComplexTypes.REFERENCE_');
-  
-  //Converting to a Javascript object
-  const refValue = await client.convertFromRaw(rawRefValue, 'ST_StandardTypes');
-  console.log(refValue);
-
-  //Short version:
-  const refValue2 = await client.convertFromRaw(
-    await client.readRawByPath('GVL_Read.ComplexTypes.REFERENCE_'), 
-    'ST_StandardTypes'
-  );
-
-} catch (err) {
-  console.log("Error:", err);
+//Converting to a Javascript object
+const ptrValue = await client.convertFromRaw(rawPtrValue, 'ST_StandardTypes');
+console.log(ptrValue);
+/* 
+{
+  BOOL_: true,
+  BOOL_2: false,
+  BYTE_: 255,
+  WORD_: 65535,
+  //..and so on
 }
+*/
 ```
 
-Another way is to use [variable handles](TODO-DOC-URL-HERE/classes/Client.html#createVariableHandle).
+**Reading REFERENCE (readRawByPath())**
 
 ```js
-try {
-  //Reading a POINTER value (Note the dereference operator ^)
-  const ptrHandle = await client.createVariableHandle('GVL_Read.ComplexTypes.POINTER_^');
-  const rawPtrValue = await client.readRawByHandle(ptrHandle);
-  await client.deleteVariableHandle(ptrHandle);
+//Reading a raw REFERENCE value
+const rawRefValue = await client.readRawByPath('GVL_Read.ComplexTypes.REFERENCE_');
 
-  //Converting to a Javascript object
-  const ptrValue = await client.convertFromRaw(rawPtrValue, 'ST_StandardTypes');
-  console.log(ptrValue);
-
-  //Reading a REFERENCE value
-  const refHandle = await client.createVariableHandle('GVL_Read.ComplexTypes.REFERENCE_');
-  const rawRefValue = await client.readRawByHandle(refHandle);
-  await client.deleteVariableHandle(refHandle);
-
-  //Converting to a Javascript object
-  const refValue = await client.convertFromRaw(rawRefValue, 'ST_StandardTypes');
-  console.log(refValue);
-
-} catch (err) {
-  console.log("Error:", err);
+//Converting to a Javascript object
+const refValue = await client.convertFromRaw(rawRefValue, 'ST_StandardTypes');
+console.log(refValue);
+/* 
+{
+  BOOL_: true,
+  BOOL_2: false,
+  BYTE_: 255,
+  WORD_: 65535,
+  //..and so on
 }
+*/
+```
+
+**Reading POINTER (variable handle)**
+
+```js
+//Reading a POINTER value (Note the dereference operator ^)
+const ptrHandle = await client.createVariableHandle('GVL_Read.ComplexTypes.POINTER_^');
+const rawPtrValue = await client.readRawByHandle(ptrHandle);
+await client.deleteVariableHandle(ptrHandle);
+
+//Converting to a Javascript object
+const ptrValue = await client.convertFromRaw(rawPtrValue, 'ST_StandardTypes');
+console.log(ptrValue);
+/* 
+{
+  BOOL_: true,
+  BOOL_2: false,
+  BYTE_: 255,
+  WORD_: 65535,
+  //..and so on
+}
+*/
+```
+
+**Reading REFERENCE (variable handle)**
+
+```js
+//Reading a REFERENCE value
+const refHandle = await client.createVariableHandle('GVL_Read.ComplexTypes.REFERENCE_');
+const rawRefValue = await client.readRawByHandle(refHandle);
+await client.deleteVariableHandle(refHandle);
+
+//Converting to a Javascript object
+const refValue = await client.convertFromRaw(rawRefValue, 'ST_StandardTypes');
+console.log(refValue);
+/* 
+{
+  BOOL_: true,
+  BOOL_2: false,
+  BYTE_: 255,
+  WORD_: 65535,
+  //..and so on
+}
+*/
 ```
 
 ## Writing values
 
 ### Writing any value
 
-Use [`writeValue()`](TODO-DOC-URL-HERE/classes/Client.html#writeValue) to write any PLC value. 
+Use [`writeValue()`](https://jisotalo.fi/ads-client/classes/Client.html#writeValue) to write any PLC value. 
 
 The only exception is the dereferenced value of a reference/pointer, see [Writing reference/pointer](#writing-referencepointer).
 
@@ -739,11 +799,11 @@ try {
 
 ### Writing raw data
 
-Use [`writeRaw()`](TODO-DOC-URL-HERE/classes/Client.html#writeRaw) to write any PLC value using raw data. Raw data is a `Buffer` object, containing the data as bytes.
+Use [`writeRaw()`](https://jisotalo.fi/ads-client/classes/Client.html#writeRaw) to write any PLC value using raw data. Raw data is a `Buffer` object, containing the data as bytes.
 
 The only exception is the dereferenced value of a reference/pointer, see [Reading reference/pointer](#reading-referencepointer).
 
-The `indexGroup` and `indexOffset` can be acquired for example by using [`getSymbol()`](TODO-DOC-URL-HERE/classes/Client.html#getSymbol).
+The `indexGroup` and `indexOffset` can be acquired for example by using [`getSymbol()`](https://jisotalo.fi/ads-client/classes/Client.html#getSymbol).
 
 ```js
 try {
@@ -758,7 +818,7 @@ try {
 }
 ```
 
-[`writeRawByPath()`](TODO-DOC-URL-HERE/classes/Client.html#writeRawByPath) can be used to write raw data by a variable path.
+[`writeRawByPath()`](https://jisotalo.fi/ads-client/classes/Client.html#writeRawByPath) can be used to write raw data by a variable path.
 
 ```js
 try {
@@ -776,7 +836,7 @@ try {
 ### Writing reference/pointer
 
 The dereferenced value of a reference (`REFERENCE TO`) or a pointer (`POINTER TO`) can be written
-using [`writeRawByPath()`](TODO-DOC-URL-HERE/classes/Client.html#writeRawByPath).
+using [`writeRawByPath()`](https://jisotalo.fi/ads-client/classes/Client.html#writeRawByPath).
 
 ```js
 try {
@@ -796,7 +856,7 @@ try {
 }
 ```
 
-Another way is to use [variable handles](TODO-DOC-URL-HERE/classes/Client.html#createVariableHandle).
+Another way is to use [variable handles](https://jisotalo.fi/ads-client/classes/Client.html#createVariableHandle).
 
 ```js
 try {
@@ -831,7 +891,7 @@ More information about ADS notifications at [Beckhoff Infosys: Use of ADS Notifi
 
 ### Any value
 
-Use [`subscribeValue()`](TODO-DOC-URL-HERE/classes/Client.html#subscribeValue) or [`subscribe()`](TODO-DOC-URL-HERE/classes/Client.html#subscribe) to subscribe to PLC variable value changes.
+Use [`subscribeValue()`](https://jisotalo.fi/ads-client/classes/Client.html#subscribeValue) or [`subscribe()`](https://jisotalo.fi/ads-client/classes/Client.html#subscribe) to subscribe to PLC variable value changes.
 
 Example: Subscribe to changes of `GVL_Subscription.NumericValue_10ms`. The callback is called when the PLC value changes (at maximum every 100 milliseconds).
 ```js
@@ -869,7 +929,7 @@ try {
 }
 ```
 
-Example: Same as previous example but using [`subscribe()`](TODO-DOC-URL-HERE/classes/Client.html#subscribe) and Typescript type for the variable value. A type can be provided for `subscribeValue<T>()` as well.
+Example: Same as previous example but using [`subscribe()`](https://jisotalo.fi/ads-client/classes/Client.html#subscribe) and Typescript type for the variable value. A type can be provided for `subscribeValue<T>()` as well.
 
 ```js
 //NOTE: Typescript
@@ -893,9 +953,9 @@ try {
 
 ### Raw data
 
-Use [`subscribeRaw()`](TODO-DOC-URL-HERE/classes/Client.html#subscribeRaw) or [`subscribe()`](TODO-DOC-URL-HERE/classes/Client.html#subscribe) to subscribe to raw value changes.
+Use [`subscribeRaw()`](https://jisotalo.fi/ads-client/classes/Client.html#subscribeRaw) or [`subscribe()`](https://jisotalo.fi/ads-client/classes/Client.html#subscribe) to subscribe to raw value changes.
 
-The `indexGroup` and `indexOffset` can be acquired for example by using [`getSymbol()`](TODO-DOC-URL-HERE/classes/Client.html#getSymbol).
+The `indexGroup` and `indexOffset` can be acquired for example by using [`getSymbol()`](https://jisotalo.fi/ads-client/classes/Client.html#getSymbol).
 
 Example: Subscribe to raw address of `indexGroup` = 16448, `indexOffset` = 414816 and `size` = 2 bytes.
   
@@ -910,7 +970,7 @@ try {
 }
 ```
 
-Same using [`subscribe()`](TODO-DOC-URL-HERE/classes/Client.html#subscribe):
+Same using [`subscribe()`](https://jisotalo.fi/ads-client/classes/Client.html#subscribe):
 ```js
 try {
   await client.subscribe({
@@ -932,7 +992,7 @@ try {
 
 ### Unsubscribing
 
-Subscriptions should always be cancelled when no longer needed (to save PLC resources). Use [`unsubscribe()`](TODO-DOC-URL-HERE/classes/Client.html#unsubscribe) or subscription object's [`ActiveSubscription.unsubscribe()`](TODO-DOC-URL-HERE/interfaces/ActiveSubscription.html#unsubscribe) to unsubscribe.
+Subscriptions should always be cancelled when no longer needed (to save PLC resources). Use [`unsubscribe()`](https://jisotalo.fi/ads-client/classes/Client.html#unsubscribe) or subscription object's [`ActiveSubscription.unsubscribe()`](https://jisotalo.fi/ads-client/interfaces/ActiveSubscription.html#unsubscribe) to unsubscribe.
 
 ```js
 const sub = await client.subscribeValue(...);
@@ -1052,7 +1112,7 @@ const res = await client.invokeRpcMethod('GVL_RPC.RpcBlock', 'Calculator', {
   Value1: 1,
   Value2: 123
 });
-* 
+
 console.log(res);
 /*
 {
@@ -1094,7 +1154,7 @@ const res = await client.invokeRpcMethod('GVL_RPC.RpcBlock', 'Structs', {
     SomeDate: new Date('2024-12-24T00:00:00.000Z') 
   }
 });
-* 
+
 console.log(res);
 /*
 {
@@ -1103,7 +1163,7 @@ console.log(res);
     SomeReal: 31.4,
     SomeDate: 2024-12-24T01:00:00.000Z
   },
-  outputs: {
+  outputs: {}
 }
 */
 ```
@@ -1112,14 +1172,14 @@ console.log(res);
 
 The raw data in this context means sent or received bytes (a `Buffer` object).
 
-When using methods such as [`readValue()`](TODO-DOC-URL-HERE/classes/Client.html#readValue), [`writeValue()`](TODO-DOC-URL-HERE/classes/Client.html#writeValue) and [`subscribeValue()`](TODO-DOC-URL-HERE/classes/Client.html#subscribeValue),
-the client converts data automatically. The conversion can be done manually as well, by using [`convertFromRaw()`](TODO-DOC-URL-HERE/classes/Client.html#convertFromRaw) and [`convertToRaw()`](TODO-DOC-URL-HERE/classes/Client.html#convertToRaw).
+When using methods such as [`readValue()`](https://jisotalo.fi/ads-client/classes/Client.html#readValue), [`writeValue()`](https://jisotalo.fi/ads-client/classes/Client.html#writeValue) and [`subscribeValue()`](https://jisotalo.fi/ads-client/classes/Client.html#subscribeValue),
+the client converts data automatically. The conversion can be done manually as well, by using [`convertFromRaw()`](https://jisotalo.fi/ads-client/classes/Client.html#convertFromRaw) and [`convertToRaw()`](https://jisotalo.fi/ads-client/classes/Client.html#convertToRaw).
 
 See my other library [iec-61131-3](https://github.com/jisotalo/iec-61131-3) for other possibilities to convert data between Javascript and IEC 61131-3 types.
 
 ### Converting a raw value to a Javascript object
 
-The [`convertFromRaw()`](TODO-DOC-URL-HERE/classes/Client.html#convertFromRaw) can be used to convert raw data to objects.
+The [`convertFromRaw()`](https://jisotalo.fi/ads-client/classes/Client.html#convertFromRaw) can be used to convert raw data to objects.
 
 Converting raw data to INT
 
@@ -1148,7 +1208,7 @@ console.log(converted);
 
 ### Converting a Javascript object to a raw value
 
-The [`convertToRaw()`](TODO-DOC-URL-HERE/classes/Client.html#convertToRaw) can be used to convert objects to raw data.
+The [`convertToRaw()`](https://jisotalo.fi/ads-client/classes/Client.html#convertToRaw) can be used to convert objects to raw data.
 
 Converting a numeric value to raw data (INT)
 
@@ -1192,32 +1252,32 @@ ADS sum commands can be used to have multiple ADS commands in one request. This 
 
 See [Beckhoff Information System](https://infosys.beckhoff.com/english.php?content=../content/1033/tc3_adsdll2/9007199379576075.html&id=9180083787138954512) for more info.
 
-- [`createVariableHandleMulti()`](TODO-DOC-URL-HERE/classes/Client.html#createVariableHandleMulti)
-- [`deleteVariableHandleMulti()`](TODO-DOC-URL-HERE/classes/Client.html#deleteVariableHandleMulti)
-- [`readRawMulti()`](TODO-DOC-URL-HERE/classes/Client.html#readRawMulti)
-- [`writeRawMulti()`](TODO-DOC-URL-HERE/classes/Client.html#writeRawMulti)
-- [`readWriteRawMulti()`](TODO-DOC-URL-HERE/classes/Client.html#readWriteRawMulti)
+- [`createVariableHandleMulti()`](https://jisotalo.fi/ads-client/classes/Client.html#createVariableHandleMulti)
+- [`deleteVariableHandleMulti()`](https://jisotalo.fi/ads-client/classes/Client.html#deleteVariableHandleMulti)
+- [`readRawMulti()`](https://jisotalo.fi/ads-client/classes/Client.html#readRawMulti)
+- [`writeRawMulti()`](https://jisotalo.fi/ads-client/classes/Client.html#writeRawMulti)
+- [`readWriteRawMulti()`](https://jisotalo.fi/ads-client/classes/Client.html#readWriteRawMulti)
 
 ### Starting and stopping a PLC 
 
-- [`startPlc()`](TODO-DOC-URL-HERE/classes/Client.html#startPlc)
-- [`stopPlc()`](TODO-DOC-URL-HERE/classes/Client.html#stopPlc)
-- [`resetPlc()`](TODO-DOC-URL-HERE/classes/Client.html#resetPlc)
-- [`restartPlc()`](TODO-DOC-URL-HERE/classes/Client.html#restartPlc)
+- [`startPlc()`](https://jisotalo.fi/ads-client/classes/Client.html#startPlc)
+- [`stopPlc()`](https://jisotalo.fi/ads-client/classes/Client.html#stopPlc)
+- [`resetPlc()`](https://jisotalo.fi/ads-client/classes/Client.html#resetPlc)
+- [`restartPlc()`](https://jisotalo.fi/ads-client/classes/Client.html#restartPlc)
 
 ### Starting and stopping TwinCAT system
 
-- [`setTcSystemToConfig()`](TODO-DOC-URL-HERE/classes/Client.html#setTcSystemToConfig)
-- [`setTcSystemToRun()`](TODO-DOC-URL-HERE/classes/Client.html#setTcSystemToRun)
-- [`restartTcSystem()`](TODO-DOC-URL-HERE/classes/Client.html#restartTcSystem)
+- [`setTcSystemToConfig()`](https://jisotalo.fi/ads-client/classes/Client.html#setTcSystemToConfig)
+- [`setTcSystemToRun()`](https://jisotalo.fi/ads-client/classes/Client.html#setTcSystemToRun)
+- [`restartTcSystem()`](https://jisotalo.fi/ads-client/classes/Client.html#restartTcSystem)
 
 ### Client events
 
-See [`AdsClientEvents`](TODO-DOC-URL-HERE/interfaces/AdsClientEvents.html) for all available events, their descriptions and examples.
+See [`AdsClientEvents`](https://jisotalo.fi/ads-client/interfaces/AdsClientEvents.html) for all available events, their descriptions and examples.
 
 ### Debugging
 
-Use [`setDebugging()`](TODO-DOC-URL-HERE/classes/Client.html#setDebugging) to change debug level.
+Use [`setDebugging()`](https://jisotalo.fi/ads-client/classes/Client.html#setDebugging) to change debug level.
 
  - 0: no debugging (default)
  - 1: basic debugging (`$env:DEBUG='ads-client'`)
@@ -1229,7 +1289,7 @@ Debug data is available in the console (See [Debug](https://www.npmjs.com/packag
 
 ## Disconnecting
 
-After the client is no more used, always use [`disconnect()`](TODO-DOC-URL-HERE/classes/Client.html#disconnect) to release all subscription handles and other resources.
+After the client is no more used, always use [`disconnect()`](https://jisotalo.fi/ads-client/classes/Client.html#disconnect) to release all subscription handles and other resources.
 
 ```js
 await client.disconnect();
@@ -1240,8 +1300,8 @@ await client.disconnect();
 ### Lot's of connection issues and timeouts
 Things to try: 
 - Remove all TwinCAT routes and create them again (yes, really)
-- Increase value of [`timeoutDelay`](TODO-DOC-URL-HERE/interfaces/AdsClientSettings.html#timeoutDelay) setting
-- Cache all data types and symbols straight after connecting using [`cacheDataTypes`](TODO-DOC-URL-HERE/classes/Client.html#cacheDataTypes) and [`cacheSymbols`](TODO-DOC-URL-HERE/classes/Client.html#cacheSymbols)
+- Increase value of [`timeoutDelay`](https://jisotalo.fi/ads-client/interfaces/AdsClientSettings.html#timeoutDelay) setting
+- Cache all data types and symbols straight after connecting using [`cacheDataTypes`](https://jisotalo.fi/ads-client/classes/Client.html#cacheDataTypes) and [`cacheSymbols`](https://jisotalo.fi/ads-client/classes/Client.html#cacheSymbols)
 
 ### Getting `TypeError: Do not know how to serialize a BigInt`
 - `JSON.stringify` doesn't understand BigInt values (such as `LINT` or similar 64 bit PLC values)
