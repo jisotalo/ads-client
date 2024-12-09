@@ -136,6 +136,43 @@ import { Client } from 'ads-client';
 
 You can also clone the repository and run `npm run build`. After that, the library is available at `./dist/`
 
+# Minimal example (TLDR)
+
+This connects to a local PLC runtime, reads a value, writes a value, reads it again and then disconnects. The value is a string and it's located in `GVL_Global.StringValue`.
+
+```js
+const { Client } = require('ads-client');
+
+const client = new Client({
+  targetAmsNetId: 'localhost',
+  targetAdsPort: 851
+});
+
+client.connect()
+  .then(async (res) => {   
+    console.log(`Connected to the ${res.targetAmsNetId}`);
+    console.log(`Router assigned us AmsNetId ${res.localAmsNetId} and port ${res.localAdsPort}`);
+
+    //Reading a value
+    const read = await client.readValue('GVL_Global.StringValue');
+    console.log('Value read (before):', read.value); 
+
+    //Writing a value
+    await client.writeValue('GVL_Global.StringValue', 'This is a new value');
+
+    //Reading a value
+    const read2 = await client.readValue('GVL_Global.StringValue');
+    console.log('Value read (after):', read2.value); 
+
+    //Disconnecting
+    await client.disconnect();
+    console.log('Disconnected');
+
+  }).catch(err => {
+    console.log('Error:', err);
+  });
+```
+
 # Connection setup
 
 The ads-client can be used with multiple system configurations.
@@ -435,43 +472,6 @@ Click a method to open it's documentation.
 | [`writeRawMulti()`](https://jisotalo.fi/ads-client/classes/Client.html#writeRawMulti)                           | Sends multiple `writeRaw()` commands in one ADS packet (ADS sum command).                                                                                                        |
 | [`writeValue()`](https://jisotalo.fi/ads-client/classes/Client.html#writeValue)                                 | Writes variable's value to the target system by a variable path (such as `GVL_Test.ExampleStruct`). Converts the value from a Javascript object to a raw value.                  |
 | [`writeValueBySymbol()`](https://jisotalo.fi/ads-client/classes/Client.html#writeValueBySymbol)                 | Writes variable's value to the target system by a symbol object (acquired using `getSymbol()`). Converts the value from a Javascript object to a raw value.                      |
-
-## Minimal example (TLDR)
-
-This connects to a local PLC runtime, reads a value, writes a value, reads it again and then disconnects. The value is a string and it's located in `GVL_Global.StringValue`.
-
-```js
-const { Client } = require('ads-client');
-
-const client = new Client({
-  targetAmsNetId: 'localhost',
-  targetAdsPort: 851
-});
-
-client.connect()
-  .then(async (res) => {   
-    console.log(`Connected to the ${res.targetAmsNetId}`);
-    console.log(`Router assigned us AmsNetId ${res.localAmsNetId} and port ${res.localAdsPort}`);
-
-    //Reading a value
-    const read = await client.readValue('GVL_Global.StringValue');
-    console.log('Value read (before):', read.value); 
-
-    //Writing a value
-    await client.writeValue('GVL_Global.StringValue', 'This is a new value');
-
-    //Reading a value
-    const read2 = await client.readValue('GVL_Global.StringValue');
-    console.log('Value read (after):', read2.value); 
-
-    //Disconnecting
-    await client.disconnect();
-    console.log('Disconnected');
-
-  }).catch(err => {
-    console.log('Error:', err);
-  });
-```
 
 ## Creating a client
 
