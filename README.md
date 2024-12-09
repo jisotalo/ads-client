@@ -503,9 +503,15 @@ const client = new Client({
 });
 
 client.connect()
-  .then(res => {   
+  .then(async (res) => {   
     console.log(`Connected to the ${res.targetAmsNetId}`);
     console.log(`Router assigned us AmsNetId ${res.localAmsNetId} and port ${res.localAdsPort}`);
+    //Connected
+
+    //...
+
+    //Disconnecting
+    await client.disconnect();
 
   }).catch(err => {
     console.log('Error:', err);
@@ -516,14 +522,13 @@ client.connect()
 
 ### Reading any value
 
-Use [`readValue()`](https://jisotalo.fi/ads-client/classes/Client.html#readValue) to read any PLC value as a Javascript object. 
+Use [`readValue()`](https://jisotalo.fi/ads-client/classes/Client.html#readValue) to read any PLC value.
 
 The only exception is the dereferenced value of a reference/pointer, see [Reading reference/pointer](#reading-referencepointer).
 
 **Reading INT**
 
 ```js
-//Example: INT
 const res = await client.readValue('GVL_Read.StandardTypes.INT_');
 console.log(res.value); 
 // 32767
@@ -619,11 +624,11 @@ console.log(res.value); //res.value is typed as ST_ComplexTypes
 
 ### Reading raw data
 
-Use [`readRaw()`](https://jisotalo.fi/ads-client/classes/Client.html#readRaw) or [`readRawByPath()`](https://jisotalo.fi/ads-client/classes/Client.html#readRawByPath) to read any PLC value as raw data (`Buffer` object, data as bytes).
+Use [`readRaw()`](https://jisotalo.fi/ads-client/classes/Client.html#readRaw) or [`readRawByPath()`](https://jisotalo.fi/ads-client/classes/Client.html#readRawByPath) to read any PLC value as raw data. The raw data in this context means received bytes (a `Buffer` object).
 
 The only exception is the dereferenced value of a reference/pointer, see [Reading reference/pointer](#reading-referencepointer).
 
-For converting the data between raw data and Javascript object, see [Converting data between raw data and Javascript objects](#converting-data-between-raw-data-and-javascript-objects)
+For converting the data between raw data and Javascript object, see [Converting data between raw data and Javascript objects](#converting-data-between-raw-data-and-javascript-objects).
 
 **readRaw()**
 
@@ -740,97 +745,119 @@ Use [`writeValue()`](https://jisotalo.fi/ads-client/classes/Client.html#writeVal
 
 The only exception is the dereferenced value of a reference/pointer, see [Writing reference/pointer](#writing-referencepointer).
 
+**Writing INT**
+
 ```js
-try {
-  //Example: INT
-  await client.writeValue('GVL_Write.StandardTypes.INT_', 32767);
+const res = await client.writeValue('GVL_Write.StandardTypes.INT_', 32767);
+console.log(res.value); 
+// 32767
+```
 
-  //Example: STRING
-  await client.writeValue('GVL_Write.StandardTypes.STRING_', 'This is a test');
-  
-  //Example: DT
-  await client.writeValue('GVL_Write.StandardTypes.DT_', new Date());
+**Writing STRING**
 
-  //Example: STRUCT (all properties)
-  await client.writeValue('GVL_Write.ComplexTypes.STRUCT_', {
-    BOOL_: true,
-    BOOL_2: false,
-    BYTE_: 255,
-    WORD_: 65535,
-    //...and so on
-  });
+```js
+await client.writeValue('GVL_Write.StandardTypes.STRING_', 'This is a test');
+```
 
-  //Example: STRUCT (only some properties)
-  await client.writeValue('GVL_Write.ComplexTypes.STRUCT_', {
-    WORD_: 65535
-  }, true); //<-- NOTE: autoFill set
+**Writing DT**
 
-  //Example: FUNCTION_BLOCK (all properties)
-  await client.writeValue('GVL_Write.ComplexTypes.BLOCK_2', {
-    IN: false, 
-    PT: 2500, 
-    Q: false, 
-    ET: 0, 
-    M: false, 
-    StartTime: 0
-  });
+```js
+await client.writeValue('GVL_Write.StandardTypes.DT_', new Date());
+```
 
-  //Example: FUNCTION_BLOCK (only some properties)
-  await client.writeValue('GVL_Write.ComplexTypes.BLOCK_2', {
-    IN: true
-  }, true); //<-- NOTE: autoFill set
+**Writing STRUCT (all properties)**
 
-  //Example: ARRAY
-  await client.writeValue('GVL_Write.StandardArrays.REAL_3', [
-    75483.546875, 
-    0, 
-    -75483.546875
-  ]);
+```js
+await client.writeValue('GVL_Write.ComplexTypes.STRUCT_', {
+  BOOL_: true,
+  BOOL_2: false,
+  BYTE_: 255,
+  WORD_: 65535,
+  //...and so on
+});
+```
 
-  //Example: ENUM
-  res = await client.writeValue('GVL_Write.ComplexTypes.ENUM_', 'Running');
-  //...or...
-  res = await client.writeValue('GVL_Write.ComplexTypes.ENUM_', 100);
+**Writing STRUCT (some properties only)**
 
-} catch (err) {
- console.log("Error:", err);
-}
+All other properties will keep their values (read before writing).
+
+```js
+await client.writeValue('GVL_Write.ComplexTypes.STRUCT_', {
+  WORD_: 65535
+}, true); //<-- NOTE: autoFill set
+```
+
+**Writing FUNCTION_BLOCK (all properties)**
+
+```js
+const timerBlock = {
+  IN: false, 
+  PT: 2500, 
+  Q: false, 
+  ET: 0, 
+  M: false, 
+  StartTime: 0
+};
+
+await client.writeValue('GVL_Write.ComplexTypes.BLOCK_2', timerBlock);
+```
+
+**Writing FUNCTION_BLOCK (some properties only)**
+
+All other properties will keep their values (read before writing).
+
+```js
+await client.writeValue('GVL_Write.ComplexTypes.BLOCK_2', {
+  IN: true
+}, true); //<-- NOTE: autoFill set
+```
+
+**Writing ARRAY**
+
+```js
+const data = [
+  75483.546875, 
+  0, 
+  -75483.546875
+];
+
+await client.writeValue('GVL_Write.StandardArrays.REAL_3', data);
+```
+
+**Writing ENUM**
+
+```js
+await client.writeValue('GVL_Write.ComplexTypes.ENUM_', 'Running');
+//...or...
+await client.writeValue('GVL_Write.ComplexTypes.ENUM_', 100);
 ```
 
 ### Writing raw data
 
-Use [`writeRaw()`](https://jisotalo.fi/ads-client/classes/Client.html#writeRaw) to write any PLC value using raw data. Raw data is a `Buffer` object, containing the data as bytes.
+Use [`writeRaw()`](https://jisotalo.fi/ads-client/classes/Client.html#writeRaw) or [`writeRawByPath()`](https://jisotalo.fi/ads-client/classes/Client.html#writeRawByPath) to write any PLC value using raw data. The raw data in this context means received bytes (a `Buffer` object).
 
 The only exception is the dereferenced value of a reference/pointer, see [Reading reference/pointer](#reading-referencepointer).
 
-The `indexGroup` and `indexOffset` can be acquired for example by using [`getSymbol()`](https://jisotalo.fi/ads-client/classes/Client.html#getSymbol).
+For converting the data between raw data and Javascript object, see [Converting data between raw data and Javascript objects](#converting-data-between-raw-data-and-javascript-objects).
 
+**writeRaw()**
 ```js
-try {
-  //Example: Writing a INT variable by index offset and index group using raw data
-  const data = await client.convertToRaw(32767, 'INT');
-  console.log(data); //<Buffer ff 7f>
+//Creating raw data of an INT
+const data = await client.convertToRaw(32767, 'INT');
+console.log(data); //<Buffer ff 7f>
 
-  await client.writeRaw(16448, 414816, data);
-
-} catch (err) {
-  console.log("Error:", err);
-}
+//Writing the value to indexGroup 16448 and indexOffset 414816
+await client.writeRaw(16448, 414816, data);
 ```
 
-[`writeRawByPath()`](https://jisotalo.fi/ads-client/classes/Client.html#writeRawByPath) can be used to write raw data by a variable path.
+**writeRawByPath()**
 
 ```js
-try {
-  //Example: Writing a INT variable by its variable path using raw data
-  const data = await client.convertToRaw(32767, 'INT');
-  console.log(data); //<Buffer ff 7f>
+//Creating raw data of an INT
+const data = await client.convertToRaw(32767, 'INT');
+console.log(data); //<Buffer ff 7f>
 
-  await client.writeRawByPath('GVL_Write.StandardTypes.INT_', data);
-
-} catch (err) {
-  console.log("Error:", err);
-}
+await client.writeRawByPath('GVL_Write.StandardTypes.INT_', data);
 ```
 
 ### Writing reference/pointer
