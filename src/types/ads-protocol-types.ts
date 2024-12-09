@@ -413,11 +413,11 @@ export interface AdsSymbol {
   /** Symbol comment (variable comment in the PLC code) */
   comment: string,
   /** If symbol is an array, information of each array dimension */
-  arrayInfo: Array<AdsArrayInfoEntry>,
+  arrayInfo: AdsArrayInfoEntry[],
   /** GUID of the symbol */
   typeGuid: string,
   /** Symbol attributes, such as pragmas */
-  attributes: Array<AdsAttributeEntry>
+  attributes: AdsAttributeEntry[],
   /* Extended flags */
   extendedFlags: number,
   /** Rest bytes in the end of data that have no meaning yet */

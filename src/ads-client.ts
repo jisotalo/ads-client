@@ -2126,7 +2126,7 @@ export class Client extends EventEmitter<AdsClientEvents> {
 
           if (this.symbol) {
             const dataType = await clientRef.getDataType(this.symbol.type, this.targetOpts);
-            result.value = clientRef.convertBufferToObject<T>(data, dataType);
+            result.value = clientRef.convertBufferToObject<T>(data, dataType, this.symbol.attributes);
           }
 
           this.latestData = result;
@@ -2862,7 +2862,6 @@ export class Client extends EventEmitter<AdsClientEvents> {
         //Enumeration attributes
         dataType.enumInfos[i].attributes = [];
 
-        //console.log(enumInfoCount, num1, commentLength, attributeCount, test, attributes);
         //Attributes
         for (let i = 0; i < attributeCount; i++) {
           const attr = {} as AdsAttributeEntry;
@@ -3003,7 +3002,7 @@ export class Client extends EventEmitter<AdsClientEvents> {
    * @param isRootType If `true`, this is the root type / first call / not recursive call (default: `true`)
    * @param knownSize Data type size (if known) - used with pseudo data types and TwinCAT 2 primite types
    */
-  private async buildDataType(name: string, targetOpts: Partial<AmsAddress> = {}, isRootType = true, knownSize?: number, attributes?: AdsAttributeEntry[]): Promise<AdsDataType> {
+  private async buildDataType(name: string, targetOpts: Partial<AmsAddress> = {}, isRootType = true, knownSize?: number): Promise<AdsDataType> {
     try {
       this.debug(`buildDataType(): Building data type for ${name}`);
 
@@ -3100,6 +3099,8 @@ export class Client extends EventEmitter<AdsClientEvents> {
             subItemType.hashValue = dataType.subItems[i].hashValue;
             subItemType.offset = dataType.subItems[i].offset;
             subItemType.comment = dataType.subItems[i].comment;
+
+            //Let's keep attributes from parent as well as subitem's own attributes
             subItemType.attributes = [...subItemType.attributes, ...dataType.subItems[i].attributes];
           }
 
@@ -3113,9 +3114,6 @@ export class Client extends EventEmitter<AdsClientEvents> {
 
         //This is final form (no need to go deeper)
         builtType = { ...dataType };
-        if (attributes) {
-          builtType.attributes = [...builtType.attributes, ...attributes];
-        }
 
       } else if (dataType.arrayDimension > 0) {
         //Data type is an array - get array subtype
@@ -3185,10 +3183,11 @@ export class Client extends EventEmitter<AdsClientEvents> {
    * 
    * @param buffer The raw data to convert
    * @param dataType Target data type
+   * @param attributes Additional attributes of the symbol or data type to use for conversion
    */
-  private convertBufferToPrimitiveType(buffer: Buffer, dataType: AdsDataType): PlcPrimitiveType {
+  private convertBufferToPrimitiveType(buffer: Buffer, dataType: AdsDataType, attributes?: AdsAttributeEntry[]): PlcPrimitiveType {
     if (dataType.adsDataType === ADS.ADS_DATA_TYPES.ADST_STRING) {
-      return ADS.decodePlcStringBuffer(buffer, this.dataTypeEncoding(dataType) === 'UTF-8');
+      return ADS.decodePlcStringBuffer(buffer, this.getStringDataTypeEncoding(dataType, attributes) === 'UTF-8');
 
     } else if (dataType.adsDataType === ADS.ADS_DATA_TYPES.ADST_WSTRING) {
       return ADS.decodePlcWstringBuffer(buffer);
@@ -3199,12 +3198,14 @@ export class Client extends EventEmitter<AdsClientEvents> {
   }
 
   /**
-   * Extracts TcEncoding from datatype attributes
+   * Extracts TcEncoding attribute from the data datatype attributes or additional attributes
    *
    * @param dataType The data type
+   * @param attributes Additional attributes of the symbol or data type
    */
-  private dataTypeEncoding(dataType: AdsDataType): string | undefined {
+  private getStringDataTypeEncoding(dataType: AdsDataType, attributes?: AdsAttributeEntry[]): string | undefined {
     return dataType.attributes.find((attr) => attr.name === 'TcEncoding')?.value
+      || attributes?.find((attr) => attr.name === 'TcEncoding')?.value; 
   }
 
   /**
@@ -3214,9 +3215,10 @@ export class Client extends EventEmitter<AdsClientEvents> {
    * 
    * @param data The raw data to convert
    * @param dataType Target data type
+   * @param attributes Additional attributes of the symbol or data type used for conversion
    * @param isArrayItem If `true`, this is an array item (default: `false`)
    */
-  private convertBufferToObject<T = any>(data: Buffer, dataType: AdsDataType, isArrayItem: boolean = false): T {
+  private convertBufferToObject<T = any>(data: Buffer, dataType: AdsDataType, attributes?: AdsAttributeEntry[], isArrayItem: boolean = false): T {
     let result: any;
 
     if ((dataType.arrayInfos.length === 0 || isArrayItem) && dataType.subItems.length > 0) {
@@ -3241,7 +3243,7 @@ export class Client extends EventEmitter<AdsClientEvents> {
             temp.push(convertArrayDimension(dim + 1));
           } else {
             //Final dimension
-            temp.push(this.convertBufferToObject(data, dataType, true));
+            temp.push(this.convertBufferToObject(data, dataType, undefined, true));
             data = data.subarray(dataType.size);
           }
         }
@@ -3292,7 +3294,7 @@ export class Client extends EventEmitter<AdsClientEvents> {
 
     } else {
       //Primitive type
-      result = this.convertBufferToPrimitiveType(data.subarray(dataType.offset, dataType.offset + dataType.size), dataType) as T;
+      result = this.convertBufferToPrimitiveType(data.subarray(dataType.offset, dataType.offset + dataType.size), dataType, attributes) as T;
     }
 
     return result as T;
@@ -3303,10 +3305,11 @@ export class Client extends EventEmitter<AdsClientEvents> {
    * 
    * @param value Javascript object to convert
    * @param dataType Target data type
+   * @param attributes Additional attributes of the symbol or data type used for conversion
    * @param objectPath Object path that is passed forward when calling recursively. This is used for error reporting if a property is missing
    * @param isArrayItem If `true`, this is an array item (default: `false`)
    */
-  private convertObjectToBuffer<T = any>(value: T, dataType: AdsDataType, objectPath: string = '', isArrayItem: boolean = false): ObjectToBufferConversionResult {
+  private convertObjectToBuffer<T = any>(value: T, dataType: AdsDataType, attributes?: AdsAttributeEntry[], objectPath: string = '', isArrayItem: boolean = false): ObjectToBufferConversionResult {
     let rawValue = Buffer.alloc(0);
 
     const pathInfo = objectPath === '' && dataType.name === ''
@@ -3347,7 +3350,7 @@ export class Client extends EventEmitter<AdsClientEvents> {
         }
 
         //Converting subItem
-        let res = this.convertObjectToBuffer((value as Record<string, any>)[key], subItem, `${pathInfo}.${subItem.name}`);
+        let res = this.convertObjectToBuffer((value as Record<string, any>)[key], subItem, undefined, `${pathInfo}.${subItem.name}`);
 
         if (res.missingProperty) {
           //We have a missing property somewhere -> quit
@@ -3412,7 +3415,7 @@ export class Client extends EventEmitter<AdsClientEvents> {
             }
 
             //Converting array item
-            let res = this.convertObjectToBuffer((value as any[])[child], dataType, `${pathInfo}.${path}[${child}]`, true);
+            let res = this.convertObjectToBuffer((value as any[])[child], dataType, undefined, `${pathInfo}.${path}[${child}]`, true);
 
             if (res.missingProperty) {
               //We have a missing property somewhere -> quit
@@ -3471,11 +3474,11 @@ export class Client extends EventEmitter<AdsClientEvents> {
         throw new ClientError(`Provided value ${JSON.stringify(value)}${pathInfo} is not valid value for this ENUM. Allowed values are a number and any of the following: ${allowedEnumValuesStr}`);
       }
 
-      this.convertPrimitiveTypeToBuffer(enumEntry.value, dataType, rawValue);
+      this.convertPrimitiveTypeToBuffer(enumEntry.value, dataType, rawValue, attributes);
 
     } else if (ADS.BASE_DATA_TYPES.isKnownType(dataType.type)) {
       rawValue = Buffer.alloc(dataType.size);
-      this.convertPrimitiveTypeToBuffer(value as PlcPrimitiveType, dataType, rawValue);
+      this.convertPrimitiveTypeToBuffer(value as PlcPrimitiveType, dataType, rawValue, attributes);
 
     } else if (dataType.adsDataType === ADS.ADS_DATA_TYPES.ADST_BIGTYPE && dataType.subItems.length === 0) {
       //If size is 0, then it's empty struct -> rawValue is already OK
@@ -3512,15 +3515,16 @@ export class Client extends EventEmitter<AdsClientEvents> {
    * @param value Javascript object to convert
    * @param dataType Data type
    * @param buffer Reference to Buffer object where to write the raw value
+   * @param attributes Additional attributes of the symbol or data type used for conversion
    */
-  private convertPrimitiveTypeToBuffer(value: PlcPrimitiveType, dataType: AdsDataType, buffer: Buffer) {
+  private convertPrimitiveTypeToBuffer(value: PlcPrimitiveType, dataType: AdsDataType, buffer: Buffer, attributes?: AdsAttributeEntry[]) {
     if (dataType.size === 0) {
       return;
     }
 
     if (dataType.adsDataType === ADS.ADS_DATA_TYPES.ADST_STRING) {
-      const isUTF8 = this.dataTypeEncoding(dataType) === 'UTF-8'
-      const encoded = ADS.encodeStringToPlcStringBuffer(value as string, isUTF8);
+      const encoded = ADS.encodeStringToPlcStringBuffer(value as string, this.getStringDataTypeEncoding(dataType, attributes) === 'UTF-8');
+
       //If string is too long for target data type, truncate it
       const length = Math.min(dataType.size - 1, encoded.length);
       encoded.copy(buffer, 0, 0, length);
@@ -6300,7 +6304,7 @@ export class Client extends EventEmitter<AdsClientEvents> {
       this.debugD(`readValue(): Getting data type for ${path}`);
 
       //Also passing size for TC2 pointer/pseudo type support
-      dataType = await this.buildDataType(symbol.type, targetOpts, true, symbol.size, symbol.attributes);
+      dataType = await this.buildDataType(symbol.type, targetOpts, true, symbol.size);
 
     } catch (err) {
       this.debug(`readValue(): Getting data type for ${path} failed: %o`, err);
@@ -6318,11 +6322,11 @@ export class Client extends EventEmitter<AdsClientEvents> {
       throw new ClientError(`readValue(): Reading raw value from ${path} failed`, err);
     }
 
-    //Converting byte data to javascript object
+    //Converting byte data to javascript object 
     let value: T;
     try {
       this.debugD(`readValue(): Converting raw value to object for ${path}`);
-      value = await this.convertBufferToObject<T>(rawValue, dataType);
+      value = await this.convertBufferToObject<T>(rawValue, dataType, symbol.attributes);
 
     } catch (err) {
       this.debug(`readValue(): Converting raw value to object for ${path} failed: %o`, err);
@@ -6434,7 +6438,7 @@ export class Client extends EventEmitter<AdsClientEvents> {
       this.debugD(`writeValue(): Getting data type for ${path}`);
 
       //Also passing size for TC2 pointer/pseudo type support
-      dataType = await this.buildDataType(symbol.type, targetOpts, true, symbol.size, symbol.attributes);
+      dataType = await this.buildDataType(symbol.type, targetOpts, true, symbol.size);
 
     } catch (err) {
       this.debug(`writeValue(): Getting data type for ${path} failed: %o`, err);
@@ -6444,7 +6448,7 @@ export class Client extends EventEmitter<AdsClientEvents> {
     //Creating raw data from object
     let rawValue: Buffer;
     try {
-      let res = this.convertObjectToBuffer(value, dataType);
+      let res = this.convertObjectToBuffer(value, dataType, symbol.attributes);
 
       if (res.missingProperty && autoFill) {
         //Some fields are missing and autoFill is used -> try to auto fill missing values
@@ -6457,7 +6461,7 @@ export class Client extends EventEmitter<AdsClientEvents> {
         value = this.deepMergeObjects(false, valueNow.value, value);
 
         //Try conversion again - should work now
-        res = this.convertObjectToBuffer(value, dataType);
+        res = this.convertObjectToBuffer(value, dataType, symbol.attributes);
 
         if (res.missingProperty) {
           //This shouldn't really happen
@@ -6562,12 +6566,13 @@ export class Client extends EventEmitter<AdsClientEvents> {
    * ```
    * 
    * @param dataType Data type name in the PLC as string (such as `ST_Struct`) or data type object (acquired using {@link getDataType}())
+   * @param attributes Additional attributes of the symbol or data type used for conversion
    * @param targetOpts Optional target settings that override values in `settings` 
    * 
    * @template T Typescript data type of the PLC data, for example `getDefaultPlcObject<number>(...)` or `getDefaultPlcObject<ST_TypedStruct>(...)`
    * @throws Throws an error if sending the command fails or if the target responds with an error.
    */
-  public async getDefaultPlcObject<T = any>(dataType: string | AdsDataType, targetOpts: Partial<AmsAddress> = {}): Promise<T> {
+  public async getDefaultPlcObject<T = any>(dataType: string | AdsDataType, attributes?: AdsAttributeEntry[], targetOpts: Partial<AmsAddress> = {}): Promise<T> {
     if (!this.connection.connected) {
       throw new ClientError(`getDefaultPlcObject(): Client is not connected. Use connect() to connect to the target first.`);
     }
@@ -6587,7 +6592,7 @@ export class Client extends EventEmitter<AdsClientEvents> {
     }
 
     //Converting raw byte data to Javascript object
-    let value: T = await this.convertFromRaw(Buffer.alloc(dataType.size), dataType, targetOpts);
+    let value: T = await this.convertFromRaw(Buffer.alloc(dataType.size), dataType, attributes, targetOpts);
 
     this.debug(`getDefaultPlcObject(): Empty default object created for ${dataType.type}`);
     return value;
@@ -6612,12 +6617,13 @@ export class Client extends EventEmitter<AdsClientEvents> {
    * 
    * @param data Raw data (acquired for example using {@link readRaw}())
    * @param dataType Data type name in the PLC as string (such as `ST_Struct`) or data type object (acquired using {@link getDataType}())
+   * @param attributes Additional attributes of the symbol or data type used for conversion
    * @param targetOpts Optional target settings that override values in `settings`
    * 
    * @template T Typescript data type of the PLC data, for example `convertFromRaw<number>(...)` or `convertFromRaw<ST_TypedStruct>(...)`
    * @throws Throws an error if sending the command fails or if the target responds with an error.
    */
-  public async convertFromRaw<T = any>(data: Buffer, dataType: string | AdsDataType, targetOpts: Partial<AmsAddress> = {}): Promise<T> {
+  public async convertFromRaw<T = any>(data: Buffer, dataType: string | AdsDataType, attributes?: AdsAttributeEntry[], targetOpts: Partial<AmsAddress> = {}): Promise<T> {
     if (!this.connection.connected) {
       throw new ClientError(`convertFromRaw(): Client is not connected. Use connect() to connect to the target first.`);
     }
@@ -6640,7 +6646,7 @@ export class Client extends EventEmitter<AdsClientEvents> {
     let value: T;
     try {
       this.debugD(`convertFromRaw(): Converting raw value to object for ${dataType.type}`);
-      value = await this.convertBufferToObject<T>(data, dataType);
+      value = await this.convertBufferToObject<T>(data, dataType, attributes);
 
     } catch (err) {
       this.debug(`convertFromRaw(): Converting raw value to object for ${dataType.type} failed: %o`, err);
@@ -6670,11 +6676,12 @@ export class Client extends EventEmitter<AdsClientEvents> {
    * @param value Value to convert
    * @param dataType Data type name in the PLC as string (such as `ST_Struct`) or data type object (acquired using {@link getDataType}())
    * @param autoFill autoFill If set and the data type is a container (`STRUCT`, `FUNCTION_BLOCK` etc.), missing properties are automatically set to default values (`0` or empty string).
+   * @param attributes Additional attributes of the symbol or data type used for conversion
    * @param targetOpts Optional target settings that override values in `settings`
    * 
    * @throws Throws an error if sending the command fails or if the target responds with an error.
    */
-  public async convertToRaw(value: any, dataType: string | AdsDataType, autoFill: boolean = false, targetOpts: Partial<AmsAddress> = {}): Promise<Buffer> {
+  public async convertToRaw(value: any, dataType: string | AdsDataType, autoFill: boolean = false, attributes?: AdsAttributeEntry[], targetOpts: Partial<AmsAddress> = {}): Promise<Buffer> {
     if (!this.connection.connected) {
       throw new ClientError(`convertToRaw(): Client is not connected. Use connect() to connect to the target first.`);
     }
@@ -6696,20 +6703,20 @@ export class Client extends EventEmitter<AdsClientEvents> {
     //Converting Javascript object to raw byte data
     let rawValue: Buffer;
     try {
-      let res = this.convertObjectToBuffer(value, dataType);
+      let res = this.convertObjectToBuffer(value, dataType, attributes);
 
       if (res.missingProperty && autoFill) {
         //Some fields are missing and autoFill is used -> try to auto fill missing values
         this.debug(`convertToRaw(): Autofilling missing fields with default/zero values`);
 
         this.debugD(`convertToRaw(): Creating default object`);
-        const defaultValue = await this.getDefaultPlcObject(dataType, targetOpts);
+        const defaultValue = await this.getDefaultPlcObject(dataType, attributes, targetOpts);
 
         this.debugD(`convertToRaw(): Merging objects (adding missing fields)`);
         value = this.deepMergeObjects(false, defaultValue, value);
 
         //Try conversion again - should work now
-        res = this.convertObjectToBuffer(value, dataType);
+        res = this.convertObjectToBuffer(value, dataType, attributes);
 
         if (res.missingProperty) {
           //This shouldn't really happen
