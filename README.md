@@ -415,8 +415,8 @@ You can use the test PLC project as reference together with the [ads-client.test
 
 Click a method to open it's documentation.
 
-| Method                                                                                             | Description                                                                                                                                                                      |
-| -------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Method                                                                                                          | Description                                                                                                                                                                      |
+| --------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | [`cacheDataTypes()`](https://jisotalo.fi/ads-client/classes/Client.html#cacheDataTypes)                         | Caches all data types from the target PLC runtime.                                                                                                                               |
 | [`cacheSymbols()`](https://jisotalo.fi/ads-client/classes/Client.html#cacheSymbols)                             | Caches all symbols from the target PLC runtime.                                                                                                                                  |
 | [`connect()`](https://jisotalo.fi/ads-client/classes/Client.html#connect)                                       | Connects to the target.                                                                                                                                                          |
@@ -1016,15 +1016,17 @@ await client.subscribeRaw(16448, 414816, 2, (data, subscription) => {
 Same as previous example, but with [`subscribe()`](https://jisotalo.fi/ads-client/classes/Client.html#subscribe) instead.
 
 ```js
+const onValueChanged = (data, subscription) => {
+  console.log(`Value has changed: ${data.value.toString('hex')}`);
+}
+
 await client.subscribe({
   target: {
     indexGroup: 16448,
     indexOffset: 414816,
     size: 2
   },
-  callback: (data, subscription) => {
-    console.log(`Value has changed: ${data.value.toString('hex')}`);
-  },
+  callback: onValueChanged,
   cycleTime: 100
 });
 ```
@@ -1047,13 +1049,11 @@ await client.unsubscribe(subscription);
 
 ## Using variable handles
 
-Variable handles are another alternative to read and write raw data.
+Using variable handles is an another way to read and write raw data.
 
-A handle is created to a specific PLC variable and after that, read and write operations are available.
-There is no need to use `indexGroup`/`indexOffset`.
+First, a handle is created to a specific PLC variable by the variable path. After that, read and write operations are available.
 
 Handles should always be deleted after no longer needed, as the PLC has limited number of handles.
-However, it's a perfectly valid practice to keep the handles open as long as needed.
 
 Handles can also be used to read/write reference and pointer values, see [Reading reference/pointer](#reading-referencepointer).
 
@@ -1222,9 +1222,9 @@ See my other library [iec-61131-3](https://github.com/jisotalo/iec-61131-3) for 
 
 ### Converting a raw value to a Javascript object
 
-The [`convertFromRaw()`](https://jisotalo.fi/ads-client/classes/Client.html#convertFromRaw) can be used to convert raw data to objects.
+Use [`convertFromRaw()`](https://jisotalo.fi/ads-client/classes/Client.html#convertFromRaw) to convert raw data to Javascript object.
 
-Converting raw data to INT
+**Converting INT**
 
 ```js
 const data = await client.readRaw(16448, 414816, 2);
@@ -1234,16 +1234,18 @@ const converted = await client.convertFromRaw(data, 'INT');
 console.log(converted); //32767
 ```
 
-Converting raw data to a custom struct
+**Converting STRUCT**
 
 ```js
-const converted = await client.convertFromRaw(data, 'ST_Struct');
+const converted = await client.convertFromRaw(data, 'ST_StandardTypes');
 console.log(converted);
 /*
-{ 
-  SomeText: 'Hello ads-client',
-  SomeReal: 3.1415927410125732,
-  SomeDate: 2020-04-13T12:25:33.000Z 
+{
+  BOOL_: true,
+  BOOL_2: false,
+  BYTE_: 255,
+  WORD_: 65535,
+  //..and so on
 }
 */
 ```
@@ -1251,39 +1253,39 @@ console.log(converted);
 
 ### Converting a Javascript object to a raw value
 
-The [`convertToRaw()`](https://jisotalo.fi/ads-client/classes/Client.html#convertToRaw) can be used to convert objects to raw data.
+Use [`convertToRaw()`](https://jisotalo.fi/ads-client/classes/Client.html#convertToRaw) to convert Javascript object to raw data.
 
-Converting a numeric value to raw data (INT)
+**Converting INT**
 
 ```js
 const data = await client.convertToRaw(12345, 'INT');
 console.log(data); //<Buffer 39 30>
 ```
 
-Converting an object to raw data (custom struct)
+**Converting STRUCT**
 
 ```js
-const obj = { 
-  SomeText: 'Hello ads-client',
-  SomeReal: 3.1415927410125732,
-  SomeDate: new Date(2020-04-13T12:25:33.000Z)
+const value = {
+  BOOL_: true,
+  BOOL_2: false,
+  BYTE_: 255,
+  WORD_: 65535,
+  //...and so on
 };
 
-const data = await client.convertToRaw(obj, 'ST_Struct');
+const data = await client.convertToRaw(value, 'ST_StandardTypes');
 console.log(data); //<Buffer ...>
 ```
 
-Converting an object with missing properties to raw data (custom struct)
+**Converting STRUCT (some properties only)**
 
+All other (missing) properties are set to default values (zero / empty string).
 ```js
-const obj = { 
-  SomeText: 'Hello ads-client',
-  SomeDate: new Date(2020-04-13T12:25:33.000Z)
+const value = {
+  WORD_: 65535
 };
 
-//Note: SomeReal property is missing from obj. 
-//It is set to 0 as autoFill is set below
-const data = await client.convertToRaw(obj, 'ST_Struct', true); //<-- NOTE: autoFill set
+const data = await client.convertToRaw(value, 'ST_StandardTypes', true); //<-- NOTE: autoFill set
 console.log(data); //<Buffer ...>
 ```
 
@@ -1291,7 +1293,7 @@ console.log(data); //<Buffer ...>
 
 ### ADS sum commands
 
-ADS sum commands can be used to have multiple ADS commands in one request. This can be useful if efficiency reasons.
+ADS sum commands can be used to have multiple ADS commands in one request. This can be useful for efficiency reasons.
 
 See [Beckhoff Information System](https://infosys.beckhoff.com/english.php?content=../content/1033/tc3_adsdll2/9007199379576075.html&id=9180083787138954512) for more info.
 
@@ -1318,16 +1320,26 @@ See [Beckhoff Information System](https://infosys.beckhoff.com/english.php?conte
 
 See [`AdsClientEvents`](https://jisotalo.fi/ads-client/interfaces/AdsClientEvents.html) for all available events, their descriptions and examples.
 
+```js
+client.on('connect', (connection) => {
+  console.log('Connected:', connection);
+});
+```
+
 ### Debugging
 
-Use [`setDebugging()`](https://jisotalo.fi/ads-client/classes/Client.html#setDebugging) to change debug level.
+Use [`setDebugLevel()`](https://jisotalo.fi/ads-client/classes/Client.html#setDebugLevel) to change debug level.
+
+```js
+client.setDebugLevel(1);
+```
 
  - 0: no debugging (default)
  - 1: basic debugging (`$env:DEBUG='ads-client'`)
  - 2: detailed debugging (`$env:DEBUG='ads-client,ads-client:details'`)
  - 3: detailed debugging with raw I/O data (`$env:DEBUG='ads-client,ads-client:details,ads-client:raw-data'`)
 
-Debug data is available in the console (See [Debug](https://www.npmjs.com/package/debug) library for mode).
+Debug data is available in the console (See [Debug](https://www.npmjs.com/package/debug) library for more).
 
 
 ## Disconnecting
@@ -1338,9 +1350,9 @@ After the client is no more used, always use [`disconnect()`](https://jisotalo.f
 await client.disconnect();
 ```
 
-## FAQ 
+## Common issues and questions
 
-### Lot's of connection issues and timeouts
+### There are lot's of connection issues and timeouts
 Things to try: 
 - Remove all TwinCAT routes and create them again (yes, really)
 - Increase value of [`timeoutDelay`](https://jisotalo.fi/ads-client/interfaces/AdsClientSettings.html#timeoutDelay) setting
@@ -1348,8 +1360,11 @@ Things to try:
 
 ### Getting `TypeError: Do not know how to serialize a BigInt`
 - `JSON.stringify` doesn't understand BigInt values (such as `LINT` or similar 64 bit PLC values)
-- Check [this Github issue](https://github.com/GoogleChromeLabs/jsbi/issues/30#issuecomment-953187833) for a patch
-  - `BigInt.prototype.toJSON = function() { return this.toString() }`
+- Check [this Github issue](https://github.com/GoogleChromeLabs/jsbi/issues/30#issuecomment-953187833) for the following patch:
+
+```js
+BigInt.prototype.toJSON = function() { return this.toString() }
+```
 
 ### Can I connect from Raspberry Pi to TwinCAT?
 
@@ -1362,6 +1377,7 @@ Yes, for example using [Setup 3 - Connect from any Node.js system](#setup-3---co
 
 - Make sure you have updated the latest PLC software using *download*. Sometimes online change causes this.
 - If you are using TwinCAT 2, see chapter [Differences when using with TwinCAT 2](#differences-when-using-with-twincat-2)
+- Double check variable path for typos
 
 ### Having timeouts or 'mailbox is full' errors
 
@@ -1369,11 +1385,12 @@ Yes, for example using [Setup 3 - Connect from any Node.js system](#setup-3---co
 - Other possible reason is that operating system TCP window is full because of large number of requests.
 - Solution: 
   - Use structs or arrays to send data in larger packets 
-  - Try raw/multi commands to decrease data usage
+  - Try raw commands or sum commands to decrease data usage
 
 ### Having problems to connect from OSX or Raspberry Pi to target PLC
 
-- You need to connect to the PLC AMS router instead
+- The local machine has no AMS router
+- You need to connect to the PLC's AMS router instead
 - See [this issue comment](https://github.com/jisotalo/ads-client/issues/51#issuecomment-758016428)
 
 ### A data type is not found even when it should be
@@ -1386,9 +1403,9 @@ For example, when copying a variable name from TwinCAT online view using CTRL+C,
 - --> **This causes error!**
 - The real data type name that needs to be used is `ARRAY [0..1,0..1] OF ST_Example` (note no whitespace between array dimensions)
 
-If you have problems, try to read the symbol object using `getSymbol()`. The final solution is to read all data types using `getDataTypes()` and manually finding the correct type.
+If you have problems, try to read the symbol object using `getSymbol()`. The final solution is to read all data types using `getDataTypes()` and manually locate the correct type.
 
-### ClientException: Connection failed: Device system manager state read failed
+### Connection failed - failed to set PLC connection
 
 - The `targetAmsNetId` didn't contain a system manager service (port `10000`)
 - The target is not a PLC and `rawClient` setting is not set
@@ -1406,7 +1423,7 @@ See also https://github.com/jisotalo/ads-client/issues/82
 
 - EADDRNOTAVAIL: See above and https://github.com/jisotalo/ads-client/issues/82
 
-### How to connect to PLC that is in CONFIG mode?
+### How to connect to a PLC that is in CONFIG mode?
 As default, the ads-client checks if the target has PLC runtime at given port. However, when target system manager is at config mode, there is none. The client will throw an error during connecting:
 
 `Connection failed - failed to set PLC connection. If target is not PLC runtime, use setting "rawClient". If system is in config mode or there is no PLC software yet, you might want to use setting "allowHalfOpen"`
@@ -1423,7 +1440,13 @@ Another option is to use setting `rawClient: true` - see [Connecting to targets 
 
 ## External links
 
-README in progress.
+| Description                                  | Link                                                    |
+| -------------------------------------------- | ------------------------------------------------------- |
+| ADS client for Node-RED                      | https://github.com/jisotalo/node-red-contrib-ads-client |
+| ADS server for Node.js                       | https://github.com/jisotalo/ads-server                  |
+| IEC 61131-3 PLC data type helper for Node.js | https://github.com/jisotalo/iec-61131-3/                |
+| Codesys client for Node.js                   | https://github.com/jisotalo/codesys-client/             |
+
 
 ## Library testing
 
