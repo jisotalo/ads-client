@@ -657,11 +657,11 @@ The dereferenced value of a reference (`REFERENCE TO`) or a pointer (`POINTER TO
 
 ```js
 //Reading a raw POINTER value (Note the dereference operator ^)
-const rawPtrValue = await client.readRawByPath('GVL_Read.ComplexTypes.POINTER_^');
+const value = await client.readRawByPath('GVL_Read.ComplexTypes.POINTER_^');
 
 //Converting to a Javascript object
-const ptrValue = await client.convertFromRaw(rawPtrValue, 'ST_StandardTypes');
-console.log(ptrValue);
+const value = await client.convertFromRaw(rawValue, 'ST_StandardTypes');
+console.log(value);
 /* 
 {
   BOOL_: true,
@@ -677,11 +677,11 @@ console.log(ptrValue);
 
 ```js
 //Reading a raw REFERENCE value
-const rawRefValue = await client.readRawByPath('GVL_Read.ComplexTypes.REFERENCE_');
+const rawValue = await client.readRawByPath('GVL_Read.ComplexTypes.REFERENCE_');
 
 //Converting to a Javascript object
-const refValue = await client.convertFromRaw(rawRefValue, 'ST_StandardTypes');
-console.log(refValue);
+const value = await client.convertFromRaw(rawValue, 'ST_StandardTypes');
+console.log(value);
 /* 
 {
   BOOL_: true,
@@ -697,13 +697,13 @@ console.log(refValue);
 
 ```js
 //Reading a POINTER value (Note the dereference operator ^)
-const ptrHandle = await client.createVariableHandle('GVL_Read.ComplexTypes.POINTER_^');
-const rawPtrValue = await client.readRawByHandle(ptrHandle);
-await client.deleteVariableHandle(ptrHandle);
+const handle = await client.createVariableHandle('GVL_Read.ComplexTypes.POINTER_^');
+const rawValue = await client.readRawByHandle(handle);
+await client.deleteVariableHandle(handle);
 
 //Converting to a Javascript object
-const ptrValue = await client.convertFromRaw(rawPtrValue, 'ST_StandardTypes');
-console.log(ptrValue);
+const value = await client.convertFromRaw(rawValue, 'ST_StandardTypes');
+console.log(value);
 /* 
 {
   BOOL_: true,
@@ -719,13 +719,13 @@ console.log(ptrValue);
 
 ```js
 //Reading a REFERENCE value
-const refHandle = await client.createVariableHandle('GVL_Read.ComplexTypes.REFERENCE_');
-const rawRefValue = await client.readRawByHandle(refHandle);
-await client.deleteVariableHandle(refHandle);
+const handle = await client.createVariableHandle('GVL_Read.ComplexTypes.REFERENCE_');
+const rawValue = await client.readRawByHandle(handle);
+await client.deleteVariableHandle(handle);
 
 //Converting to a Javascript object
-const refValue = await client.convertFromRaw(rawRefValue, 'ST_StandardTypes');
-console.log(refValue);
+const value = await client.convertFromRaw(rawValue, 'ST_StandardTypes');
+console.log(value);
 /* 
 {
   BOOL_: true,
@@ -779,7 +779,7 @@ await client.writeValue('GVL_Write.ComplexTypes.STRUCT_', {
 
 **Writing STRUCT (some properties only)**
 
-All other properties will keep their values (read before writing).
+All other properties will keep their values. The client reads the active value first and then makes changes.
 
 ```js
 await client.writeValue('GVL_Write.ComplexTypes.STRUCT_', {
@@ -804,7 +804,7 @@ await client.writeValue('GVL_Write.ComplexTypes.BLOCK_2', timerBlock);
 
 **Writing FUNCTION_BLOCK (some properties only)**
 
-All other properties will keep their values (read before writing).
+All other properties will keep their values. The client reads the active value first and then makes changes.
 
 ```js
 await client.writeValue('GVL_Write.ComplexTypes.BLOCK_2', {
@@ -834,7 +834,7 @@ await client.writeValue('GVL_Write.ComplexTypes.ENUM_', 100);
 
 ### Writing raw data
 
-Use [`writeRaw()`](https://jisotalo.fi/ads-client/classes/Client.html#writeRaw) or [`writeRawByPath()`](https://jisotalo.fi/ads-client/classes/Client.html#writeRawByPath) to write any PLC value using raw data. The raw data in this context means received bytes (a `Buffer` object).
+Use [`writeRaw()`](https://jisotalo.fi/ads-client/classes/Client.html#writeRaw) or [`writeRawByPath()`](https://jisotalo.fi/ads-client/classes/Client.html#writeRawByPath) to write any PLC value using raw data. The raw data in this context means bytes (a `Buffer` object).
 
 The only exception is the dereferenced value of a reference/pointer, see [Reading reference/pointer](#reading-referencepointer).
 
@@ -863,56 +863,81 @@ await client.writeRawByPath('GVL_Write.StandardTypes.INT_', data);
 ### Writing reference/pointer
 
 The dereferenced value of a reference (`REFERENCE TO`) or a pointer (`POINTER TO`) can be written
-using [`writeRawByPath()`](https://jisotalo.fi/ads-client/classes/Client.html#writeRawByPath).
+with [`writeRawByPath()`](https://jisotalo.fi/ads-client/classes/Client.html#writeRawByPath) or by using [variable handles](https://jisotalo.fi/ads-client/classes/Client.html#createVariableHandle).
+
+**Writing POINTER (writeRawByPath())**
 
 ```js
-try {
-  //Writing a POINTER value
-  const ptrValue = {...} //some value
-  const rawPtrValue = await client.convertToRaw(ptrValue, 'ST_StandardTypes');
+const value = {
+  BOOL_: true,
+  BOOL_2: false,
+  BYTE_: 255,
+  WORD_: 65535,
+  //...and so on
+};
+const rawValue = await client.convertToRaw(value, 'ST_StandardTypes');
 
-  await client.writeRawByPath('GVL_Write.ComplexTypes.POINTER_^', rawPtrValue);
-
-  //Writing a REFERENCE value  
-  const refValue = {...} //some value
-  const rawRefValue = await client.convertToRaw(refValue, 'ST_StandardTypes');
-  await client.writeRawByPath('GVL_Write.ComplexTypes.REFERENCE_', rawRefValue);
-
-} catch (err) {
-  console.log("Error:", err);
-}
+//Writing a raw POINTER value (Note the dereference operator ^)
+await client.writeRawByPath('GVL_Write.ComplexTypes.POINTER_^', rawValue);
 ```
 
-Another way is to use [variable handles](https://jisotalo.fi/ads-client/classes/Client.html#createVariableHandle).
+**Writing REFERENCE (writeRawByPath())**
 
 ```js
-try {
-  //Writing a POINTER value (Note the dereference operator ^)
-  const ptrValue = {...} //some value
-  const rawPtrValue = await client.convertToRaw(ptrValue, 'ST_StandardTypes');
+const value = {
+  BOOL_: true,
+  BOOL_2: false,
+  BYTE_: 255,
+  WORD_: 65535,
+  //...and so on
+};
+const rawValue = await client.convertToRaw(value, 'ST_StandardTypes');
 
-  const ptrHandle = await client.createVariableHandle('GVL_Write.ComplexTypes.POINTER_^');
-  await client.writeRawByHandle(ptrHandle, rawPtrValue);
-  await client.deleteVariableHandle(ptrHandle);
+//Writing a raw REFERENCE value
+await client.writeRawByPath('GVL_Write.ComplexTypes.REFERENCE_', rawValue);
+```
 
-  //Writing a REFERENCE value
-  const refValue = {...} //some value
-  const rawRefValue = await client.convertToRaw(refValue, 'ST_StandardTypes');
+**Writing POINTER (variable handle)**
 
-  const refHandle = await client.createVariableHandle('GVL_Write.ComplexTypes.REFERENCE_');
-  await client.writeRawByHandle(refHandle, rawRefValue);
-  await client.deleteVariableHandle(refHandle);
+```js
+const value = {
+  BOOL_: true,
+  BOOL_2: false,
+  BYTE_: 255,
+  WORD_: 65535,
+  //...and so on
+};
+const rawValue = await client.convertToRaw(value, 'ST_StandardTypes');
 
-} catch (err) {
-  console.log("Error:", err);
-}
+//Writing a raw POINTER value (Note the dereference operator ^)
+const handle = await client.createVariableHandle('GVL_Write.ComplexTypes.POINTER_^');
+await client.writeRawByHandle(handle, rawValue);
+await client.deleteVariableHandle(handle);
+```
+
+**Writing REFERENCE (variable handle)**
+
+```js
+const value = {
+  BOOL_: true,
+  BOOL_2: false,
+  BYTE_: 255,
+  WORD_: 65535,
+  //...and so on
+};
+const rawValue = await client.convertToRaw(value, 'ST_StandardTypes');
+
+//Writing a raw REFERENCE value
+const handle = await client.createVariableHandle('GVL_Write.ComplexTypes.POINTER_');
+await client.writeRawByHandle(handle, rawValue);
+await client.deleteVariableHandle(handle);
 ```
 
 ## Subscribing to value changes
 
-In ads-client, subscriptions are used to handle ADS notifications.
+In ads-client, subscriptions are used to handle ADS notifications. ADS notifications are data sent by PLC automatically without request. For example, the latest value of a variable every second.
 
-By subscribing to a variable value changes, the target system (PLC) will send ADS notifications when the value changes (or every x milliseconds). The client then receives these notifications and calls the callback function with the latest value.
+By subscribing to a variable value changes, the target system (PLC) will send ADS notifications when the value changes (or every x milliseconds). The client then receives these notifications and calls the user callback function with the latest value.
 
 More information about ADS notifications at [Beckhoff Infosys: Use of ADS Notifications](https://infosys.beckhoff.com/content/1033/tc3_ads.net/9407523595.html?id=431879546285476216).
 
@@ -920,113 +945,104 @@ More information about ADS notifications at [Beckhoff Infosys: Use of ADS Notifi
 
 Use [`subscribeValue()`](https://jisotalo.fi/ads-client/classes/Client.html#subscribeValue) or [`subscribe()`](https://jisotalo.fi/ads-client/classes/Client.html#subscribe) to subscribe to PLC variable value changes.
 
-Example: Subscribe to changes of `GVL_Subscription.NumericValue_10ms`. The callback is called when the PLC value changes (at maximum every 100 milliseconds).
-```js
-try {
-  const sub = await client.subscribeValue(
-    'GVL_Subscription.NumericValue_10ms',
-    (data, subscription) => {
-      console.log(`Value of ${subscription.symbol.name} has changed: ${data.value}`);
-    },
-    100
-  );
+**Example**
 
-} catch (err) {
-  console.log("Error:", err);
+Subscribing to changes of `GVL_Subscription.NumericValue_10ms`. The callback is called when the PLC value changes (at maximum every 100 milliseconds).
+
+```js
+const onValueChanged = (data, subscription) => {
+  console.log(`Value of ${subscription.symbol.name} has changed: ${data.value}`);
 }
+
+const subscription = await client.subscribeValue(
+  'GVL_Subscription.NumericValue_10ms',
+  onValueChanged,
+  100 
+);
 ```
 
-Example: Subscribe to value of `GVL_Subscription.NumericValue_1000ms`. The callback is called with the latest value every 100 milliseconds (changed or not).
+**Example**
+
+Subscribing to value of `GVL_Subscription.NumericValue_1000ms`. The callback is called with the latest value every 100 milliseconds (doesn't matter if the value has changed or not).
 
 ```js
-try {
-  const valueChanged = (data, subscription) => {
-    console.log(`Value of ${subscription.symbol.name}: ${data.value}`);
-  }
-
-  const sub = await client.subscribeValue(
-    'GVL_Subscription.NumericValue_1000ms',
-    valueChanged,
-    100,
-    false
-  );
-
-} catch (err) {
-  console.log("Error:", err);
+const onValueReceived = (data, subscription) => {
+  console.log(`Value of ${subscription.symbol.name} is: ${data.value}`);
 }
+
+const subscription = await client.subscribeValue(
+  'GVL_Subscription.NumericValue_1000ms',
+  onValueReceived,
+  100,
+  false 
+);
+
 ```
 
-Example: Same as previous example but using [`subscribe()`](https://jisotalo.fi/ads-client/classes/Client.html#subscribe) and Typescript type for the variable value. A type can be provided for `subscribeValue<T>()` as well.
+**Typescript example**
+
+Same as previous example, but with [`subscribe()`](https://jisotalo.fi/ads-client/classes/Client.html#subscribe) instead. A type can be provided for `subscribeValue<T>()` as well.
 
 ```js
-//NOTE: Typescript
-try {
-  const valueChanged = (data, subscription) => {
-    //data.value is typed as "number" instead of "any" (see subscribe() call below)
-    console.log(`Value of ${subscription.symbol.name}: ${data.value}`);
-  }
-
-  const sub = await client.subscribe<number>({
-    target: 'GVL_Subscription.NumericValue_1000ms',
-    callback: valueChanged,
-    cycleTime: 100,
-    sendOnChange: false
-  });
-
-} catch (err) {
-  console.log("Error:", err);
-}
+const subscription = await client.subscribe<number>({
+  target: 'GVL_Subscription.NumericValue_1000ms',
+  callback: (data, subscription) => {
+    //data.value is typed as "number" instead of "any"
+    console.log(`Value of ${subscription.symbol.name} is: ${data.value}`);
+  },
+  cycleTime: 100,
+  sendOnChange: false
+});
 ```
 
 ### Raw data
 
 Use [`subscribeRaw()`](https://jisotalo.fi/ads-client/classes/Client.html#subscribeRaw) or [`subscribe()`](https://jisotalo.fi/ads-client/classes/Client.html#subscribe) to subscribe to raw value changes.
 
-The `indexGroup` and `indexOffset` can be acquired for example by using [`getSymbol()`](https://jisotalo.fi/ads-client/classes/Client.html#getSymbol).
+The `indexGroup` and `indexOffset` can be acquired by using [`getSymbol()`](https://jisotalo.fi/ads-client/classes/Client.html#getSymbol).
 
-Example: Subscribe to raw address of `indexGroup` = 16448, `indexOffset` = 414816 and `size` = 2 bytes.
+**Example**
+
+Subscribing to raw address of `indexGroup` = 16448 and `indexOffset` = 414816 (2 bytes).
   
 ```js
-try {
-  await client.subscribeRaw(16448, 414816, 2, (data, subscription) => {
-    console.log(`Value has changed: ${data.value.toString('hex')}`);
-  }, 100);
-
-} catch (err) {
-  console.log("Error:", err);
-}
+await client.subscribeRaw(16448, 414816, 2, (data, subscription) => {
+  console.log(`Value has changed: ${data.value.toString('hex')}`);
+}, 100);
 ```
 
-Same using [`subscribe()`](https://jisotalo.fi/ads-client/classes/Client.html#subscribe):
-```js
-try {
-  await client.subscribe({
-    target: {
-      indexGroup: 16448,
-      indexOffset: 414816,
-      size: 2
-    },
-    callback: (data, subscription) => {
-      console.log(`Value has changed: ${data.value.toString('hex')}`);
-    },
-    cycleTime: 100
-  });
+**Example**
 
-} catch (err) {
-  console.log("Error:", err);
-}
+Same as previous example, but with [`subscribe()`](https://jisotalo.fi/ads-client/classes/Client.html#subscribe) instead.
+
+```js
+await client.subscribe({
+  target: {
+    indexGroup: 16448,
+    indexOffset: 414816,
+    size: 2
+  },
+  callback: (data, subscription) => {
+    console.log(`Value has changed: ${data.value.toString('hex')}`);
+  },
+  cycleTime: 100
+});
 ```
 
 ### Unsubscribing
 
-Subscriptions should always be cancelled when no longer needed (to save PLC resources). Use [`unsubscribe()`](https://jisotalo.fi/ads-client/classes/Client.html#unsubscribe) or subscription object's [`ActiveSubscription.unsubscribe()`](https://jisotalo.fi/ads-client/interfaces/ActiveSubscription.html#unsubscribe) to unsubscribe.
+Subscriptions should always be cancelled when no longer needed (to save PLC resources). 
+
+To unsubscribe, use [`unsubscribe()`](https://jisotalo.fi/ads-client/classes/Client.html#unsubscribe) or subscription object's [`ActiveSubscription.unsubscribe()`](https://jisotalo.fi/ads-client/interfaces/ActiveSubscription.html#unsubscribe).
 
 ```js
-const sub = await client.subscribeValue(...);
+const subscription = await client.subscribeValue(...);
 
 //Later when no longer needed
-await sub.unsubscribe();
-//or await client.unsubscribe(sub);
+await subscription.unsubscribe();
+
+//Or alternatively
+await client.unsubscribe(subscription);
 ```
 
 ## Using variable handles
