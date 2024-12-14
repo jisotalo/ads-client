@@ -1,10 +1,8 @@
 # ads-client
 
-
 [![npm version](https://img.shields.io/npm/v/ads-client)](https://www.npmjs.org/package/ads-client) 
 [![GitHub](https://img.shields.io/badge/View%20on-GitHub-brightgreen)](https://github.com/jisotalo/ads-client)
 [![License](https://img.shields.io/github/license/jisotalo/ads-client)](https://choosealicense.com/licenses/mit/)
-
 
 Beckhoff TwinCAT ADS client library for Node.js (unofficial). 
 
@@ -14,12 +12,14 @@ If you are using Node-RED, check out the [node-red-contrib-ads-client](https://w
 
 # Project status
 
-XX.12.2024 - version 2 released!
+14.12.2024 - version 2 released!
 
 - Rewritten in Typescript
 - See [CHANGELOG.md](https://github.com/jisotalo/ads-client/blob/v2-dev/CHANGELOG.md) for details.
 - See [MIGRATION.md](https://github.com/jisotalo/ads-client/blob/v2-dev/MIGRATION.md) for guide of migrating v1 -> v2 (**breaking changes!**)
 - See the new [documentation](https://jisotalo.fi/ads-client/classes/Client.html)
+
+Documentation for legacy version 1.4.4 is archived at [https://archive.ph/Sswco](https://archive.ph/Sswco).
 
 # Features
 - Supports TwinCAT 2 and 3
@@ -40,6 +40,7 @@ XX.12.2024 - version 2 released!
 - [Table of contents](#table-of-contents)
 - [Support](#support)
 - [Installing](#installing)
+- [Minimal example (TLDR)](#minimal-example-tldr)
 - [Connection setup](#connection-setup)
   - [Setup 1 - Connect from Windows](#setup-1---connect-from-windows)
   - [Setup 2 - Connect from Linux/Windows](#setup-2---connect-from-linuxwindows)
@@ -80,19 +81,24 @@ XX.12.2024 - version 2 released!
     - [Converting a raw value to a Javascript object](#converting-a-raw-value-to-a-javascript-object)
     - [Converting a Javascript object to a raw value](#converting-a-javascript-object-to-a-raw-value)
   - [Other features](#other-features)
+    - [ADS sum commands](#ads-sum-commands)
+    - [Starting and stopping a PLC](#starting-and-stopping-a-plc)
+    - [Starting and stopping TwinCAT system](#starting-and-stopping-twincat-system)
+    - [Client events](#client-events)
+    - [Debugging](#debugging)
   - [Disconnecting](#disconnecting)
-  - [FAQ](#faq)
-    - [Lot's of connection issues and timeouts](#lots-of-connection-issues-and-timeouts)
+  - [Common issues and questions](#common-issues-and-questions)
+    - [There are lot's of connection issues and timeouts](#there-are-lots-of-connection-issues-and-timeouts)
     - [Getting `TypeError: Do not know how to serialize a BigInt`](#getting-typeerror-do-not-know-how-to-serialize-a-bigint)
     - [Can I connect from Raspberry Pi to TwinCAT?](#can-i-connect-from-raspberry-pi-to-twincat)
     - [Receiving ADS error 1808 `Symbol not found` even when it should be found](#receiving-ads-error-1808-symbol-not-found-even-when-it-should-be-found)
     - [Having timeouts or 'mailbox is full' errors](#having-timeouts-or-mailbox-is-full-errors)
     - [Having problems to connect from OSX or Raspberry Pi to target PLC](#having-problems-to-connect-from-osx-or-raspberry-pi-to-target-plc)
     - [A data type is not found even when it should be](#a-data-type-is-not-found-even-when-it-should-be)
-    - [ClientException: Connection failed: Device system manager state read failed](#clientexception-connection-failed-device-system-manager-state-read-failed)
+    - [Connection failed - failed to set PLC connection](#connection-failed---failed-to-set-plc-connection)
     - [Connection failed (error EADDRNOTAVAIL)](#connection-failed-error-eaddrnotavail)
     - [Problems running ads-client with docker](#problems-running-ads-client-with-docker)
-    - [How to connect to PLC that is in CONFIG mode?](#how-to-connect-to-plc-that-is-in-config-mode)
+    - [How to connect to a PLC that is in CONFIG mode?](#how-to-connect-to-a-plc-that-is-in-config-mode)
     - [Issues with TwinCAT 2 low-end devices (BK9050, BC9050 etc.)](#issues-with-twincat-2-low-end-devices-bk9050-bc9050-etc)
   - [External links](#external-links)
   - [Library testing](#library-testing)
@@ -121,7 +127,7 @@ If you need help with integrating the ads-client, I'm available for coding work 
 Install the [npm package](https://www.npmjs.com/package/ads-client):
 
 ```
-npm install ads-client@beta
+npm install ads-client
 ```
 
 Include the module in your code:
@@ -153,17 +159,22 @@ client.connect()
     console.log(`Connected to the ${res.targetAmsNetId}`);
     console.log(`Router assigned us AmsNetId ${res.localAmsNetId} and port ${res.localAdsPort}`);
 
-    //Reading a value
-    const read = await client.readValue('GVL_Global.StringValue');
-    console.log('Value read (before):', read.value); 
+    try {
+      //Reading a value
+      const read = await client.readValue('GVL_Global.StringValue');
+      console.log('Value read (before):', read.value); 
 
-    //Writing a value
-    await client.writeValue('GVL_Global.StringValue', 'This is a new value');
+      //Writing a value
+      await client.writeValue('GVL_Global.StringValue', 'This is a new value');
 
-    //Reading a value
-    const read2 = await client.readValue('GVL_Global.StringValue');
-    console.log('Value read (after):', read2.value); 
+      //Reading a value
+      const read2 = await client.readValue('GVL_Global.StringValue');
+      console.log('Value read (after):', read2.value); 
 
+    } catch (err) {
+      console.log('Something failed:', err);
+    }
+    
     //Disconnecting
     await client.disconnect();
     console.log('Disconnected');

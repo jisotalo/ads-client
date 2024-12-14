@@ -37,18 +37,18 @@
     "url": "https://github.com/jisotalo/ads-client.git"
   },
   "dependencies": {
-    "debug": "^4.3.5",
+    "debug": "^4.4.0",
     "iconv-lite": "^0.6.3",
     "long": "^5.2.3"
   },
   "devDependencies": {
     "@tsconfig/node16": "^16.1.3",
     "@types/debug": "^4.1.12",
-    "@types/jest": "^29.5.12",
-    "@types/node": "^20.14.12",
+    "@types/jest": "^29.5.14",
+    "@types/node": "^22.10.2",
     "jest": "^29.7.0",
-    "typedoc": "^0.26.5",
-    "typescript": "^5.5.4"
+    "typedoc": "^0.27.4",
+    "typescript": "^5.7.2"
   },
   "files": [
     "dist/",
