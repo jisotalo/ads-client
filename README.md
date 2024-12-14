@@ -9,15 +9,15 @@ Beckhoff TwinCAT ADS client library for Node.js (unofficial). Connects to Beckho
 
 Coded from scratch using [TwinCAT ADS specification](https://infosys.beckhoff.com/content/1033/tc3_ads_intro/116157835.html?id=124964102706356243) and [Beckhoff.TwinCAT.Ads nuget package](https://www.nuget.org/packages/Beckhoff.TwinCAT.Ads/5.0.0-preview6). Inspiration from similar projects like [node-ads](https://www.npmjs.com/package/node-ads), [beckhoff-js](https://www.npmjs.com/package/beckhoff-js) and [iecstruct](https://www.npmjs.com/package/iecstruct).
 
-There is automatically created documentation available at https://jisotalo.fi/ads-client/
+There is automatically created documentation available at https://archive.ph/Sswco
 
-# Version 2 will be released soon
+# Legacy version
 
-The 1.4.4 is the the last version for v1, unless some bugs need fixing.
+This is a branch for legacy version (v1), which is no longer supported.
 
-<span style="color:red; font-weight:bold;">It might be a good idea to use the version 2 beta for new projects. It will no longer have breaking changes and it's basically ready!</span>
+See [https://archive.ph/Sswco](https://archive.ph/Sswco) for archived documentation.
 
-See [`v2-dev`](https://github.com/jisotalo/ads-client/tree/v2-dev) branch for more info. It's a full rewrite in in TypeScript and it can be installed from npm (`npm i ads-client@beta`). 
+To install, use `npm i ads-client@1.4.4`.
 
 # Supporting
 
