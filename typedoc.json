@@ -1,0 +1,22 @@
+{
+  "$schema": "https://typedoc.org/schema.json",
+  "entryPoints": ["./src/ads-client.ts"],
+  "out": "docs",
+  "excludeExternals": true,
+  "disableSources": true,
+  "navigationLeaves": [],
+  "navigation": {
+    "includeCategories": true
+  },
+  "searchInDocuments": true,
+  "searchInComments": true,
+  "visibilityFilters": {},
+  "navigationLinks": {
+    "Documentation": "https://jisotalo.fi/ads-client/classes/Client.html",
+    "README": "https://jisotalo.fi/ads-client/index.html",
+    "Discussion & Support": "https://github.com/jisotalo/ads-client/discussions",
+    "GitHub": "https://github.com/jisotalo/ads-client/",
+    "NPM": "https://www.npmjs.com/package/ads-client/",
+  },
+  "name": "ads-client | Beckhoff TwinCAT ADS client library for Node.js"
+}

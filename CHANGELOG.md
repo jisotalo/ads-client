@@ -4,14 +4,140 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.14.4] - 03.10.2023
-### Changed
-- Bug fix: Changed RPC method flags from 16-bit to 32-bit
-- Bug fix: Fix RPC method parsing in TwinCAT 4026
+## [2.0.0] - 14.12.2024
+**IMPORTANT:** This is a major version update. There are lots of **breaking changes**! 
 
-See [PR #127](https://github.com/jisotalo/ads-client/pull/127) for details.
+<u>**Updating v1 -> v2 requires manual changes to your codebase!**</u>
 
-Thank you [icon-bobk](https://github.com/icon-bobk) for contribution!
+See [MIGRATION.md](MIGRATION.md) for all breaking changes and follow the instructions. 
+
+### Special thanks
+- Special thanks to [Christian Rishøj](https://github.com/crishoj) for valuable contribution!
+
+### Changes
+- Everything rewritten in TypeScript
+- Everything is tested before releasing
+- Lots of optimizations
+- Lots of name changes
+- New methods: `resetPlc()`, `readWriteRawMulti()`, `writeRawByPath()`, `readValueBySymbol()`, `writeValueBySymbol()`
+- New setting `disableCaching`: disables all symbol and data type caching
+- Added optional `targetOpts` argument in **all methods**
+  - Possible to provide different target address (AmsNetId and/or AdsPort) than specified in the settings
+  - Caching is only available for the original target provided in settings
+  - The same client can be used for many different targets at the same time
+- Added support for reading/writing `INTERFACE` data types
+- Added support for reading/writing empty `FUNCTION_BLOCK`s
+- Added support for reading/writing `BIT` data type
+- Writing a `STRING` or `WSTRING` value that is longer than the target data type causes the string to be truncated.
+  - Previously the string end character was lost, which caused "never ending string" and `<Value of the expression cannot be retrieved` in PLC online view.
+  - E.g. writing 85 bytes of string to `STRING(80)` variable
+- `BOOL` and `BIT` data values are now true if the value is anything else than 0
+  - In TwinCAT, `BOOL` is true if the value is anything else than zero (see [x_TO_BOOL](https://infosys.beckhoff.com/english.php?content=../content/1033/tc3_plc_intro/2529047435.html&id=))
+  - Before, ads-client set the value to true only if value was true or 1, otherwise it was 0
+- `writeControl()` accepts also string values for `adsState`
+- Added support for UTF-8 encoded ADS symols
+  - Required for TwinCAT 3.1.4026 support
+  - Required for TwinCAT 3.1.4022/3.1.4024 with  `UTF-8 Encoding` checked under `TwinCAT XAE -> SYSTEM -> Settings -> ADS Symbolic`.
+- Added new `metaData.adsSymbolsUseUtf8`
+  - Set `true` if target system is using UTF-8 for ADS symbol encoding
+- Added new setting `forceUtf8ForAdsSymbols` (default: `false`)
+  - If set, client always handles ADS symbols as UTF-8 encoded
+  - Otherwise tries to detect the encoding or fallbacks to cp1252
+- `readPlcUploadInfo()` updated to support new version 3 upload info (inc. ADS symbol encoding info)
+  - Also added support for old version 1 upload info (perhaps old TC2 devices..?)
+- New method `sendAdsCommandWithFallback()`
+  - Calls `sendAdsCommand()` with a specific command. If it fails to certain ADS errors, tries the fallback command.
+- Added test suites for TwinCAT 2
+  - Separate TwinCAT 2 test PLC project created (See [https://github.com/jisotalo/ads-client-test-plc-project/tree/v2-dev](https://github.com/jisotalo/ads-client-test-plc-project/tree/v2-dev))
+  - Updated tests to work with TC2 (and removed tests for TC2 unsupported features)
+- Added `warning` event to listen for console warnings
+
+## [2.0.0 beta releases]
+<details>
+<summary>Click to display release notes of 2.0.0-beta1...2.0.0-beta5</summary>
+
+## [2.0.0-beta.6] - 14.12.2024
+- Final release before releasing 2.0.0 stable
+
+## [2.0.0-beta.5] - 25.11.2024
+- Added support for UTF-8 encoded ADS symols
+  - Required for TwinCAT 3.1.4026 support
+  - Required for TwinCAT 3.1.4022/3.1.4024 with  `UTF-8 Encoding` checked under `TwinCAT XAE -> SYSTEM -> Settings -> ADS Symbolic`.b
+- Added new `metaData.adsSymbolsUseUtf8`
+  - Set `true` if target system is using UTF-8 for ADS symbol encoding
+- Added new setting `forceUtf8ForAdsSymbols` (default: `false`)
+  - If set, client always handles ADS symbols as UTF-8 encoded
+  - Otherwise tries to detect the encoding or fallbacks to cp1252
+- `readPlcUploadInfo()` updated to support new version 3 upload info (inc. ADS symbol encoding info)
+  - Also added support for old version 1 upload info (perhaps old TC2 devices..?)
+- New method `sendAdsCommandWithFallback()`
+  - Calls `sendAdsCommand()` with a specific command. If it fails to certain ADS errors, tries the fallback command.
+- Bug fix: If RPC method parameter had attributes, error was thrown
+- Bug fix: If RPC method parameter had multiple flags, error was thrown (`Response with ADS error received (error 1797 - Parameter size not correct)`)
+- When calling `readPlcRuntimeState()` and state has changed, event `plcRuntimeStateChange` is emitted (previously emitted only if notification received from PLC)
+  - See [issue #159](https://github.com/jisotalo/ads-client/issues/159)
+- `startPlc()`, `resetPlc()`, `stopPlc()` and `restartPlc()` call `readPlcRuntimeState()` afterwards to update the runtime state to metadata (and to emit event if needed) 
+  - See [issue #159](https://github.com/jisotalo/ads-client/issues/159)
+- Added support for ENUM value comments and attributes (TwinCAT 3.1.4026 and newer)
+  - See [issue #163](https://github.com/jisotalo/ads-client/issues/163)
+  
+## [2.0.0-beta.4] - 02.10.2024
+- Improved TwinCAT 2 support
+  - Improved performance by caching base data types that aren't available in the PLC (for example, `INT16` in TC2)
+  - Bug fix: Building data types for TC2 system didn't always work (`DataType` flag is not set in base types)
+  - Bug fix: Building data types for TC2 system didn't always work (with arrays of base types)
+- Added test suites for TwinCAT 2
+  - Separate TwinCAT 2 test PLC project created (See [https://github.com/jisotalo/ads-client-test-plc-project/tree/v2-dev](https://github.com/jisotalo/ads-client-test-plc-project/tree/v2-dev))
+  - Updated tests to work with TC2 (and removed tests for TC2 unsupported features)
+- Bug fix: Client failed to disconnect when using [AdsRouterConsole](https://github.com/Beckhoff/TF6000_ADS_DOTNET_V5_Samples/tree/main/Sources/RouterSamples/AdsRouterConsoleApp) as a TwinCAT router
+  - Client now waits for port unregistering response, if the connection is not dropped immediately
+
+Thank you [Christian Rishøj](https://github.com/crishoj) for contribution!
+
+## [2.0.0-beta.3] - 10.09.2024
+- **BREAKING:** Renamed `ReadWriteRawMultiCommand` property `writeData` to `value`
+- Added `warning` event to listen for console warnings
+- Bugfix: `writeRawByPath()` didn't use the `targetOpts` parameter
+- Type `ClientEvents` renamed to `AdsClientEvents`
+- Added automatic deletion of stale subscriptions / unknown ADS notification handles
+  - New setting: `deleteUnknownSubscriptions` (default: `true`)
+
+Thank you [Christian Rishøj](https://github.com/crishoj) for contribution!
+
+## [2.0.0-beta.2] - 26.08.2024
+- Changed `subscribeSymbol()` -> `subscribeValue()`
+- Bug fix: Fixing [issue #144](https://github.com/jisotalo/ads-client/issues/144)
+
+## [2.0.0-beta.1] - 24.08.2024
+**IMPORTANT:** This is a major version update. There are lots of **breaking changes**! 
+
+<u>**Updating v1 -> v2 requires manual changes to your codebase!**</u>
+
+See [MIGRATION.md](MIGRATION.md) for all breaking changes and follow the instructions. This changelog does not have breaking changes listed for 2.0.0.
+
+### Changes
+- Everything rewritten in TypeScript
+- Everything is tested before releasing
+- Lots of optimizations
+- Lots of name changes
+- New methods: `resetPlc()`, `readWriteRawMulti()`, `writeRawByPath()`, `readValueBySymbol()`, `writeValueBySymbol()`
+- New setting `disableCaching`: disables all symbol and data type caching
+- Added optional `targetOpts` argument in **all methods**
+  - Possible to provide different target address (AmsNetId and/or AdsPort) than specified in the settings
+  - Caching is only available for the original target provided in settings
+  - The same client can be used for many different targets at the same time
+- Added support for reading/writing `INTERFACE` data types
+- Added support for reading/writing empty `FUNCTION_BLOCK`s
+- Added support for reading/writing `BIT` data type
+- Writing a `STRING` or `WSTRING` value that is longer than the target data type causes the string to be truncated.
+  - Previously the string end character was lost, which caused "never ending string" and `<Value of the expression cannot be retrieved` in PLC online view.
+  - E.g. writing 85 bytes of string to `STRING(80)` variable
+- `BOOL` and `BIT` data values are now true if the value is anything else than 0
+  - In TwinCAT, `BOOL` is true if the value is anything else than zero (see [x_TO_BOOL](https://infosys.beckhoff.com/english.php?content=../content/1033/tc3_plc_intro/2529047435.html&id=))
+  - Before, ads-client set the value to true only if value was true or 1, otherwise it was 0
+- `writeControl()` accepts also string values for `adsState`
+
+</details>
 
 ## [1.14.3] - 23.09.2023
 ### Changed
@@ -50,6 +176,7 @@ Thank you [icon-bobk](https://github.com/icon-bobk) for contribution!
 - Bug fix: Connecting to local router failed with ECONNREFUSED error on Node.js version 17 and newer
   - See [https://github.com/nodejs/node/issues/40702](https://github.com/nodejs/node/issues/40702)
   - Fixed by using `127.0.0.1` instead of `localhost`
+
 
 ## [1.14.0] - 23.07.2022
 ### Added
