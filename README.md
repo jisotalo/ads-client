@@ -17,8 +17,8 @@ There is automatically created documentation available at https://jisotalo.fi/ad
 14.12.2024 - version 2 released!
 
 - Rewritten in Typescript
-- See [CHANGELOG.md](https://github.com/jisotalo/ads-client/blob/v2-dev/CHANGELOG.md) for details.
-- See [MIGRATION.md](https://github.com/jisotalo/ads-client/blob/v2-dev/MIGRATION.md) for guide of migrating v1 -> v2 (**breaking changes!**)
+- See [CHANGELOG.md](https://github.com/jisotalo/ads-client/blob/master/CHANGELOG.md) for details.
+- See [MIGRATION.md](https://github.com/jisotalo/ads-client/blob/master/MIGRATION.md) for guide of migrating v1 -> v2 (**breaking changes!**)
 - See the new [documentation](https://jisotalo.fi/ads-client/classes/Client.html)
 
 See [`legacy-v1` branch](https://github.com/jisotalo/ads-client/tree/legacy-v1) for previous/legacy version 1.4.4.
@@ -1125,12 +1125,12 @@ These are my own observations.
 
 These examples use `FB_RPC` from the test PLC project at [https://github.com/jisotalo/ads-client-test-plc-project](https://github.com/jisotalo/ads-client-test-plc-project). 
 
-![](https://raw.githubusercontent.com/jisotalo/ads-client/refs/heads/v2-dev/img/fb_rpc.png)
+![](https://github.com/jisotalo/ads-client/blob/master/img/fb_rpc.png?raw=true)
 
 There is an instance of the function block at `GVL_RPC.RpcBlock`.
 
 ### RPC method with standard data types
-
+conn
 The `Calculator()` method calculates sum, product and division of the input values. The method returns `true`, if all calculations were successful.
 ```
 {attribute 'TcRpcEnable'}
@@ -1469,7 +1469,7 @@ This prevents regression, thus updating the ads-client should be always safe.
 There are separate tests for TwinCAT 2 and TwinCAT 3.
 
 PLC projects for running test suites are located in the following repository:
-[https://github.com/jisotalo/ads-client-test-plc-project/tree/v2-dev](https://github.com/jisotalo/ads-client-test-plc-project/tree/v2-dev).
+[https://github.com/jisotalo/ads-client-test-plc-project](https://github.com/jisotalo/ads-client-test-plc-project).
 
 ### TwinCAT 3 tests
 
