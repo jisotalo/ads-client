@@ -301,7 +301,7 @@ const client = new Client({
 
 It's also possible to run the client in a docker containers, also with a separate router (Linux systems).
 
-I'm available for coding work if you need help with this. See [Supporting](#supporting)
+I'm available for coding work if you need help with this. See [Support](#support)
 
 # Important 
 
