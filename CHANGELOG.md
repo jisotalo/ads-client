@@ -9,7 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <u>**Updating v1 -> v2 requires manual changes to your codebase!**</u>
 
-See [MIGRATION.md](MIGRATION.md) for all breaking changes and follow the instructions. This changelog does not have breaking changes listed for 2.0.0.
+See [MIGRATION.md](MIGRATION.md) for all breaking changes and follow the instructions. 
+
+### Special thanks
+- Special thanks to [Christian Rishøj](https://github.com/crishoj) for valuable contribution!
 
 ### Changes
 - Everything rewritten in TypeScript
