@@ -10,6 +10,8 @@ Connect to a Beckhoff TwinCAT automation system using the ADS protocol from a No
 
 If you are using Node-RED, check out the [node-red-contrib-ads-client](https://www.npmjs.com/package/node-red-contrib-ads-client).
 
+There is automatically created documentation available at https://jisotalo.fi/ads-client/
+
 # Project status
 
 14.12.2024 - version 2 released!
