@@ -190,7 +190,7 @@ client.connect()
 
 The ads-client can be used with multiple system configurations.
 
-![ads-client-setups](https://raw.githubusercontent.com/jisotalo/ads-client/refs/heads/v2-dev/img/connection_setup.png)
+![ads-client-setups](https://github.com/jisotalo/ads-client/blob/master/img/connection_setup.png?raw=true)
 
 
 ## Setup 1 - Connect from Windows
