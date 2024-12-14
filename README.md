@@ -21,7 +21,7 @@ There is automatically created documentation available at https://jisotalo.fi/ad
 - See [MIGRATION.md](https://github.com/jisotalo/ads-client/blob/v2-dev/MIGRATION.md) for guide of migrating v1 -> v2 (**breaking changes!**)
 - See the new [documentation](https://jisotalo.fi/ads-client/classes/Client.html)
 
-Documentation for legacy version 1.4.4 is archived at [https://archive.ph/Sswco](https://archive.ph/Sswco).
+See [`legacy-v1` branch](https://github.com/jisotalo/ads-client/tree/legacy-v1) for previous/legacy version 1.4.4.
 
 # Features
 - Supports TwinCAT 2 and 3
