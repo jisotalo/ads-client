@@ -34,6 +34,7 @@ See [`legacy-v1` branch](https://github.com/jisotalo/ads-client/tree/legacy-v1) 
 - Calling function block methods (RPC)
 - Automatic 32/64 bit variable support (PVOID, XINT, etc.)
 - Automatic byte alignment support (all pack-modes automatically supported)
+- Handles TwinCAT restarts, configuration changes and PLC software updates automatically 
 
 # Table of contents
 - [ads-client](#ads-client)

@@ -1,5 +1,5 @@
 import ClientError from "../client-error";
-import { AdsDataType, AdsDeviceInfo, AdsRawAddress, AdsResponse, AdsState, AdsSymbol, AdsUploadInfo, AmsAddress, AmsRouterState, AmsTcpPacket, BaseAdsResponse } from "./ads-protocol-types";
+import { AdsDataType, AdsDeviceInfo, AdsRawAddress, AdsResponse, AdsState, AdsSymbol, AdsTcSystemExtendedState, AdsTcSystemState, AdsUploadInfo, AmsAddress, AmsRouterState, AmsTcpPacket, BaseAdsResponse } from "./ads-protocol-types";
 
 /**
  * Possible debug levels
@@ -33,16 +33,16 @@ export interface AdsClientEvents {
    * Emitted when the client has disconnected from the target.
    * 
    * **Parameters:**
-   * - `isReconnecting`: True if disconnect happened during reconnecting
+   * - `connectionLost`: True if disconnect happened due to connection lost
    * 
    * @example
    * ```js
-   * client.on('disconnect', (isReconnecting) => {
-   *  console.log('Disconnected - is reconnecting:', isReconnecting);
+   * client.on('disconnect', (connectionLost) => {
+   *  console.log('Disconnected - connection lost:', connectionLost);
    * });
    * ``` 
    */
-  'disconnect': [isReconnecting: boolean],
+  'disconnect': [connectionLost: boolean],
 
   /**
    * Emitted when the client has reconnected to the target after a disconnection.
@@ -105,7 +105,7 @@ export interface AdsClientEvents {
    * @example
    * ```js
    * client.on('plcRuntimeStateChange', (state, previousState) => {
-   *  console.log(`Target PLC state has changed from ${previousState} to ${state}`);
+   *  console.log('Target PLC runtime state has changed from', previousState, 'to', state);
    * });
    * ``` 
    */
@@ -121,11 +121,11 @@ export interface AdsClientEvents {
    * @example
    * ```js
    * client.on('tcSystemStateChange', (state, previousState) => {
-   *  console.log(`Target TwinCAT system state has changed from ${previousState} to ${state}`);
+   *  console.log('Target TwinCAT system state has changed from', previousState, 'to', state);
    * });
    * ``` 
    */
-  'tcSystemStateChange': [state: AdsState, previousState?: AdsState],
+  'tcSystemStateChange': [state: AdsTcSystemState, previousState?: AdsTcSystemState],
 
   /**
    * Emitted when the AMS router state has changed.
@@ -565,8 +565,8 @@ export interface ActiveAdsRequest {
 export interface ConnectionMetaData {
   /** Local AMS router state (if available) */
   routerState?: AmsRouterState,
-  /** Target TwinCAT system state (if available) */
-  tcSystemState?: AdsState,
+  /** Target TwinCAT system service state (if available) */
+  tcSystemState?: AdsTcSystemState,
   /** Target PLC device information (if available) */
   plcDeviceInfo?: AdsDeviceInfo,
   /** Target PLC runtime state (if available) */
@@ -583,7 +583,7 @@ export interface ConnectionMetaData {
   allPlcDataTypesCached: boolean,
   /** Cached target PLC runtime data types without subitems (if available) */
   plcDataTypes: AdsDataTypeContainer,
-  /** Set to `true` if target ADS symbols/datatypes are UTF-8 encoded (always in TwinCAT 4026->) */
+  /** Set to `true` if target ADS symbols/datatypes are UTF-8 encoded (default in TwinCAT 4026 and newer) */
   adsSymbolsUseUtf8: boolean
 };
 
