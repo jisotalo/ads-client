@@ -112,7 +112,23 @@ describe('connection', () => {
       adsSymbolsUseUtf8: false
     }));
 
-    expect(client.metaData.tcSystemState).toStrictEqual({
+    //Note: checking only keys
+    expect(Object.keys(client.metaData.tcSystemState)).toStrictEqual(Object.keys({
+      adsState: 5,
+      adsStateStr: 'Run',
+      deviceState: 1,
+      restartIndex: 202,
+      version: 3,
+      revision: 1,
+      build: 4024,
+      platform: 1,
+      osType: 3,
+      flags: 0,
+      flagsStr: [],
+      reserved: Buffer.alloc(0)
+    }));
+
+    expect(client.metaData.tcSystemState).toMatchObject({
       adsState: 5,
       adsStateStr: 'Run',
       deviceState: 1
@@ -3683,8 +3699,66 @@ describe('controlling TwinCAT system service', () => {
   });
 });
 
+describe('testing subscription persisting', () => {
+  const client2 = new Client({
+    targetAmsNetId: AMS_NET_ID,
+    targetAdsPort: 851,
+    connectionCheckInterval: 3000,
+    hideConsoleWarnings: true
+  });
 
-describe('handling unknown/stale ADS notifications', () => {
+  let subscription = null;
+  let restartDone = false;
+  let latestValue = -1;
+  const subscriptionReceivedEvent = jest.fn();
+  const reconnectEvent = jest.fn();
+
+  client2.on('reconnect', (restored, list) => {
+    reconnectEvent(list.length === 0);
+  })
+
+  //Called when data is received
+  const onNewData = (data, subscription) => {
+    if (restartDone) {
+      //After restart, the variable value should be smaller than before
+      subscriptionReceivedEvent(data.value < latestValue);
+
+    } else if (data.value > latestValue) {
+      latestValue = data.value;
+    }
+  }
+
+  test('connecting', async () => {
+    await client2.connect();
+  });
+
+  test('creating subscription', async () => {
+    subscription = await client2.subscribeValue('GVL_Subscription.NumericValue_100ms', onNewData, 10);
+    await delay(1000);
+  });
+
+  test('restarting TwinCAT system', async () => {
+    //Using writeControl so that ads-client knows nothing about the restart request
+    await client2.writeControl(ADS.ADS_STATE.Reset, undefined, undefined, { adsPort: 10000 });
+    restartDone = true;
+    await delay(2500);
+  });
+
+  test('checking that subscription works', async () => {
+    await delay(2500);
+    expect(subscriptionReceivedEvent).toHaveBeenCalledWith(true);
+    expect(reconnectEvent).toHaveBeenCalledWith(true);
+  });
+
+  test('disconnecting', async () => {
+    if (client2?.connection.connected) {
+      const task = client2.disconnect()
+      expect(task).resolves.toBeUndefined()
+    }
+  });
+});
+
+describe('handling unknown/stale ADS notifications (might fail with TwinCAT.Ads.TcpRouter)', () => {
   //We need own client for this as the ADS port has to be static
   //Otherwise we wouldn't get notifications after reconnect
   const client2 = new Client({

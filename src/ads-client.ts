@@ -101,7 +101,9 @@ import {
   BaseAdsResponse,
   EmptyAdsResponse,
   UnknownAdsResponse,
-  AdsUploadInfo
+  AdsUploadInfo,
+  AdsTcSystemExtendedState,
+  AdsTcSystemState
 } from "./types/ads-protocol-types";
 
 export type * from "./types/ads-client-types";
@@ -224,11 +226,6 @@ export class Client extends EventEmitter<AdsClientEvents> {
   private portRegisterTimeoutTimer?: NodeJS.Timeout = undefined;
 
   /**
-   * Container for all active subscriptions.
-   */
-  private activeSubscriptions: ActiveSubscriptionContainer = {};
-
-  /**
    * Container for previous subscriptions that were active
    * before reconnecting or when PLC runtime symbol version changed.
    */
@@ -328,6 +325,13 @@ export class Client extends EventEmitter<AdsClientEvents> {
    * Some properties might not be available in all connection setups and setting combinations.
    */
   public metaData: ConnectionMetaData = { ...this.defaultMetaData };
+
+  /**
+   * Container for all active subscriptions.
+   * 
+   * Do not edit this directly.
+   */
+  public activeSubscriptions: ActiveSubscriptionContainer = {};
 
   /**
    * Creates a new ADS client instance.
@@ -665,7 +669,9 @@ export class Client extends EventEmitter<AdsClientEvents> {
         this.socket?.destroy();
         this.socket = undefined;
 
-        this.emit("disconnect", isReconnecting);
+        if (!isReconnecting) {
+          this.emit("disconnect", isReconnecting);
+        }
         return resolve();
       }
 
@@ -693,7 +699,11 @@ export class Client extends EventEmitter<AdsClientEvents> {
         this.socket = undefined;
 
         this.debug(`disconnectFromTarget(): Connection closed successfully`);
-        this.emit("disconnect", isReconnecting);
+        
+        if (!isReconnecting) {
+          this.emit("disconnect", isReconnecting);
+        }
+
         return resolve();
 
       } catch (err) {
@@ -712,7 +722,9 @@ export class Client extends EventEmitter<AdsClientEvents> {
         this.activeSubscriptions = {};
 
         this.debug(`disconnectFromTarget(): Connection closing failed, connection was forced to close`);
-        this.emit("disconnect", isReconnecting);
+        if (isReconnecting) {
+          this.emit("disconnect", isReconnecting);
+        }
         return reject(new ClientError(`disconnect(): Disconnected with errors: ${(disconnectError as Error).message}`, err));
       }
     })
@@ -962,8 +974,12 @@ export class Client extends EventEmitter<AdsClientEvents> {
    * This is not called if the `settings.rawClient` is `true`.
    */
   private async setupPlcConnection() {
-    //Read system state
-    await this.readTcSystemState();
+    //Read system state - try the extended version first
+    try {
+      await this.readTcSystemExtendedState();
+    } catch (err) {
+      await this.readTcSystemState();
+    }
 
     //Start system state poller
     await this.startTcSystemStatePoller();
@@ -1042,12 +1058,29 @@ export class Client extends EventEmitter<AdsClientEvents> {
     let startTimer = true;
 
     try {
-      let oldState = this.metaData.tcSystemState !== undefined
+      const oldState = this.metaData.tcSystemState
         ? { ...this.metaData.tcSystemState }
         : undefined;
 
-      const state = await this.readTcSystemState();
+      let state: AdsTcSystemState;
 
+      //If we have extended state, then use it for better restart detection
+      if (this.metaData.tcSystemState?.restartIndex !== undefined) {
+        state = await this.readTcSystemExtendedState();
+
+      } else if (this.metaData.tcSystemState) {
+        state = await this.readTcSystemState();
+
+      } else {
+        //We don't know yet so try the extended first
+        try {
+          state = await this.readTcSystemExtendedState();
+        } catch (err) {
+          state = await this.readTcSystemState();
+        }
+      }
+
+      //State read successfully
       this.connectionDownSince = undefined;
 
       if (!oldState || state.adsState !== oldState.adsState) {
@@ -1069,6 +1102,12 @@ export class Client extends EventEmitter<AdsClientEvents> {
           startTimer = false;
           this.onConnectionLost();
         }
+
+      } else if (state.restartIndex !== undefined && oldState?.restartIndex !== state.restartIndex) {
+        this.debug(`checkTcSystemState(): TwinCAT system service has restarted -> reconnecting`);
+        this.emit('tcSystemStateChange', state, oldState);
+        startTimer = false;
+        this.onConnectionLost();
       }
 
     } catch (err) {
@@ -1254,6 +1293,7 @@ export class Client extends EventEmitter<AdsClientEvents> {
 
     this.connection.connected = false;
     this.emit('connectionLost', socketFailure);
+    this.emit('disconnect', true);
 
     if (this.settings.autoReconnect !== true) {
       this.warn("Connection to target was lost and setting autoReconnect was false -> disconnecting");
@@ -3205,7 +3245,7 @@ export class Client extends EventEmitter<AdsClientEvents> {
    */
   private getStringDataTypeEncoding(dataType: AdsDataType, attributes?: AdsAttributeEntry[]): string | undefined {
     return dataType.attributes.find((attr) => attr.name === 'TcEncoding')?.value
-      || attributes?.find((attr) => attr.name === 'TcEncoding')?.value; 
+      || attributes?.find((attr) => attr.name === 'TcEncoding')?.value;
   }
 
   /**
@@ -4539,12 +4579,14 @@ export class Client extends EventEmitter<AdsClientEvents> {
   /**
    * Reads target TwinCAT system state from ADS port 10000 (usually `Run` or `Config`).
    *
+   * NOTE: You might want to use the extended {@link readTcSystemExtendedState}() instead.
+   * 
    * If `targetOpts` is not used to override target, the state is also
    * saved to the `metaData.tcSystemState`.
    * 
    * This is the same as {@link readState}(), except that the result is saved to
    * the `metaData.tcSystemState`.
-   *
+   * 
    * @example
    * ```js
    * try {
@@ -4586,6 +4628,103 @@ export class Client extends EventEmitter<AdsClientEvents> {
       throw new ClientError(`readTcSystemState(): Reading TwinCAT system state failed`, err);
     }
   }
+
+  /**
+   * Reads extended target TwinCAT system service state from ADS port 10000 
+   * if supported by target system. Extended version of the {@link readTcSystemState}().
+   *
+   * If `targetOpts` is not used to override target, the state is also
+   * saved to the `metaData.tcSystemState`.
+   * 
+   * NOTE: Might not be supported in older TwinCAT versions. If so, use {@link readTcSystemState}() instead. 
+   * Tested to work with 3.1.4022 and newer.
+   * 
+   * @example
+   * ```js
+   * try {
+   *  const tcSystemState = await client.readTcSystemServiceState();
+   * } catch (err) {
+   *  console.log("Error:", err);
+   * }
+   * ```
+   * 
+   * @param targetOpts Optional target settings that override values in `settings`
+   * 
+   * @throws Throws an error if sending the command fails or if the target responds with an error.
+   */
+  public async readTcSystemExtendedState(targetOpts: Partial<AmsAddress> = {}): Promise<AdsTcSystemExtendedState> {
+    if (!this.connection.connected) {
+      throw new ClientError(`readTcSystemServiceState(): Client is not connected. Use connect() to connect to the target first.`);
+    }
+    this.debug(`readTcSystemServiceState(): Reading TwinCAT system service state`);
+
+    try {
+      const target: Partial<AmsAddress> = {
+        adsPort: 10000,
+        ...targetOpts
+      };
+
+      const response = await this.readRaw(240, 0, 16, target);
+
+      const result = {} as AdsTcSystemExtendedState;
+      let pos = 0;
+
+      //0..1 ADS state
+      result.adsState = response.readUInt16LE(pos);
+      result.adsStateStr = ADS.ADS_STATE.toString(result.adsState);
+      pos += 2;
+
+      //2..3 Device state
+      result.deviceState = response.readUInt16LE(pos);
+      pos += 2;
+
+      //4..5 Restart index
+      result.restartIndex = response.readUInt16LE(pos);
+      pos += 2;
+
+      //6 Version
+      result.version = response.readUInt8(pos);
+      pos += 1;
+
+      //7 Revision
+      result.revision = response.readUInt8(pos);
+      pos += 1;
+
+      //8..9 Build
+      result.build = response.readUInt16LE(pos);
+      pos += 2;
+
+      //10 Platform
+      result.platform = response.readUInt8(pos);
+      pos += 1;
+
+      //11 OS type
+      result.osType = response.readUInt8(pos);
+      pos += 1;
+
+      //12..13 Flags
+      result.flags = response.readUInt16LE(pos);
+      result.flagsStr = ADS.ADS_SYSTEM_SERVICE_STATE_FLAGS.toStringArray(result.flags);
+      pos += 2;
+
+      //14.. Reserved
+      result.reserved = response.subarray(pos);
+
+      this.debug(`readTcSystemServiceState(): TwinCAT system service state read successfully`);
+
+      if (!targetOpts.adsPort && !targetOpts.amsNetId) {
+        //Target is not overridden -> save to metadata
+        this.metaData.tcSystemState = result;
+      }
+
+      return result;
+
+    } catch (err) {
+      this.debug(`readTcSystemServiceState(): Reading TwinCAT system service state failed: %o`, err);
+      throw new ClientError(`readTcSystemServiceState(): Reading TwinCAT system service state failed`, err);
+    }
+  }
+
 
   /**
    * Reads target PLC runtime symbol version.

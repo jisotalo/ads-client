@@ -24,6 +24,7 @@
 <li>Calling function block methods (RPC)</li>
 <li>Automatic 32/64 bit variable support (PVOID, XINT, etc.)</li>
 <li>Automatic byte alignment support (all pack-modes automatically supported)</li>
+<li>Handles TwinCAT restarts, configuration changes and PLC software updates automatically</li>
 </ul>
 <a id="md:table-of-contents" class="tsd-anchor"></a><h1 class="tsd-anchor-link">Table of contents<a href="#md:table-of-contents" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h1><ul>
 <li><a href="#md:ads-client">ads-client</a></li>
@@ -437,6 +438,10 @@
 <tr>
 <td><a href="https://jisotalo.fi/ads-client/classes/Client.html#readTcSystemState" target="_blank" class="external"><code>readTcSystemState()</code></a></td>
 <td>Reads target TwinCAT system state from ADS port 10000 (usually <code>Run</code> or <code>Config</code>).</td>
+</tr>
+<tr>
+<td><a href="https://jisotalo.fi/ads-client/classes/Client.html#readTcSystemExtendedState" target="_blank" class="external"><code>readTcSystemExtendedState()</code></a></td>
+<td>Reads extended target TwinCAT system service state from ADS port 10000 if supported by target system. Tested to work with 3.1.4022 and newer.</td>
 </tr>
 <tr>
 <td><a href="https://jisotalo.fi/ads-client/classes/Client.html#readValue" target="_blank" class="external"><code>readValue()</code></a></td>

@@ -4,6 +4,24 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.1.0] - 27.01.2025
+### Added
+- New method `readTcSystemExtendedState()`
+  - Reads [extended target TwinCAT system state](https://jisotalo.fi/ads-client/interfaces/AdsTcSystemExtendedState.html) (if available)
+- Improved detection of TwinCAT system service restart
+  - Available if remote system supports `readTcSystemExtendedState()`
+  - Tested with TwinCAT 3.1.4022, 3.1.4024 and 3.1.4026
+  - Client detects a restart of TwinCAT system and reconnects to re-establish subscriptions
+  - See issue [issue #159](https://github.com/jisotalo/ads-client/issues/159)
+- Added tests for subscription persistence during TwinCAT system restart
+
+### Changed
+- Changed `activeSubscriptions` property visibility from private to public
+- `disconnect` event is no longer emitted continuously each reconnect attempt (only during the initial disconnect / connection lost event)
+- `disconnect` event parameter `isReconnecting` changed to `connectionLost`
+- TwinCAT system state type (`metaData.tcSystemState`) changed from `AdsState` to `AdsTcSystemState`
+  - Not a breaking change - the new type extends `AdsState`
+
 ## [2.0.2] - 14.12.2024
 **IMPORTANT:** This is a major version update. There are lots of **breaking changes**! 
 

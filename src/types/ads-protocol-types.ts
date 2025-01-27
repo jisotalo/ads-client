@@ -637,3 +637,39 @@ export interface AdsUploadInfo {
   /** Reserved bytes (version >= 3) */
   reserved?: Buffer
 }
+
+/**
+ * Extended TwinCAT system service state
+ * 
+ * @category Types
+ */
+export interface AdsTcSystemExtendedState extends AdsState {
+  /** Restart index (increases when system is restarted)  */
+  restartIndex: number,
+  /** Major version of the target system */
+  version: number,
+  /** Revision of the target system */
+  revision: number,
+  /** Build number of the target system */
+  build: number,
+  /** Platform ID of the target system */
+  platform: number,
+  /** Operation system ID of the target system  */
+  osType: number,
+  /** System service flags as number (bits) (see `ADS.ADS_SYSTEM_SERVICE_STATE_FLAGS`) */
+  flags: number,
+  /** System service flags as string array (see `ADS.ADS_SYSTEM_SERVICE_STATE_FLAGS`) */
+  flagsStr: (keyof typeof ADS.ADS_SYSTEM_SERVICE_STATE_FLAGS | string)[],
+  /** Reserved bytes (if any) */
+  reserved?: Buffer
+}
+
+/**
+ * TwinCAT system service state
+ * 
+ * In all cases, contains the {@link AdsState} fields.
+ * More fields are available if target supports extended state.
+ * 
+ * @category Types
+ */
+export type AdsTcSystemState = AdsState & Partial<AdsTcSystemExtendedState>;

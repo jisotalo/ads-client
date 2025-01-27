@@ -973,6 +973,51 @@ export const ADS_UPLOAD_INFO_FLAGS = {
 }
 
 /**
+ * System service state flags
+ * 
+ * Source: TwinCAT.Ads.dll By Beckhoff
+ */
+export const ADS_SYSTEM_SERVICE_STATE_FLAGS = {
+  /** The router mode only */
+  RouterModeOnly: 1,
+  /** System is part of a controller redundancy */
+  RedundancySystem: 2,
+  /** System is the primary controller */
+  RedundancyPrimary: 4,
+  /** System is currently active -> controling the machine */
+  RedundancyActive: 16,
+  /** The data folder support */
+  DataFolderSupport: 32,
+  /** Redundancy is currently down -> not syncronized */
+  RedundancyInOp: 64,
+  /** Standby system is currently suspended - e.g. while online change */
+  RedundancySuspended: 128,
+  /** Creates new currentconfig */
+  NewCurrentConfig: 256,
+
+  /** Return given flag value as string array */
+  toStringArray: function (flags: number): string[] {
+    const flagsArr: string[] = [];
+
+    for (const key of Object.keys(this)) {
+      const typedKey = key as keyof typeof ADS_SYSTEM_SERVICE_STATE_FLAGS;
+
+      if (typeof this[typedKey] !== 'number')
+        continue;
+
+      //Check if flag is available
+      if ((flags & this[typedKey] as number) === this[typedKey]) {
+        if (flags === 0 || this[typedKey] !== 0) {
+          flagsArr.push(key);
+        }
+      }
+    }
+
+    return flagsArr;
+  }
+}
+
+/**
  * AMS router state
  */
 export const AMS_ROUTER_STATE = {

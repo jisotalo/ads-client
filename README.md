@@ -34,6 +34,7 @@ See [`legacy-v1` branch](https://github.com/jisotalo/ads-client/tree/legacy-v1) 
 - Calling function block methods (RPC)
 - Automatic 32/64 bit variable support (PVOID, XINT, etc.)
 - Automatic byte alignment support (all pack-modes automatically supported)
+- Handles TwinCAT restarts, configuration changes and PLC software updates automatically 
 
 # Table of contents
 - [ads-client](#ads-client)
@@ -457,6 +458,7 @@ Click a method to open it's documentation.
 | [`readRawMulti()`](https://jisotalo.fi/ads-client/classes/Client.html#readRawMulti)                             | Sends multiple `readRaw()` commands in one ADS packet (ADS sum command).                                                                                                         |
 | [`readState()`](https://jisotalo.fi/ads-client/classes/Client.html#readState)                                   | Reads target ADS state.                                                                                                                                                          |
 | [`readTcSystemState()`](https://jisotalo.fi/ads-client/classes/Client.html#readTcSystemState)                   | Reads target TwinCAT system state from ADS port 10000 (usually `Run` or `Config`).                                                                                               |
+| [`readTcSystemExtendedState()`](https://jisotalo.fi/ads-client/classes/Client.html#readTcSystemExtendedState)   | Reads extended target TwinCAT system service state from ADS port 10000 if supported by target system. Tested to work with 3.1.4022 and newer.                                    |
 | [`readValue()`](https://jisotalo.fi/ads-client/classes/Client.html#readValue)                                   | Reads variable's value from the target system by a variable path (such as `GVL_Test.ExampleStruct`) and returns the value as a Javascript object.                                |
 | [`readValueBySymbol()`](https://jisotalo.fi/ads-client/classes/Client.html#readValueBySymbol)                   | Reads variable's value from the target system by a symbol object (acquired using `getSymbol()`) and returns the value as a Javascript object.                                    |
 | [`readWriteRaw()`](https://jisotalo.fi/ads-client/classes/Client.html#readWriteRaw)                             | Writes raw data to the target system by a raw ADS address (index group, index offset) and reads the result as raw data.                                                          |
