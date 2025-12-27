@@ -747,7 +747,7 @@ export class Client extends EventEmitter<AdsClientEvents> {
 
       if (this.socket) {
         this.debug(`reconnectToTarget(): Trying to disconnect`);
-        await this.disconnectFromTarget(forceDisconnect, isReconnecting).catch();
+        await this.disconnectFromTarget(forceDisconnect, isReconnecting).catch(() => {});
       }
       this.debug(`reconnectToTarget(): Trying to connect...`);
       return this.connectToTarget(true)
@@ -1297,7 +1297,7 @@ export class Client extends EventEmitter<AdsClientEvents> {
 
     if (this.settings.autoReconnect !== true) {
       this.warn("Connection to target was lost and setting autoReconnect was false -> disconnecting");
-      await this.disconnectFromTarget(true).catch();
+      await this.disconnectFromTarget(true).catch(() => {});
       return;
     }
 
