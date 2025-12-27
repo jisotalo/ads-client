@@ -174,6 +174,7 @@ export class Client extends EventEmitter<AdsClientEvents> {
     plcSymbols: {},
     allPlcDataTypesCached: false,
     plcDataTypes: {},
+    builtDataTypes: {},
     adsSymbolsUseUtf8: false
   };
 
@@ -1222,6 +1223,7 @@ export class Client extends EventEmitter<AdsClientEvents> {
 
       //Clear all cached symbol and data types etc.
       this.metaData.plcDataTypes = {};
+      this.metaData.builtDataTypes = {};
       this.metaData.plcSymbols = {};
       this.metaData.plcUploadInfo = undefined;
 
@@ -3046,6 +3048,17 @@ export class Client extends EventEmitter<AdsClientEvents> {
     try {
       this.debug(`buildDataType(): Building data type for ${name}`);
 
+      //Check cache first (only for root types without custom target options)
+      const cacheKey = name.toLowerCase();
+      if (isRootType
+        && !this.settings.disableCaching
+        && !targetOpts.adsPort
+        && !targetOpts.amsNetId
+        && this.metaData.builtDataTypes[cacheKey]) {
+        this.debug(`buildDataType(): Returning cached built data type for ${name}`);
+        return this.metaData.builtDataTypes[cacheKey];
+      }
+
       let dataType: AdsDataType | undefined;
 
       try {
@@ -3208,6 +3221,11 @@ export class Client extends EventEmitter<AdsClientEvents> {
         //The root type has actually the data type in "name" property
         builtType.type = builtType.name;
         builtType.name = '';
+
+        //Cache the built type (only for root types without custom target options)
+        if (!this.settings.disableCaching && !targetOpts.adsPort && !targetOpts.amsNetId) {
+          this.metaData.builtDataTypes[cacheKey] = builtType;
+        }
       }
 
       return builtType;
