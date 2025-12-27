@@ -174,6 +174,7 @@ export class Client extends EventEmitter<AdsClientEvents> {
     plcSymbols: {},
     allPlcDataTypesCached: false,
     plcDataTypes: {},
+    builtDataTypes: {},
     adsSymbolsUseUtf8: false
   };
 
@@ -593,15 +594,21 @@ export class Client extends EventEmitter<AdsClientEvents> {
       });
 
       //Listening data event
-      socket.on("data", data => {
-        if (this.debugIO.enabled) {
-          this.debugIO(`IO in  <------ ${data.byteLength} bytes from ${socket.remoteAddress}: ${data.toString("hex")}`);
-        } else if (this.debugD.enabled) {
-          this.debugD(`IO in  <------ ${data.byteLength} bytes from ${socket.remoteAddress}`);
-        }
+      socket.on("data", (data) => {
+        if (Buffer.isBuffer(data)) {
+          if (this.debugIO.enabled) {
+            this.debugIO(`IO in  <------ ${data.byteLength} bytes from ${socket.remoteAddress}: ${data.toString("hex")}`);
+          } else if (this.debugD.enabled) {
+            this.debugD(`IO in  <------ ${data.byteLength} bytes from ${socket.remoteAddress}`);
+          }
 
-        this.receiveBuffer = Buffer.concat([this.receiveBuffer, data]);
-        this.handleReceivedData();
+          this.receiveBuffer = Buffer.concat([this.receiveBuffer, data]);
+          this.handleReceivedData();
+
+        } else {
+          //This should never happen, as the Socket defaults to Buffer
+          this.debug(`Socket callback data type is unknown (${typeof data})`);
+        }
       });
 
       //Timeout only during connecting, other timeouts are handled elsewhere
@@ -699,7 +706,7 @@ export class Client extends EventEmitter<AdsClientEvents> {
         this.socket = undefined;
 
         this.debug(`disconnectFromTarget(): Connection closed successfully`);
-        
+
         if (!isReconnecting) {
           this.emit("disconnect", isReconnecting);
         }
@@ -747,7 +754,7 @@ export class Client extends EventEmitter<AdsClientEvents> {
 
       if (this.socket) {
         this.debug(`reconnectToTarget(): Trying to disconnect`);
-        await this.disconnectFromTarget(forceDisconnect, isReconnecting).catch();
+        await this.disconnectFromTarget(forceDisconnect, isReconnecting).catch(() => { });
       }
       this.debug(`reconnectToTarget(): Trying to connect...`);
       return this.connectToTarget(true)
@@ -1222,6 +1229,7 @@ export class Client extends EventEmitter<AdsClientEvents> {
 
       //Clear all cached symbol and data types etc.
       this.metaData.plcDataTypes = {};
+      this.metaData.builtDataTypes = {};
       this.metaData.plcSymbols = {};
       this.metaData.plcUploadInfo = undefined;
 
@@ -1297,7 +1305,7 @@ export class Client extends EventEmitter<AdsClientEvents> {
 
     if (this.settings.autoReconnect !== true) {
       this.warn("Connection to target was lost and setting autoReconnect was false -> disconnecting");
-      await this.disconnectFromTarget(true).catch();
+      await this.disconnectFromTarget(true).catch(() => { });
       return;
     }
 
@@ -3046,6 +3054,17 @@ export class Client extends EventEmitter<AdsClientEvents> {
     try {
       this.debug(`buildDataType(): Building data type for ${name}`);
 
+      //Check cache first (only for root types without custom target options)
+      const cacheKey = name.toLowerCase();
+      if (isRootType
+        && !this.settings.disableCaching
+        && !targetOpts.adsPort
+        && !targetOpts.amsNetId
+        && this.metaData.builtDataTypes[cacheKey]) {
+        this.debug(`buildDataType(): Returning cached built data type for ${name}`);
+        return this.metaData.builtDataTypes[cacheKey];
+      }
+
       let dataType: AdsDataType | undefined;
 
       try {
@@ -3208,6 +3227,11 @@ export class Client extends EventEmitter<AdsClientEvents> {
         //The root type has actually the data type in "name" property
         builtType.type = builtType.name;
         builtType.name = '';
+
+        //Cache the built type (only for root types without custom target options)
+        if (!this.settings.disableCaching && !targetOpts.adsPort && !targetOpts.amsNetId) {
+          this.metaData.builtDataTypes[cacheKey] = builtType;
+        }
       }
 
       return builtType;

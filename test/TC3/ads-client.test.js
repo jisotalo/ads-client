@@ -109,6 +109,7 @@ describe('connection', () => {
       plcSymbols: {},
       allPlcDataTypesCached: false,
       plcDataTypes: {},
+      builtDataTypes: {},
       adsSymbolsUseUtf8: false
     }));
 

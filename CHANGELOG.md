@@ -4,6 +4,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.2.0] - 27.12.2025
+### Added
+- Added caching of built data types to improve performance
+  - See [pull request #178](https://github.com/jisotalo/ads-client/pull/178)
+  
+### Changed
+- Bug fix: Unhandled Promise rejections during automatic reconnecting
+  - See [pull request #177](https://github.com/jisotalo/ads-client/pull/177)
+- Fixed a Typescript warning at `socket.on("data", (data) => {...})` as the data chunk could be a string as well
+- Dependencies updated
+- Documentation updated
+
+Thank you [Christian Rishøj](https://github.com/crishoj) for contribution!
+
+All tests passing.
+
 ## [2.1.0] - 27.01.2025
 ### Added
 - New method `readTcSystemExtendedState()`

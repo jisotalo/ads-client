@@ -583,6 +583,8 @@ export interface ConnectionMetaData {
   allPlcDataTypesCached: boolean,
   /** Cached target PLC runtime data types without subitems (if available) */
   plcDataTypes: AdsDataTypeContainer,
+  /** Cached fully built data types with all subitems resolved */
+  builtDataTypes: AdsDataTypeContainer,
   /** Set to `true` if target ADS symbols/datatypes are UTF-8 encoded (default in TwinCAT 4026 and newer) */
   adsSymbolsUseUtf8: boolean
 };
