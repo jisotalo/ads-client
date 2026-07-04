@@ -1240,6 +1240,21 @@ describe('reading values', () => {
           value: 2
         });
       }
+      {
+        // E_ExtendedEnum - checks per-member attributes (ExtendedEnumInfos flag, TC 4026+)
+        const res = await client.readValue('GVL_Read.ComplexTypes.ENUM_6');
+        expect(res.value).toMatchObject({
+          name: 'Unknown',
+          value: -99
+        });
+        expect(res.dataType.enumInfos).toMatchObject([
+          { name: 'Disabled', value: 0,   attributes: [{ name: 'color', value: 'grey' }] },
+          { name: 'Starting', value: 50,  attributes: [{ name: 'color', value: 'yellow' }] },
+          { name: 'Running',  value: 100, attributes: [{ name: 'color', value: 'green' }] },
+          { name: 'Stopping', value: 200, attributes: [{ name: 'color', value: 'orange' }] },
+          { name: 'Unknown',  value: -99, attributes: [{ name: 'ads-client-enum-attribute', value: 'example-enum-value-ääö' }, { name: 'color', value: 'red' }] },
+        ]);
+      }
     });
 
     test('reading POINTER (address)', async () => {

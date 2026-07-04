@@ -2911,7 +2911,7 @@ export class Client extends EventEmitter<AdsClientEvents> {
         dataType.enumInfos[i].attributes = [];
 
         //Attributes
-        for (let i = 0; i < attributeCount; i++) {
+        for (let ai = 0; ai < attributeCount; ai++) {
           const attr = {} as AdsAttributeEntry;
 
           //Name length
