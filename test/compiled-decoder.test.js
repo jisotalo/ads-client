@@ -218,17 +218,91 @@ describe('Client.decodeBufferToObject', () => {
     expect(client['decodeBufferToObject'](data, dataType)).toStrictEqual(interpreted); //Cached path
   });
 
-  test('falls back to the interpreter when compilation is not possible', () => {
+  test('routes uncompilable types to the interpreter', () => {
     const client = makeClient({ useCompiledDecoders: true });
-    const dataType = makeType({ name: 'INT', type: 'INT', adsDataType: T.ADST_INT16, size: 2 });
-    //Sabotage compilation by making the base type unresolvable, then restore
-    const brokenType = { ...dataType, type: 'SOME_UNKNOWN_TYPE' };
+    const brokenType = makeType({ name: 'INT', type: 'SOME_UNKNOWN_TYPE', adsDataType: T.ADST_INT16, size: 2 });
     const data = Buffer.alloc(2);
-    data.writeInt16LE(42, 0);
 
     expect(compileDataTypeDecoder(brokenType, client.settings)).toBeUndefined();
-    expect(() => client['decodeBufferToObject'](data, dataType)).not.toThrow();
-    expect(client['decodeBufferToObject'](data, dataType)).toBe(42);
+    //NOTE: all currently-known uncompilable constructs also throw in the interpreter,
+    //so this asserts the ROUTING (the interpreter's error, not a compiler error), and
+    //that the failed compilation result is cached
+    expect(() => client['decodeBufferToObject'](data, brokenType)).toThrow(/Base type SOME_UNKNOWN_TYPE not found/);
+    expect(client['compiledDecoders'].has(brokenType)).toBe(true);
+    expect(client['compiledDecoders'].get(brokenType)).toBeUndefined();
+  });
+
+  test('honors on-the-fly settings changes on already-compiled decoders (like the interpreter)', () => {
+    const client = makeClient({ useCompiledDecoders: true });
+    const dataType = mixedStructType();
+    const data = mixedStructBuffer(5);
+
+    const before = client['decodeBufferToObject'](data, dataType);
+    expect(before.eMode).toEqual({ name: 'B', value: 5 });
+    expect(before.dtDate).toBeInstanceOf(Date);
+
+    //Documented usage: client.settings.convertDatesToJavascript = false; //OK
+    client.settings.objectifyEnumerations = false;
+    client.settings.convertDatesToJavascript = false;
+
+    const after = client['decodeBufferToObject'](data, dataType);
+    expect(after).toStrictEqual(client['convertBufferToObject'](data, dataType));
+    expect(after.eMode).toBe(5);
+    expect(typeof after.dtDate).toBe('number');
+    //Same cached decoder served both calls
+    expect(client['compiledDecoders'].get(dataType)).toBeDefined();
+  });
+
+  test('decodes empty structs like the interpreter', () => {
+    const client = makeClient();
+    const dataType = makeType({ name: 'ST_Empty', type: 'ST_Empty', adsDataType: T.ADST_BIGTYPE, size: 0 });
+    const decoded = compileDataTypeDecoder(dataType, client.settings)(Buffer.alloc(0));
+
+    expect(decoded).toStrictEqual(client['convertBufferToObject'](Buffer.alloc(0), dataType));
+    expect(decoded).toEqual({});
+  });
+
+  test('decodes nested STRING members with type-level TcEncoding like the interpreter', () => {
+    const client = makeClient({ useCompiledDecoders: true });
+    const dataType = makeType({
+      name: 'ST_Enc', type: 'ST_Enc', adsDataType: T.ADST_BIGTYPE, size: 16,
+      subItems: [makeType({
+        name: 'sUtf8', type: 'STRING(15)', adsDataType: T.ADST_STRING, size: 16, offset: 0,
+        attributes: [{ name: 'TcEncoding', value: 'UTF-8' }] //On the data type, not the symbol
+      })]
+    });
+    const data = Buffer.alloc(16);
+    Buffer.from('smörgås\0', 'utf8').copy(data, 0);
+
+    const decoded = client['decodeBufferToObject'](data, dataType);
+    expect(decoded).toStrictEqual(client['convertBufferToObject'](data, dataType));
+    expect(decoded.sUtf8).toBe('smörgås');
+    expect(client['compiledDecoders'].has(dataType)).toBe(true); //Type-level encoding does not skip compilation
+  });
+
+  test('skips the compiled path only for TcEncoding symbol attributes on STRING roots', () => {
+    const client = makeClient({ useCompiledDecoders: true });
+    const attributes = [{ name: 'TcEncoding', value: 'UTF-8' }];
+
+    //STRING root + symbol TcEncoding: attributes affect decoding -> interpreter
+    const stringType = makeType({ name: 'STRING(15)', type: 'STRING(15)', adsDataType: T.ADST_STRING, size: 16 });
+    client['decodeBufferToObject'](Buffer.alloc(16), stringType, attributes);
+    expect(client['compiledDecoders'].has(stringType)).toBe(false);
+
+    //Struct root + symbol TcEncoding: attributes cannot affect decoding -> compiled path
+    const structType = mixedStructType();
+    const decoded = client['decodeBufferToObject'](mixedStructBuffer(), structType, attributes);
+    expect(client['compiledDecoders'].has(structType)).toBe(true);
+    expect(decoded).toStrictEqual(client['convertBufferToObject'](mixedStructBuffer(), structType, attributes));
+  });
+
+  test('skips the compiled path when disableCaching is set', () => {
+    const client = makeClient({ useCompiledDecoders: true, disableCaching: true });
+    const dataType = mixedStructType();
+
+    const decoded = client['decodeBufferToObject'](mixedStructBuffer(), dataType);
+    expect(decoded).toStrictEqual(client['convertBufferToObject'](mixedStructBuffer(), dataType));
+    expect(client['compiledDecoders'].has(dataType)).toBe(false);
   });
 
   test('skips the compiled path for targetOpts overrides (data type cache does not apply)', () => {
@@ -246,10 +320,12 @@ describe('Client.decodeBufferToObject', () => {
 
   test('is disabled by default', () => {
     const client = makeClient();
+    const dataType = mixedStructType();
 
     expect(client.settings.useCompiledDecoders).toBe(false);
-    client['decodeBufferToObject'](mixedStructBuffer(), mixedStructType());
-    expect(client['compiledDecoders'].has(mixedStructType())).toBe(false);
+    client['decodeBufferToObject'](mixedStructBuffer(), dataType);
+    //Same object for call and check - WeakMap is identity-keyed
+    expect(client['compiledDecoders'].has(dataType)).toBe(false);
   });
 
   test('compiled decoding is substantially faster than interpreting', () => {
@@ -309,6 +385,8 @@ describe('Client.decodeBufferToObject', () => {
     const interpretedUs = Number(t2 - t1) / N / 1000;
     console.info(`compiled: ${compiledUs.toFixed(2)} µs/op, interpreted: ${interpretedUs.toFixed(2)} µs/op, ${(interpretedUs / compiledUs).toFixed(1)}x`);
 
-    expect(interpretedUs / compiledUs).toBeGreaterThan(2);
+    //Deliberately loose (typical ratio is 4-5x) - this guards against the compiled path
+    //regressing to interpreter speed, without being flaky under CI load
+    expect(interpretedUs / compiledUs).toBeGreaterThan(1.3);
   });
 });

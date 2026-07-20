@@ -3297,9 +3297,11 @@ export class Client extends EventEmitter<AdsClientEvents> {
    * - `settings.disableCaching` is set (every call would compile from scratch - slower than interpreting)
    * - `targetOpts` overrides the target (`buildDataType()` builds a fresh object per call - same reason)
    *
-   * It is also skipped when symbol attributes are provided that would affect decoding
-   * (string encoding) - multiple symbols with different attributes can resolve to the
-   * same cached data type, and the cache is keyed by data type alone.
+   * It is also skipped when symbol attributes are provided that would affect decoding -
+   * multiple symbols with different attributes can resolve to the same cached data type,
+   * and the cache is keyed by data type alone. Like in `convertBufferToObject()`, symbol
+   * attributes only influence string encoding of the root type (subitems only see their
+   * own data type attributes), so only a `TcEncoding` attribute on a STRING root skips.
    *
    * @param data The raw data to convert
    * @param dataType Target data type
@@ -3309,7 +3311,8 @@ export class Client extends EventEmitter<AdsClientEvents> {
   private decodeBufferToObject<T = any>(data: Buffer, dataType: AdsDataType, attributes?: AdsAttributeEntry[], targetOpts: Partial<AmsAddress> = {}): T {
     //Same condition that gates the built data type cache in buildDataType()
     const dataTypeIsCached = !this.settings.disableCaching && !targetOpts.adsPort && !targetOpts.amsNetId;
-    const attributesAffectDecoding = attributes?.some(attr => attr.name === 'TcEncoding');
+    const attributesAffectDecoding = dataType.adsDataType === ADS.ADS_DATA_TYPES.ADST_STRING
+      && attributes?.some(attr => attr.name === 'TcEncoding');
 
     if (this.settings.useCompiledDecoders && dataTypeIsCached && !attributesAffectDecoding) {
       let decoder = this.compiledDecoders.get(dataType);

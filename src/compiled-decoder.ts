@@ -17,6 +17,11 @@ export type CompiledDecoder = (data: Buffer) => any;
 
 /**
  * Settings that affect value decoding (subset of `AdsClientSettings`).
+ *
+ * NOTE: the settings object is captured by reference and the flags are read on every
+ * decode call - like `convertBufferToObject()` reads `this.settings` on every call.
+ * Changing `objectifyEnumerations` / `convertDatesToJavascript` on the fly (documented
+ * as OK on `Client.settings`) therefore affects already-compiled decoders too.
  */
 export interface CompiledDecoderSettings {
   /** If set, enumeration (ENUM) data types are converted to objects */
@@ -50,9 +55,14 @@ const NATIVE_READERS: Record<string, (data: Buffer, offset: number) => any> = {
   'UDINT': (data, offset) => data.readUInt32LE(offset),
   'REAL': (data, offset) => data.readFloatLE(offset),
   'LREAL': (data, offset) => data.readDoubleLE(offset),
-  'LWORD': (data, offset) => data.readBigUInt64LE(offset),
-  'LINT': (data, offset) => data.readBigInt64LE(offset),
 };
+
+//64-bit readers only where Buffer has BigInt support - elsewhere the base type's own
+//fromBuffer() fallback (returning the raw Buffer, like the interpreter) is used
+if (typeof Buffer.prototype.readBigInt64LE === 'function') {
+  NATIVE_READERS['LWORD'] = (data, offset) => data.readBigUInt64LE(offset);
+  NATIVE_READERS['LINT'] = (data, offset) => data.readBigInt64LE(offset);
+}
 
 /**
  * Signals that a data type contains a construct the compiler does not support.
@@ -63,9 +73,10 @@ class UnsupportedDataType extends Error { }
 /**
  * Compiles a decoder function for the given data type.
  *
- * The returned decoder produces output identical to `convertBufferToObject()`
- * (given the same `settings` and `attributes`) without re-walking the data type
- * metadata on every call.
+ * The returned decoder produces output identical to `convertBufferToObject()` without
+ * re-walking the data type metadata on every call. The `settings` object is captured
+ * by reference and its flags are read on every decode, so on-the-fly changes to
+ * `objectifyEnumerations` / `convertDatesToJavascript` are honored like the interpreter does.
  *
  * Returns `undefined` if the data type contains a construct the compiler does not
  * support - the caller should then fall back to `convertBufferToObject()`.
@@ -97,8 +108,9 @@ export const compileDataTypeDecoder = (dataType: AdsDataType, settings: Compiled
  * @param settings Decoding-related client settings
  * @param isArrayItem If `true`, this node is an array item (offsets relative to the element base)
  * @param attributes Symbol attributes (root node only, like in `convertBufferToObject()`)
+ * @param skipEnums If `true`, compile the non-enumeration variant of this node (used for the `objectifyEnumerations: false` alternative)
  */
-const compileNode = (dataType: AdsDataType, settings: CompiledDecoderSettings, isArrayItem: boolean, attributes?: AdsAttributeEntry[]): NodeDecoder => {
+const compileNode = (dataType: AdsDataType, settings: CompiledDecoderSettings, isArrayItem: boolean, attributes?: AdsAttributeEntry[], skipEnums: boolean = false): NodeDecoder => {
 
   if ((dataType.arrayInfos.length === 0 || isArrayItem) && dataType.subItems.length > 0) {
     //Struct or array item
@@ -148,11 +160,14 @@ const compileNode = (dataType: AdsDataType, settings: CompiledDecoderSettings, i
 
     return (data, base) => decodeDimension(data, base, 0, 0)[0];
 
-  } else if (dataType.enumInfos.length > 0 && settings.objectifyEnumerations) {
-    //Enumeration and objectifyEnumerations is enabled
+  } else if (dataType.enumInfos.length > 0 && !skipEnums) {
+    //Enumeration - objectifyEnumerations is read per call (it is documented as
+    //changeable on the fly), so both variants are compiled and selected at decode time.
     //Like convertBufferToObject(), known values resolve to the shared AdsEnumInfoEntry
     //object from the metadata (interned - safe, as these are never mutated)
+    const { offset } = dataType;
     const readValue = compilePrimitiveReader(dataType, settings);
+    const plain = compileNode(dataType, settings, isArrayItem, attributes, true);
     const entriesByValue = new Map<any, AdsEnumInfoEntry>();
 
     for (const entry of dataType.enumInfos) {
@@ -160,7 +175,10 @@ const compileNode = (dataType: AdsDataType, settings: CompiledDecoderSettings, i
     }
 
     return (data, base) => {
-      const value = readValue(data, base + dataType.offset);
+      if (!settings.objectifyEnumerations) {
+        return plain(data, base);
+      }
+      const value = readValue(data, base + offset);
       return entriesByValue.get(primitiveKey(value)) ?? { name: '', value } as AdsEnumInfoEntry;
     };
 
@@ -178,13 +196,13 @@ const compileNode = (dataType: AdsDataType, settings: CompiledDecoderSettings, i
     }
 
     const { offset, size } = dataType;
-    const convertDates = settings.convertDatesToJavascript;
     const fromBuffer = ADS.BASE_DATA_TYPES.find(type)?.fromBuffer;
 
     if (!fromBuffer) {
       throw new UnsupportedDataType(`Base type ${type} not found`);
     }
-    return (data, base) => fromBuffer(data.subarray(base + offset, base + offset + size) as never, convertDates);
+    //convertDatesToJavascript is read per call - it is documented as changeable on the fly
+    return (data, base) => fromBuffer(data.subarray(base + offset, base + offset + size) as never, settings.convertDatesToJavascript);
 
   } else if (dataType.flagsStr.includes('BitValues')) {
     //BIT (special case) - offset is in bits, relative to the parent scope
@@ -235,9 +253,9 @@ const compilePrimitiveReader = (dataType: AdsDataType, settings: CompiledDecoder
   }
 
   //No offset-native reader (e.g. DATE_AND_TIME) - fall back to the base type's
-  //own fromBuffer() on a subarray, resolved once here instead of per call
-  const convertDates = settings.convertDatesToJavascript;
-  return (data, offset) => type.fromBuffer(data.subarray(offset, offset + size) as never, convertDates);
+  //own fromBuffer() on a subarray, resolved once here instead of per call.
+  //convertDatesToJavascript is read per call - it is documented as changeable on the fly
+  return (data, offset) => type.fromBuffer(data.subarray(offset, offset + size) as never, settings.convertDatesToJavascript);
 };
 
 /**
