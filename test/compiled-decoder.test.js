@@ -231,6 +231,19 @@ describe('Client.decodeBufferToObject', () => {
     expect(client['decodeBufferToObject'](data, dataType)).toBe(42);
   });
 
+  test('skips the compiled path for targetOpts overrides (data type cache does not apply)', () => {
+    const client = makeClient({ useCompiledDecoders: true });
+    const dataType = mixedStructType();
+    const data = mixedStructBuffer();
+
+    //With targetOpts, buildDataType() returns a fresh AdsDataType per call, so caching
+    //a decoder (keyed by object identity) would silently recompile on every call
+    const result = client['decodeBufferToObject'](data, dataType, undefined, { amsNetId: '192.168.4.2.1.1' });
+
+    expect(result).toStrictEqual(client['convertBufferToObject'](data, dataType));
+    expect(client['compiledDecoders'].has(dataType)).toBe(false);
+  });
+
   test('is disabled by default', () => {
     const client = makeClient();
 

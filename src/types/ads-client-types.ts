@@ -455,7 +455,11 @@ export interface AdsClientSettings {
    * subscribing to large structs with fast cycle times.
    *
    * Data types with constructs not supported by the decoder compiler are automatically converted
-   * the regular way. Has no effect if `disableCaching` is set.
+   * the regular way.
+   *
+   * Compiled decoders piggyback on the built data type cache, so they only apply where that
+   * cache applies: this setting has no effect if `disableCaching` is set, and calls with
+   * `targetOpts` target overrides always use the regular conversion.
    */
   useCompiledDecoders?: boolean
 }
