@@ -338,10 +338,13 @@ export class Client extends EventEmitter<AdsClientEvents> {
 
   /**
    * Cached compiled decoders (see `settings.useCompiledDecoders`), keyed by the cached
-   * data type object. A `WeakMap` follows the data type cache lifecycle automatically:
-   * when the metadata cache is cleared (reconnect, symbol version change), new data type
-   * objects are built and stale decoders are garbage collected. `undefined` is cached
-   * for data types the decoder compiler does not support.
+   * data type object. A `WeakMap` follows the built data type cache lifecycle: when
+   * `metaData.builtDataTypes` is replaced with a fresh object - as on a symbol version
+   * change - the data types are built again and the decoders compiled for the previous
+   * ones are garbage collected. This holds only as long as clearing the cache replaces
+   * the container instead of reusing it, so that a decoder can never outlive the data
+   * type it was compiled for. `undefined` is cached for data types the decoder compiler
+   * does not support.
    */
   private compiledDecoders = new WeakMap<AdsDataType, CompiledDecoder | undefined>();
 
@@ -3290,7 +3293,7 @@ export class Client extends EventEmitter<AdsClientEvents> {
    *
    * The compiled decoder cache piggybacks on the built data type cache: it's a `WeakMap`
    * keyed by the cached `AdsDataType` object, so a decoder is compiled once per cached
-   * type and dropped when the metadata cache is cleared. This only works when
+   * type and dropped when that type is no longer cached. This only works when
    * `buildDataType()` actually returns cached (identical) objects, so the compiled path
    * is skipped whenever that caching does not apply:
    *
