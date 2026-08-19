@@ -32,6 +32,7 @@ import Debug from "debug";
 import Long from "long";
 import * as ADS from './ads-commons';
 import ClientError from "./client-error";
+import { compileDataTypeDecoder, type CompiledDecoder } from "./compiled-decoder";
 
 import type {
   ActiveAdsRequestContainer,
@@ -306,7 +307,8 @@ export class Client extends EventEmitter<AdsClientEvents> {
     rawClient: false,
     disableCaching: false,
     deleteUnknownSubscriptions: true,
-    forceUtf8ForAdsSymbols: false
+    forceUtf8ForAdsSymbols: false,
+    useCompiledDecoders: false
   } as Required<AdsClientSettings>;
 
   /**
@@ -329,10 +331,22 @@ export class Client extends EventEmitter<AdsClientEvents> {
 
   /**
    * Container for all active subscriptions.
-   * 
+   *
    * Do not edit this directly.
    */
   public activeSubscriptions: ActiveSubscriptionContainer = {};
+
+  /**
+   * Cached compiled decoders (see `settings.useCompiledDecoders`), keyed by the cached
+   * data type object. A `WeakMap` follows the built data type cache lifecycle: when
+   * `metaData.builtDataTypes` is replaced with a fresh object - as on a symbol version
+   * change - the data types are built again and the decoders compiled for the previous
+   * ones are garbage collected. This holds only as long as clearing the cache replaces
+   * the container instead of reusing it, so that a decoder can never outlive the data
+   * type it was compiled for. `undefined` is cached for data types the decoder compiler
+   * does not support.
+   */
+  private compiledDecoders = new WeakMap<AdsDataType, CompiledDecoder | undefined>();
 
   /**
    * Creates a new ADS client instance.
@@ -2174,7 +2188,7 @@ export class Client extends EventEmitter<AdsClientEvents> {
 
           if (this.symbol) {
             const dataType = await clientRef.getDataType(this.symbol.type, this.targetOpts);
-            result.value = clientRef.convertBufferToObject<T>(data, dataType, this.symbol.attributes);
+            result.value = clientRef.decodeBufferToObject<T>(data, dataType, this.symbol.attributes, this.targetOpts);
           }
 
           this.latestData = result;
@@ -3273,10 +3287,61 @@ export class Client extends EventEmitter<AdsClientEvents> {
   }
 
   /**
-   * Converts raw data to Javascript object.
-   * 
-   * This is usually called recursively.
-   * 
+   * Converts raw data to a Javascript object, using a cached compiled decoder if
+   * `settings.useCompiledDecoders` is set (see {@link compileDataTypeDecoder}),
+   * otherwise using {@link Client.convertBufferToObject}. The result is identical.
+   *
+   * The compiled decoder cache piggybacks on the built data type cache: it's a `WeakMap`
+   * keyed by the cached `AdsDataType` object, so a decoder is compiled once per cached
+   * type and dropped when that type is no longer cached. This only works when
+   * `buildDataType()` actually returns cached (identical) objects, so the compiled path
+   * is skipped whenever that caching does not apply:
+   *
+   * - `settings.disableCaching` is set (every call would compile from scratch - slower than interpreting)
+   * - `targetOpts` overrides the target (`buildDataType()` builds a fresh object per call - same reason)
+   *
+   * It is also skipped when symbol attributes are provided that would affect decoding -
+   * multiple symbols with different attributes can resolve to the same cached data type,
+   * and the cache is keyed by data type alone. Like in `convertBufferToObject()`, symbol
+   * attributes only influence string encoding of the root type (subitems only see their
+   * own data type attributes), so only a `TcEncoding` attribute on a STRING root skips.
+   *
+   * @param data The raw data to convert
+   * @param dataType Target data type
+   * @param attributes Additional attributes of the symbol or data type used for conversion
+   * @param targetOpts Optional target settings that were used when resolving `dataType`
+   */
+  private decodeBufferToObject<T = any>(data: Buffer, dataType: AdsDataType, attributes?: AdsAttributeEntry[], targetOpts: Partial<AmsAddress> = {}): T {
+    //Same condition that gates the built data type cache in buildDataType()
+    const dataTypeIsCached = !this.settings.disableCaching && !targetOpts.adsPort && !targetOpts.amsNetId;
+    const attributesAffectDecoding = dataType.adsDataType === ADS.ADS_DATA_TYPES.ADST_STRING
+      && attributes?.some(attr => attr.name === 'TcEncoding');
+
+    if (this.settings.useCompiledDecoders && dataTypeIsCached && !attributesAffectDecoding) {
+      let decoder = this.compiledDecoders.get(dataType);
+
+      if (decoder === undefined && !this.compiledDecoders.has(dataType)) {
+        decoder = compileDataTypeDecoder(dataType, this.settings, attributes);
+        this.compiledDecoders.set(dataType, decoder);
+
+        if (!decoder) {
+          this.debug(`decodeBufferToObject(): Data type ${dataType.type} has unsupported constructs - converting without compiled decoder`);
+        }
+      }
+
+      if (decoder) {
+        return decoder(data) as T;
+      }
+    }
+
+    return this.convertBufferToObject<T>(data, dataType, attributes);
+  }
+
+  /**
+   * Converts raw data to a Javascript object by interpreting the data type metadata.
+   *
+   * See also {@link Client.decodeBufferToObject} for the compiled variant.
+   *
    * @param data The raw data to convert
    * @param dataType Target data type
    * @param attributes Additional attributes of the symbol or data type used for conversion
@@ -6489,7 +6554,7 @@ export class Client extends EventEmitter<AdsClientEvents> {
     let value: T;
     try {
       this.debugD(`readValue(): Converting raw value to object for ${path}`);
-      value = await this.convertBufferToObject<T>(rawValue, dataType, symbol.attributes);
+      value = await this.decodeBufferToObject<T>(rawValue, dataType, symbol.attributes, targetOpts);
 
     } catch (err) {
       this.debug(`readValue(): Converting raw value to object for ${path} failed: %o`, err);
@@ -6809,7 +6874,7 @@ export class Client extends EventEmitter<AdsClientEvents> {
     let value: T;
     try {
       this.debugD(`convertFromRaw(): Converting raw value to object for ${dataType.type}`);
-      value = await this.convertBufferToObject<T>(data, dataType, attributes);
+      value = await this.decodeBufferToObject<T>(data, dataType, attributes, targetOpts);
 
     } catch (err) {
       this.debug(`convertFromRaw(): Converting raw value to object for ${dataType.type} failed: %o`, err);
