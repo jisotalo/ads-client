@@ -100,6 +100,7 @@ See [`legacy-v1` branch](https://github.com/jisotalo/ads-client/tree/legacy-v1) 
     - [A data type is not found even when it should be](#a-data-type-is-not-found-even-when-it-should-be)
     - [Connection failed - failed to set PLC connection](#connection-failed---failed-to-set-plc-connection)
     - [Connection failed (error EADDRNOTAVAIL)](#connection-failed-error-eaddrnotavail)
+    - [Connection to 127.0.0.1:48898 failed (read ECONNRESET) with TwinCAT 3.1.4026](#connection-to-12700148898-failed-read-econnreset-with-twincat-314026)
     - [Problems running ads-client with docker](#problems-running-ads-client-with-docker)
     - [How to connect to a PLC that is in CONFIG mode?](#how-to-connect-to-a-plc-that-is-in-config-mode)
     - [Issues with TwinCAT 2 low-end devices (BK9050, BC9050 etc.)](#issues-with-twincat-2-low-end-devices-bk9050-bc9050-etc)
@@ -204,6 +205,7 @@ This is the most common scenario. The client is running on a Windows PC that has
   - TwinCAT XAR (runtime)
   - [TwinCAT ADS](https://www.beckhoff.com/en-en/products/automation/twincat/tc1xxx-twincat-3-base/tc1000.html)
 - An ADS route is created between the client and the PLC using TwinCAT router
+- With TwinCAT 3.1.4026, the runtime is installed in kernel mode (see [Connection to 127.0.0.1:48898 failed (read ECONNRESET) with TwinCAT 3.1.4026](#connection-to-12700148898-failed-read-econnreset-with-twincat-314026))
 
 **Client settings:**
 
@@ -329,6 +331,8 @@ TwinCAT 4024.5 and newer already have this enabled as default.
 ![ads-client-tcp-loopback](https://user-images.githubusercontent.com/13457157/82748398-2640bf00-9daa-11ea-98e5-0032b3537969.png)
 
 Now you can connect to the localhost using `targetAmsNetId` address of `127.0.0.1.1.1` or `localhost`.
+
+**Note:** With TwinCAT 3.1.4026, this only applies when the runtime is installed in kernel mode. If the runtime is installed in user mode, the TCP loopback is not available at all and this registry setting has no effect - see [Connection to 127.0.0.1:48898 failed (read ECONNRESET) with TwinCAT 3.1.4026](#connection-to-12700148898-failed-read-econnreset-with-twincat-314026).
 
 ## Structured variables
 
@@ -1433,6 +1437,19 @@ This could happen if you have manually provided `localAddress` or `localTcpPort`
 For example, setting `localAddress` to `192.168.10.1` when the computer has only ethernet interface with IP `192.168.1.1`.
 
 See also https://github.com/jisotalo/ads-client/issues/82
+
+### Connection to 127.0.0.1:48898 failed (read ECONNRESET) with TwinCAT 3.1.4026
+
+With TwinCAT 3.1.4026, the TwinCAT Package Manager installs the runtime (XAR) either in kernel mode or in user mode. The mode is selected automatically based on the system (for example, user mode is selected if virtualization-based security is detected).
+
+If the runtime is installed in user mode, the system service is `TcSystemServiceUm.exe`. It only serves TCP port 48898 for remote connections that have a matching route - all other connections (including localhost) are closed immediately. The ads-client fails to register an ADS port and the connection fails with `read ECONNRESET`. The `EnableAmsTcpLoopback` registry setting does not help in this case.
+
+You can check the installed mode with `tcpkg config list` - see the `XarMode` row. Another symptom is that installed XAR packages have the `.UM` suffix (`tcpkg list --installed`) instead of `.KM`.
+
+Solutions:
+- Install the runtime in kernel mode: `tcpkg config set -n xarMode -v KM` and restart the system. Use value `KMWithUM` instead to also keep the usermode runtime instances available.
+  - Note: kernel mode requires that Hyper-V and Core Isolation (Memory Integrity) are disabled
+- Or connect through the target's router instead of the local one - see [Setup 3 - Connect from any Node.js system](#setup-3---connect-from-any-nodejs-system)
 
 ### Problems running ads-client with docker
 
