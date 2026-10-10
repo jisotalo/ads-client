@@ -442,7 +442,26 @@ export interface AdsClientSettings {
    * 
    * When connecting to a non-PLC system with UTF-8 encoded ADS symbols, this setting needs to be set.
    */
-  forceUtf8ForAdsSymbols?: boolean
+  forceUtf8ForAdsSymbols?: boolean,
+
+  /**
+   * **Optional**: If set, raw values are converted to Javascript objects using compiled decoders (default: `false`).
+   *
+   * When reading a value (or receiving a subscription notification), the raw data is converted using
+   * a decoder function that is compiled once for each data type and then cached, instead of
+   * interpreting the data type metadata again on every conversion.
+   *
+   * The result is identical, but conversion is typically several times faster - which matters when
+   * subscribing to large structs with fast cycle times.
+   *
+   * Data types with constructs not supported by the decoder compiler are automatically converted
+   * the regular way.
+   *
+   * Compiled decoders piggyback on the built data type cache, so they only apply where that
+   * cache applies: this setting has no effect if `disableCaching` is set, and calls with
+   * `targetOpts` target overrides always use the regular conversion.
+   */
+  useCompiledDecoders?: boolean
 }
 
 /**
